@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
+  <link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -208,6 +208,10 @@
   .typing-indicator{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);padding:4px 0 0;height:18px;}
   .modal-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:13px;outline:none;width:100%;}
   .modal-input:focus{border-color:var(--accent);}
+  /* Inbox badge */
+  .inbox-btn-wrap{position:relative;display:flex;align-items:center;justify-content:center;}
+  .inbox-badge{position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;border-radius:10px;min-width:16px;height:16px;font-size:9px;font-family:var(--font-display);font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--panel);pointer-events:none;display:none;}
+  .inbox-badge.visible{display:flex;}
   /* Profile modal */
   .profile-banner{height:80px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));margin-bottom:-28px;position:relative;}
   .profile-avatar-big{width:56px;height:56px;border-radius:14px;background:var(--bg3);border:3px solid var(--panel);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:22px;font-weight:900;position:relative;margin-left:16px;}
@@ -265,7 +269,10 @@
       <div class="sidebar-header">
         <div class="sidebar-logo">NEXUS</div>
         <button class="icon-btn" title="Users" onclick="N.openModal('users-modal')">👥</button>
-        <button class="icon-btn" title="Inbox" onclick="N.openModal('inbox-modal')"><span id="inbox-icon">📬</span></button>
+        <div class="inbox-btn-wrap">
+          <button class="icon-btn" title="Inbox" onclick="N.openModal('inbox-modal')"><span id="inbox-icon">📬</span></button>
+          <div class="inbox-badge" id="inbox-badge"></div>
+        </div>
         <button class="icon-btn" title="New Group" onclick="N.openModal('group-modal')">➕</button>
         <button class="icon-btn" title="Settings" onclick="N.openModal('settings-modal')">⚙️</button>
       </div>
@@ -505,6 +512,14 @@ const fmtD=d=>{const t=new Date();if(d.toDateString()===t.toDateString())return'
 const fmtB=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
 const fIcon=n=>{const e=(n||'').split('.').pop().toLowerCase();return({pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp4:'🎬',mov:'🎬',mp3:'🎵',wav:'🎵',zip:'📦',rar:'📦',js:'💻',ts:'💻',py:'💻',txt:'📃',md:'📃'})[e]||'📁';};
 
+// True online = flag is true AND lastSeen within last 90 seconds
+function isOnline(u){
+  if(!u||!u.online) return false;
+  if(!u.lastSeen) return u.online===true; // fallback for old docs
+  const lastSeen = u.lastSeen?.seconds ? u.lastSeen.seconds*1000 : (u.lastSeen?.toMillis ? u.lastSeen.toMillis() : 0);
+  return (Date.now() - lastSeen) < 90000; // 90 seconds
+}
+
 function toast(msg,type=''){
   const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;
   $('toast-container').appendChild(t);
@@ -593,13 +608,54 @@ async function doLogin(){
   }
 }
 
+// ── INBOX LIVE LISTENER ──────────────────────────
+let inboxUnsub = null;
+let inboxCount = 0;
+
+function listenForInboxChanges(){
+  if(inboxUnsub) inboxUnsub();
+  const q=query(collection(db,'invites'),where('toUid','==',cu.uid));
+  inboxUnsub=onSnapshot(q,snap=>{
+    inboxCount=snap.size;
+    updateInboxBadge();
+    // Also refresh inbox modal if open
+    if(document.getElementById('inbox-modal')?.classList.contains('open')) renderInbox();
+    // Toast for new invites
+    snap.docChanges().forEach(ch=>{
+      if(ch.type==='added'){
+        const inv=ch.doc.data();
+        const from=uCache[inv.fromUid]?.displayName||inv.fromName||'Someone';
+        const kind=inv.type==='dm'?'wants to DM you':`invited you to "${inv.groupName||'a group'}"`;
+        toast(`📬 ${from} ${kind}`,'');
+      }
+    });
+  });
+}
+
+function updateInboxBadge(){
+  const badge=$('inbox-badge');
+  const icon=$('inbox-icon');
+  if(!badge) return;
+  if(inboxCount>0){
+    badge.textContent=inboxCount>99?'99+':String(inboxCount);
+    badge.classList.add('visible');
+    if(icon) icon.textContent='📩';
+  } else {
+    badge.classList.remove('visible');
+    if(icon) icon.textContent='📬';
+  }
+}
+
 async function doLogout(){
   if(!cu)return;
-  try{await updateDoc(doc(db,'users',cu.uid),{online:false});}catch{}
+  try{await updateDoc(doc(db,'users',cu.uid),{online:false,lastSeen:serverTimestamp()});}catch{}
   Object.values(clsnrs).forEach(u=>u());
   if(acunsub)acunsub();
+  if(inboxUnsub){inboxUnsub();inboxUnsub=null;}
+  if(usersUnsub){usersUnsub();usersUnsub=null;}
   if(incomingCallUnsub){incomingCallUnsub();incomingCallUnsub=null;}
-  clsnrs={};acunsub=null;acid=null;aChats={};mCache={};
+  if(presenceInterval){clearInterval(presenceInterval);presenceInterval=null;}
+  clsnrs={};acunsub=null;acid=null;aChats={};mCache={};inboxCount=0;
   if(activeCallId)endCall();
   await signOut(auth);
 }
@@ -612,9 +668,48 @@ async function enterApp(){
   const snap=await getDocs(collection(db,'users'));
   snap.forEach(d=>{uCache[d.id]=d.data();});
   setupChatsListener();
+  setupPresence();
   listenForIncomingCalls();
+  listenForInboxChanges();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
+}
+
+// ── PRESENCE ─────────────────────────────────────
+// Uses Firestore to track real online status.
+// Sets online:true on login, online:false on tab close/logout.
+let presenceInterval = null;
+function setupPresence(){
+  // Mark online immediately
+  updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp()}).catch(()=>{});
+  // Heartbeat every 30s so we can detect stale presence
+  if(presenceInterval) clearInterval(presenceInterval);
+  presenceInterval = setInterval(()=>{
+    updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp()}).catch(()=>{});
+  }, 30000);
+  // Mark offline on page unload/close
+  const markOffline=()=>{
+    // Use sendBeacon for reliable delivery on page close
+    const url=`https://firestore.googleapis.com/v1/projects/${FB.projectId}/databases/(default)/documents/users/${cu.uid}`;
+    const body=JSON.stringify({fields:{online:{booleanValue:false},lastSeen:{timestampValue:new Date().toISOString()}}});
+    try{ navigator.sendBeacon(url,body); }catch{}
+    // Also try the normal way
+    updateDoc(doc(db,'users',cu.uid),{online:false,lastSeen:serverTimestamp()}).catch(()=>{});
+  };
+  window.addEventListener('beforeunload', markOffline);
+  window.addEventListener('pagehide', markOffline);
+  // Handle tab visibility — mark offline when tab is hidden for >2 min
+  let hiddenTimer=null;
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      hiddenTimer=setTimeout(()=>{
+        updateDoc(doc(db,'users',cu.uid),{online:false}).catch(()=>{});
+      }, 120000); // 2 minutes hidden = offline
+    } else {
+      if(hiddenTimer){clearTimeout(hiddenTimer);hiddenTimer=null;}
+      updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp()}).catch(()=>{});
+    }
+  });
 }
 
 function renderProfile(){
@@ -624,6 +719,7 @@ function renderProfile(){
   $('my-rank-el').textContent=rank.l;
 }
 
+let usersUnsub = null;
 function setupChatsListener(){
   if(acunsub)acunsub();
   const q=query(collection(db,'chats'),where('members','array-contains',cu.uid));
@@ -634,6 +730,25 @@ function setupChatsListener(){
     });
     renderSidebar();
   });
+  // Live listener for all users so online dots stay current
+  if(usersUnsub) usersUnsub();
+  usersUnsub=onSnapshot(collection(db,'users'),snap=>{
+    snap.docChanges().forEach(ch=>{
+      uCache[ch.doc.id]={...ch.doc.data()};
+    });
+    renderSidebar();
+    // Refresh open chat header online status
+    if(acid) refreshChatHeader();
+  });
+}
+
+function refreshChatHeader(){
+  const chat=aChats[acid];if(!chat) return;
+  const ig=chat.type==='group';
+  if(ig) return;
+  const ouid=chat.members?.find(m=>m!==cu.uid);
+  const ou=uCache[ouid]||{};
+  $('ch-sub').textContent=(isOnline(ou)?'🟢 Online':'⚫ Offline');
 }
 
 // ── SIDEBAR ────────────────────────────────────
@@ -645,7 +760,8 @@ function renderSidebar(){
   feed.innerHTML='';
   list.forEach(chat=>{
     const ig=chat.type==='group',ouid=ig?null:chat.members?.find(m=>m!==cu.uid),ou=ouid?uCache[ouid]:null;
-    const nm=ig?(chat.name||'Group'):(ou?.displayName||'Unknown'),rank=getRank(ig?0:(ou?.msgCount||0)),online=!ig&&ou?.online;
+    const nm=ig?(chat.name||'Group'):(ou?.displayName||'Unknown'),rank=getRank(ig?0:(ou?.msgCount||0));
+    const online=!ig&&isOnline(ou);
     const ts=chat.lastTs?new Date(chat.lastTs.seconds*1000):null;
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ig?'👥':nm[0].toUpperCase()}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c}">${esc(nm)}</div><div class="feed-preview">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div></div>`;
@@ -657,7 +773,12 @@ function oName(chat){const uid=chat.members?.find(m=>m!==cu.uid);return uCache[u
 
 // ── OPEN CHAT ──────────────────────────────────
 function openChat(cid){
-  acid=cid;const chat=aChats[cid];if(!chat)return;
+  acid=cid;const chat=aChats[cid];
+  if(!chat){
+    // Chat might not be in aChats yet (just created) — wait briefly
+    setTimeout(()=>{if(aChats[cid])openChat(cid);},800);
+    return;
+  }
   $('chat-empty').style.display='none';$('active-chat').style.display='flex';
   const ig=chat.type==='group',ouid=ig?null:chat.members?.find(m=>m!==cu.uid),ou=ouid?(uCache[ouid]||{}):{}; 
   const nm=ig?(chat.name||'Group'):(ou.displayName||'Unknown'),rank=getRank(ig?0:(ou.msgCount||0));
@@ -665,7 +786,7 @@ function openChat(cid){
   $('ch-avatar').className='feed-avatar'+(ig?' group':'');
   const chNameClick=!ig?`onclick="N.openProfileModal('${ouid}')" style="cursor:pointer;"`:"";  
   $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}" ${chNameClick}>${esc(nm)}</span>`;
-  $('ch-sub').textContent=(ig?`${chat.members?.length||0} members · `:'')+(ig?'':(ou.online?'🟢 Online':'⚫ Offline'));
+  $('ch-sub').textContent=(ig?`${chat.members?.length||0} members · `:'')+(ig?'':(isOnline(ou)?'🟢 Online':'⚫ Offline'));
   const leaveBtn=$('leave-group-btn');
   if(leaveBtn) leaveBtn.style.display=ig?'flex':'none';
   subMsgs(cid);renderSidebar();
@@ -674,13 +795,14 @@ function openChat(cid){
 
 // ── MESSAGES ───────────────────────────────────
 function subMsgs(cid){
-  if(clsnrs[cid]){renderMsgs(cid);return;}
+  if(clsnrs[cid]){renderMsgs(cid);setTimeout(()=>applyChatBgPreset(cid),30);return;}
   const q=query(collection(db,'chats',cid,'messages'),orderBy('ts','asc'));
   clsnrs[cid]=onSnapshot(q,snap=>{mCache[cid]=snap.docs.map(d=>({id:d.id,...d.data()}));if(acid===cid)renderMsgs(cid);});
 }
 
 function renderMsgs(cid){
   const msgs=mCache[cid]||[],area=$('messages-area'),wipe=$('wipe-confirm-slot');
+  if(!area||!wipe) return;
   Array.from(area.children).forEach(c=>{if(c!==wipe)c.remove();});
   if(!msgs.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:var(--text-dim);font-size:13px;font-family:var(--font-mono);padding:60px 40px;flex:1;';e.textContent='No messages yet. Say hello!';area.insertBefore(e,wipe);return;}
   let ld=null,ls=null,gEl=null;
@@ -718,6 +840,7 @@ const fmtMsg=t=>t?esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_b
 // ── SEND ───────────────────────────────────────
 async function sendMessage(){
   if(!acid||!cu)return;
+  if(!aChats[acid]){toast('Chat not ready yet.','danger');return;}
   const inp=$('msg-input'),text=inp.value.trim();
   if(pf){await sendFile(pf);return;}
   if(!text)return;
@@ -778,7 +901,18 @@ function toggleEmojiPicker(){
 
 // ── WIPE ───────────────────────────────────────
 function confirmWipe(){$('wipe-confirm-slot').innerHTML=`<div class="wipe-confirm"><span>⚠️ Wipe all messages in this chat?</span><div style="display:flex;gap:8px;"><button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.doWipe()">WIPE</button><button class="btn-small" onclick="N.cancelWipe()">CANCEL</button></div></div>`;}
-async function doWipe(){if(!acid)return;const s=await getDocs(collection(db,'chats',acid,'messages'));await Promise.all(s.docs.map(d=>deleteDoc(d.ref)));await updateDoc(doc(db,'chats',acid),{lastMessage:'',lastTs:serverTimestamp()});cancelWipe();toast('Chat wiped.','danger');}
+async function doWipe(){
+  if(!acid)return;
+  try{
+    const s=await getDocs(collection(db,'chats',acid,'messages'));
+    await Promise.all(s.docs.map(d=>deleteDoc(d.ref)));
+    await updateDoc(doc(db,'chats',acid),{lastMessage:'',lastTs:serverTimestamp()});
+    mCache[acid]=[];
+    renderMsgs(acid);
+    cancelWipe();
+    toast('Chat wiped.','danger');
+  }catch(e){toast('Wipe failed: '+e.message,'danger');}
+}
 const cancelWipe=()=>{$('wipe-confirm-slot').innerHTML='';};
 
 // ── MODALS ─────────────────────────────────────
@@ -798,7 +932,7 @@ async function renderUsers(){
   const list=$('users-list');list.innerHTML='';
   Object.entries(uCache).filter(([uid])=>uid!==cu.uid).sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;">${(u.displayName||'U')[0].toUpperCase()}${u.online?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c}">${esc(u.displayName||uid)}</div><div class="user-item-msgs">${u.msgCount||0} messages · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;">${(u.displayName||'U')[0].toUpperCase()}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c}">${esc(u.displayName||uid)}</div><div class="user-item-msgs">${u.msgCount||0} messages · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
     list.appendChild(el);
   });
 }
@@ -822,7 +956,7 @@ async function startDM(tuid){
 async function renderInbox(){
   const snap=await getDocs(query(collection(db,'invites'),where('toUid','==',cu.uid)));
   const invs=snap.docs.map(d=>({id:d.id,...d.data()}));
-  $('inbox-icon').textContent=invs.length?'📩':'📬';
+  // badge is managed by live listener; just render the list
   const list=$('inbox-list');list.innerHTML='';
   if(!invs.length){list.innerHTML='<p style="color:var(--text-dim);font-size:13px;font-family:var(--font-mono)">No pending invitations.</p>';return;}
   invs.forEach(inv=>{
@@ -835,16 +969,23 @@ async function renderInbox(){
 }
 
 async function acceptInvite(iid,cid,type){
-  if(type==='dm'){
-    // Create the DM chat now that it's accepted
-    const chatRef=await addDoc(collection(db,'chats'),{type:'dm',members:[cu.uid,(await getDoc(doc(db,'invites',iid))).data().fromUid],createdAt:serverTimestamp(),lastMessage:'',lastTs:serverTimestamp()});
-    await deleteDoc(doc(db,'invites',iid));
-    closeModal('inbox-modal');openChat(chatRef.id);toast('DM accepted!','success');
-  } else {
-    await updateDoc(doc(db,'chats',cid),{members:arrayUnion(cu.uid)});
-    await deleteDoc(doc(db,'invites',iid));
-    closeModal('inbox-modal');openChat(cid);toast('Joined the group!','success');
-  }
+  try{
+    if(type==='dm'){
+      const invSnap=await getDoc(doc(db,'invites',iid));
+      if(!invSnap.exists()){toast('Invite no longer valid.','danger');return;}
+      const inv=invSnap.data();
+      // Check a DM doesn't already exist
+      const ex=Object.values(aChats).find(c=>c.type==='dm'&&c.members?.includes(cu.uid)&&c.members?.includes(inv.fromUid));
+      if(ex){await deleteDoc(doc(db,'invites',iid));closeModal('inbox-modal');openChat(ex.id);return;}
+      const chatRef=await addDoc(collection(db,'chats'),{type:'dm',members:[cu.uid,inv.fromUid],createdAt:serverTimestamp(),lastMessage:'',lastTs:serverTimestamp()});
+      await deleteDoc(doc(db,'invites',iid));
+      closeModal('inbox-modal');openChat(chatRef.id);toast('DM accepted!','success');
+    } else {
+      await updateDoc(doc(db,'chats',cid),{members:arrayUnion(cu.uid)});
+      await deleteDoc(doc(db,'invites',iid));
+      closeModal('inbox-modal');openChat(cid);toast('Joined the group!','success');
+    }
+  }catch(e){toast('Error: '+e.message,'danger');}
 }
 async function declineInvite(iid){await deleteDoc(doc(db,'invites',iid));renderInbox();}
 
@@ -877,7 +1018,7 @@ async function createGroup(){
   if(!ginvitees.length){toast('Add at least one member.','danger');return;}
   const ref=await addDoc(collection(db,'chats'),{type:'group',name:nm,members:[cu.uid],createdAt:serverTimestamp(),lastMessage:'',lastTs:serverTimestamp()});
   for(const uid of ginvitees)await addDoc(collection(db,'invites'),{toUid:uid,fromUid:cu.uid,fromName:cud?.displayName||'User',groupName:nm,chatId:ref.id,ts:serverTimestamp()});
-  closeModal('group-modal');openChat(ref.id);toast(`Group "${nm}" created!`,'success');
+  $('group-name-input').value='';closeModal('group-modal');openChat(ref.id);toast(`Group "${nm}" created!`,'success');
 }
 
 function renderSettings(){
@@ -911,10 +1052,12 @@ function renderSettings(){
 
 async function saveBio(){
   const bio=($('bio-input')?.value||'').trim().substring(0,200);
-  await updateDoc(doc(db,'users',cu.uid),{bio});
-  cud={...cud,bio};
-  uCache[cu.uid]={...uCache[cu.uid],bio};
-  toast('Bio saved!','success');
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{bio});
+    cud={...cud,bio};
+    uCache[cu.uid]={...uCache[cu.uid],bio};
+    toast('Bio saved!','success');
+  }catch(e){toast('Save failed: '+e.message,'danger');}
 }
 
 // ── CALLS (WebRTC + Firestore signaling) ────────
@@ -1010,10 +1153,10 @@ function showIncomingCall(call){
 }
 
 async function startCall(mode){
-  if(!acid||!cu) return;
+  if(!acid||!cu){ toast('Open a chat first.','danger'); return; }
   const chat = aChats[acid];
-  if(!chat) return;
-  const otherMembers = chat.members.filter(m=>m!==cu.uid);
+  if(!chat){ toast('Chat not found.','danger'); return; }
+  const otherMembers = (chat.members||[]).filter(m=>m!==cu.uid);
   if(!otherMembers.length){ toast('No one else in this chat.','danger'); return; }
 
   // Get local media first
@@ -1355,6 +1498,7 @@ async function doLeaveGroup(){
     $('active-chat').style.display='none';
     $('chat-empty').style.display='flex';
     cancelWipe();
+    renderSidebar();
     toast('You left the group.','success');
   }catch(e){
     toast('Failed to leave: '+e.message,'danger');
