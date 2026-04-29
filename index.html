@@ -396,58 +396,6 @@
   .star-row{display:flex;justify-content:center;gap:6px;margin:16px 0;}
   .avg-stars{display:flex;align-items:center;gap:6px;justify-content:center;font-size:22px;margin:10px 0;}
 
-  /* ── RAINBOW AVATAR RING ── */
-  @keyframes aring-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
-
-  /* Wrapper: exact size, rounded, clips the gradient layer */
-  .aring{
-    display:inline-flex;align-items:center;justify-content:center;
-    border-radius:8px;
-    position:relative;
-    flex-shrink:0;
-    overflow:hidden;        /* clips the spinning gradient */
-    isolation:isolate;      /* new stacking context = no z-index leaks */
-  }
-  /* Spinning conic gradient fills the whole container */
-  .aring::before{
-    content:'';
-    position:absolute;
-    inset:0;
-    background:conic-gradient(
-      #ff0080 0deg,
-      #ff6600 60deg,
-      #ffe100 120deg,
-      #00ff88 180deg,
-      #00c8ff 240deg,
-      #9933ff 300deg,
-      #ff0080 360deg
-    );
-    animation:aring-spin 3s linear infinite;
-    pointer-events:none;    /* CRITICAL: never intercepts clicks */
-  }
-  /* Dark inset gap — creates the ring border effect */
-  .aring::after{
-    content:'';
-    position:absolute;
-    inset:3px;
-    background:var(--bg3,#0f0f1a);
-    border-radius:6px;
-    pointer-events:none;    /* CRITICAL: never intercepts clicks */
-  }
-  /* Avatar content sits above both layers */
-  .aring>*{
-    position:relative;
-    z-index:1;
-    width:100%;
-    height:100%;
-    border-radius:5px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  .aring>img{object-fit:cover;display:block;}
-  /* Sidebar footer ring wrapper (legacy compat) */
-  .avatar-ring-wrap{display:inline-flex;align-items:center;justify-content:center;}
   /* Changelog items */
   .cl-item{padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;}
   .cl-item:hover{border-color:rgba(68,102,255,0.3);}
@@ -854,25 +802,13 @@ function userEmoji(uid){
 
 // Returns HTML for an avatar — profile pic if set, else emoji
 function avatarHtml(uid, sizePx){
-  // sizePx: explicit pixel size like '28px' or '42px'
-  // Falls back to fitting the parent if omitted.
   const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
   const emoji=userEmoji(uid);
-  const hasRing=u.hasRated===true;
-
-  let inner;
   if(u.profilePic){
     const safeEmoji=emoji.replace(/'/g,"\'");
-    inner='<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\');">';
-  } else {
-    inner=emoji;
+    return '<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\');">';
   }
-
-  if(hasRing && sizePx){
-    const sz=sizePx;
-    return '<span class="aring" style="width:'+sz+';height:'+sz+';">'+inner+'</span>';
-  }
-  return inner;
+  return emoji;
 }
 
 
@@ -1070,11 +1006,7 @@ async function doLogout(){
 async function enterApp(){
   $('auth-screen').classList.remove('active');
   $('app-screen').classList.add('active');
-  // Check if user has previously rated
-  try{
-    const fbDoc=await getDoc(doc(db,'feedback',cu.uid));
-    if(fbDoc.exists()) cud={...cud,hasRated:true};
-  }catch{}
+
   renderProfile();
   const snap=await getDocs(collection(db,'users'));
   snap.forEach(d=>{uCache[d.id]=d.data();});
@@ -1084,7 +1016,6 @@ async function enterApp(){
   listenForInboxChanges();
   // Apply saved display mode
   applyMobileMode(mobileMode);
-  restoreRainbowRingIfRated();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
 }
@@ -1144,18 +1075,18 @@ function renderProfile(){
     const avH=avatarHtml(cu?.uid||'','36px');
     if(avH.startsWith('<')){
       avel.innerHTML=avH;
-      avel.style.cssText='width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;border:none;flex-shrink:0;';
+      avel.style.overflow='hidden';avel.style.padding='0';avel.style.fontSize='';
+      avel.style.background='transparent';avel.style.border='1px solid var(--border)';
     } else {
       avel.textContent=avH;
-      avel.style.cssText='width:36px;height:36px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;';
+      avel.style.overflow='';avel.style.padding='';avel.style.fontSize='20px';
+      avel.style.background='var(--bg3)';avel.style.border='1px solid var(--border)';
     }
   }
   const nameEl=$('my-name-el');
   if(nameEl) nameEl.innerHTML=`<span class="${rank.c} ${rank.fc||''}">${esc(nm)}</span>`;
   const rankEl=$('my-rank-el');
   if(rankEl) rankEl.textContent=rank.l;
-  // Re-apply rainbow ring if user has rated
-  if(cud?.hasRated) setTimeout(applyRainbowRing,0);
 }
 
 let usersUnsub = null;
@@ -3236,10 +3167,6 @@ async function submitFeedback(){
       displayName:cud?.displayName||'User',
       ts:serverTimestamp()
     });
-    cud={...cud,hasRated:true};
-    uCache[cu.uid]={...uCache[cu.uid],hasRated:true};
-    // Give rainbow ring
-    applyRainbowRing();
     renderFeedbackDone(selectedRating, false);
     toast('Thanks for your feedback! 🌈','success');
   }catch(e){toast('Failed to submit: '+e.message,'danger');}
@@ -3270,23 +3197,13 @@ async function renderFeedbackDone(myRating, alreadyRated){
         <div style="font-size:22px;font-weight:700;color:var(--accent);font-family:var(--font-display);">${avg.toFixed(1)} / 5</div>
         <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">${count} rating${count!==1?'s':''}</div>
       </div>
-      ${!alreadyRated?'<div style="margin-top:14px;font-size:11px;color:var(--accent2);font-family:var(--font-mono);">🌈 Rainbow ring applied to your avatar!</div>':''}
     </div>`;
 }
 
 // ── RAINBOW RING ───────────────────────────────────
-function applyRainbowRing(){
-  cud={...cud,hasRated:true};
-  if(cu?.uid) uCache[cu.uid]={...uCache[cu.uid],hasRated:true};
-  // Re-render everything — avatarHtml will now return .aring spans everywhere
-  renderProfile();
-  if(acid) renderMsgs(acid);
-  renderSidebar();
-}
 
-function restoreRainbowRingIfRated(){
-  if(cud?.hasRated||uCache[cu?.uid]?.hasRated) applyRainbowRing();
-}
+
+
 
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
