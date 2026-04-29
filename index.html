@@ -260,6 +260,46 @@
   .typing-indicator{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);padding:4px 0 0;height:18px;}
   .modal-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:13px;outline:none;width:100%;}
   .modal-input:focus{border-color:var(--accent);}
+
+  /* ══ MOBILE MODE ══ */
+  [data-mobile="1"] .app-layout{position:relative;}
+  /* Sidebar slides in as overlay */
+  [data-mobile="1"] .sidebar{
+    position:absolute;left:0;top:0;bottom:0;z-index:50;
+    transform:translateX(-100%);
+    transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    box-shadow:4px 0 24px rgba(0,0,0,0.6);
+    width:88vw;max-width:320px;min-width:0;
+  }
+  [data-mobile="1"] .sidebar.open{transform:translateX(0);}
+  /* Backdrop when sidebar open */
+  [data-mobile="1"] #sidebar-backdrop{
+    display:none;position:absolute;inset:0;z-index:49;
+    background:rgba(0,0,0,0.55);
+  }
+  [data-mobile="1"] .sidebar.open ~ #sidebar-backdrop{display:block;}
+  /* Chat area takes full width */
+  [data-mobile="1"] .chat-area{width:100%;}
+  /* Bigger tap targets */
+  [data-mobile="1"] .icon-btn{width:38px;height:38px;font-size:16px;}
+  [data-mobile="1"] .send-btn{width:48px;height:48px;}
+  [data-mobile="1"] .feed-item{padding:13px 14px;}
+  [data-mobile="1"] .feed-avatar{width:46px;height:46px;}
+  [data-mobile="1"] .msg-input{font-size:16px;} /* prevent iOS zoom */
+  [data-mobile="1"] .messages-area{padding:16px;}
+  [data-mobile="1"] .input-bar{padding:10px 12px;}
+  /* Mobile hamburger toggle button */
+  #mobile-menu-btn{display:none;position:fixed;top:14px;left:14px;z-index:60;
+    width:36px;height:36px;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;font-size:16px;cursor:pointer;align-items:center;justify-content:center;
+    box-shadow:0 2px 12px rgba(0,0,0,0.4);}
+  [data-mobile="1"] #mobile-menu-btn{display:flex;}
+  [data-mobile="1"] .chat-header{padding-left:56px;} /* room for hamburger */
+  /* Modals full-width on mobile */
+  [data-mobile="1"] .modal{width:96vw;max-width:96vw;max-height:90vh;}
+  [data-mobile="1"] .auth-box{padding:28px 20px;}
+  [data-mobile="1"] .modal-overlay{align-items:flex-end;}
+  [data-mobile="1"] .modal{border-radius:20px 20px 0 0;}
   /* Inbox badge */
   .inbox-btn-wrap{position:relative;display:flex;align-items:center;justify-content:center;}
   .inbox-badge{position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;border-radius:10px;min-width:16px;height:16px;font-size:9px;font-family:var(--font-display);font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--panel);pointer-events:none;display:none;}
@@ -323,8 +363,10 @@
 
 <!-- APP -->
 <div class="screen" id="app-screen">
-  <div class="app-layout">
-    <div class="sidebar">
+  <div class="app-layout" id="app-layout">
+    <button id="mobile-menu-btn" onclick="N.toggleSidebar()" title="Menu">☰</button>
+    <div id="sidebar-backdrop" onclick="N.closeSidebar()"></div>
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-logo">NEXUS</div>
         <button class="icon-btn" title="Users" onclick="N.openModal('users-modal')">👥</button>
@@ -438,6 +480,21 @@
     <div class="settings-section">
       <div class="settings-label">YOUR PROGRESS</div>
       <div id="rank-progress-display"></div>
+    </div>
+    <div class="settings-section" id="settings-display-section">
+      <div class="settings-label">DISPLAY MODE</div>
+      <div style="display:flex;gap:10px;">
+        <div id="mode-desktop" class="theme-card" style="flex:1;padding:14px 10px;text-align:center;cursor:pointer;" onclick="N.setMobileMode(false)">
+          <div style="font-size:24px;margin-bottom:6px;">🖥️</div>
+          <div class="theme-name">DESKTOP</div>
+          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">Sidebar always visible</div>
+        </div>
+        <div id="mode-mobile" class="theme-card" style="flex:1;padding:14px 10px;text-align:center;cursor:pointer;" onclick="N.setMobileMode(true)">
+          <div style="font-size:24px;margin-bottom:6px;">📱</div>
+          <div class="theme-name">MOBILE</div>
+          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">Sidebar slides in</div>
+        </div>
+      </div>
     </div>
     <div class="settings-section">
       <div class="settings-label">ACCOUNT</div>
@@ -784,6 +841,8 @@ async function enterApp(){
   setupPresence();
   listenForIncomingCalls();
   listenForInboxChanges();
+  // Apply saved display mode
+  applyMobileMode(mobileMode);
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
 }
@@ -914,6 +973,8 @@ function openChat(cid){
   if(leaveBtn) leaveBtn.style.display=ig?'flex':'none';
   subMsgs(cid);renderSidebar();
   setTimeout(()=>applyChatBgPreset(cid),50);
+  // Auto-close sidebar on mobile after selecting a chat
+  if(mobileMode) closeSidebar();
 }
 
 // ── MESSAGES ───────────────────────────────────
@@ -1148,6 +1209,12 @@ function renderSettings(){
   const mc=cud?.msgCount||0, rank=getRank(mc);
   const myEmoji=userEmoji(cu?.uid||'');
   const nm=cud?.displayName||'User';
+
+  // ── DISPLAY MODE BUTTONS ──
+  const deskCard=document.getElementById('mode-desktop');
+  const mobCard=document.getElementById('mode-mobile');
+  if(deskCard) deskCard.classList.toggle('selected', !mobileMode);
+  if(mobCard) mobCard.classList.toggle('selected', mobileMode);
 
   // ── THEME GRID ──
   const grid=$('theme-grid');grid.innerHTML='';
@@ -1884,18 +1951,24 @@ function openProfileModal(uid){
     lava:'linear-gradient(135deg,#200122,#6f0000)',
     neon:'linear-gradient(135deg,#00ff87,#60efff)',
   };
-  let bannerStyle='';
+  // Resolve banner — use <img> for URLs/data so GIFs work and CORS isn't an issue
   const bType=u.banner||'default';
+  let bannerBg='';
+  let bannerImgSrc='';
   if(bType==='data'&&u.bannerData){
-    bannerStyle=`background:url("${u.bannerData.replace(/"/g,'&quot;')}") center/cover no-repeat`;
+    bannerImgSrc=u.bannerData;
   } else if(bType==='url'&&u.bannerUrl){
-    bannerStyle=`background:url("${esc(u.bannerUrl)}") center/cover no-repeat`;
+    bannerImgSrc=u.bannerUrl;
   } else {
-    bannerStyle=`background:${BANNER_STYLES[bType]||BANNER_STYLES.default}`;
+    bannerBg=BANNER_STYLES[bType]||BANNER_STYLES.default;
   }
+  const bannerInner=bannerImgSrc
+    ?`<img src="${esc(bannerImgSrc)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px 10px 0 0;" alt="" onerror="this.style.display='none'">`
+    :'';
+  const bannerStyle=bannerBg?`background:${bannerBg}`:'background:#111';
   const container=$('profile-modal-content');
   container.innerHTML=`
-    <div class="profile-banner" style="${bannerStyle};"></div>
+    <div class="profile-banner" style="${bannerStyle};position:relative;">${bannerInner}</div>
     <div class="profile-header-row">
       <div class="profile-avatar-big">${emoji}</div>
       <div style="flex:1;min-width:0;padding-bottom:4px;">
@@ -2037,6 +2110,40 @@ function clearChatBg(){
   closeModal('bg-modal');
 }
 
+// ── MOBILE MODE ──────────────────────────────────
+let mobileMode = localStorage.getItem('nexus_mobile')==='1';
+
+function applyMobileMode(on){
+  mobileMode=on;
+  localStorage.setItem('nexus_mobile', on?'1':'0');
+  document.getElementById('app-layout')?.setAttribute('data-mobile', on?'1':'0');
+  if(!on){
+    document.getElementById('sidebar')?.classList.remove('open');
+  }
+}
+
+function setMobileMode(on){
+  applyMobileMode(on);
+  // Refresh the selected state in settings if open
+  const deskCard=document.getElementById('mode-desktop');
+  const mobCard=document.getElementById('mode-mobile');
+  if(deskCard) deskCard.classList.toggle('selected', !on);
+  if(mobCard) mobCard.classList.toggle('selected', on);
+  toast(on?'Mobile mode ON — tap ☰ to open sidebar':'Desktop mode ON','success');
+}
+
+function toggleSidebar(){
+  const s=document.getElementById('sidebar');
+  if(s) s.classList.toggle('open');
+}
+
+function closeSidebar(){
+  document.getElementById('sidebar')?.classList.remove('open');
+}
+
+// Auto-close sidebar when a chat is opened on mobile
+const _origOpenChat_mobile = window._N?.openChat;
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -2058,6 +2165,7 @@ window._N = {
   applyBgUrl, applyBgFile, clearChatBg,
   saveEmoji,
   saveBanner, saveBannerUrl, saveBannerFile,
+  toggleSidebar, closeSidebar, setMobileMode,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
