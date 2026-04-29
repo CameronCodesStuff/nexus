@@ -397,38 +397,49 @@
   .avg-stars{display:flex;align-items:center;gap:6px;justify-content:center;font-size:22px;margin:10px 0;}
 
   /* ── RAINBOW AVATAR RING ── */
-  @keyframes ring-spin{to{transform:rotate(360deg);}}
-  /* Sidebar footer ring (DOM-wrapped) */
-  .avatar-ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
-  .avatar-ring-wrap::before{
-    content:'';position:absolute;inset:-4px;border-radius:10px;
-    background:conic-gradient(#ff0080 0%,#ff6600 15%,#ffe100 30%,#00ff88 45%,#00c8ff 60%,#9933ff 75%,#ff0080 100%);
-    animation:ring-spin 1.5s linear infinite;
-    z-index:-1;border-radius:inherit;
-    filter:brightness(1.3) saturate(1.4);
+  @keyframes aring-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+  /* The ring span — explicit size set via inline style */
+  .aring{
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:8px;
+    position:relative;
+    flex-shrink:0;
+    overflow:hidden;
   }
-  .avatar-ring-wrap::after{
-    content:'';position:absolute;inset:-1px;
-    background:var(--panel,#080810);
-    z-index:-1;border-radius:inherit;
+  /* Spinning gradient layer behind everything */
+  .aring::before{
+    content:'';
+    position:absolute;
+    /* Make it bigger than the container so rotation doesn't show corners */
+    width:160%;height:160%;
+    top:-30%;left:-30%;
+    background:conic-gradient(
+      #ff0080 0deg,
+      #ff6600 60deg,
+      #ffe100 120deg,
+      #00ff88 180deg,
+      #00c8ff 240deg,
+      #9933ff 300deg,
+      #ff0080 360deg
+    );
+    animation:aring-spin 3s linear infinite;
+    z-index:0;
   }
-  /* Inline ring for messages, user list, anywhere avatarHtml() is used */
-  .avatar-ring-inline::before{
-    content:'';position:absolute;inset:-4px;
-    background:conic-gradient(#ff0080 0%,#ff6600 15%,#ffe100 30%,#00ff88 45%,#00c8ff 60%,#9933ff 75%,#ff0080 100%);
-    animation:ring-spin 1.5s linear infinite;
-    z-index:0;border-radius:inherit;
-    filter:brightness(1.3) saturate(1.4);
-  }
-  /* Thin dark separator so ring pops against any background */
-  .avatar-ring-inline::after{
-    content:'';position:absolute;inset:-1px;
+  /* Dark inset so the ring is only visible at the edges */
+  .aring::after{
+    content:'';
+    position:absolute;
+    inset:2px;
     background:var(--bg3,#0f0f1a);
-    z-index:0;border-radius:inherit;
+    border-radius:6px;
+    z-index:1;
   }
-  /* Inner content sits above both rings */
-  .avatar-ring-inline>*{position:relative;z-index:1;border-radius:inherit;width:100%;height:100%;display:block;}
-  .avatar-ring-inline{overflow:visible;}
+  /* Content sits on top */
+  .aring>*{position:relative;z-index:2;width:100%;height:100%;border-radius:6px;}
+  .aring>img{object-fit:cover;display:block;}
+  /* Sidebar footer ring wrapper */
+  .avatar-ring-wrap{display:inline-flex;align-items:center;justify-content:center;}
   /* Changelog items */
   .cl-item{padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;}
   .cl-item:hover{border-color:rgba(68,102,255,0.3);}
@@ -834,8 +845,9 @@ function userEmoji(uid){
 }
 
 // Returns HTML for an avatar — profile pic if set, else emoji
-function avatarHtml(uid, size='100%'){
-  // For own user always use cud (most up-to-date), else uCache
+function avatarHtml(uid, sizePx){
+  // sizePx: explicit pixel size like '28px' or '42px'
+  // Falls back to fitting the parent if omitted.
   const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
   const emoji=userEmoji(uid);
   const hasRing=u.hasRated===true;
@@ -843,14 +855,14 @@ function avatarHtml(uid, size='100%'){
   let inner;
   if(u.profilePic){
     const safeEmoji=emoji.replace(/'/g,"\'");
-    inner='<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\');">';
+    inner='<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\');">';
   } else {
     inner=emoji;
   }
 
-  if(hasRing){
-    // Wrap in a rainbow ring span that works inline in any container
-    return '<span class="avatar-ring-inline" style="display:inline-flex;align-items:center;justify-content:center;width:'+size+';height:'+size+';border-radius:inherit;position:relative;">'+inner+'</span>';
+  if(hasRing && sizePx){
+    const sz=sizePx;
+    return '<span class="aring" style="width:'+sz+';height:'+sz+';">'+inner+'</span>';
   }
   return inner;
 }
@@ -1121,17 +1133,14 @@ function renderProfile(){
   // Update sidebar footer avatar
   const avel=$('my-avatar-el');
   if(avel){
-    const avH=avatarHtml(cu?.uid||'');
-    const avIsHtml=avH.startsWith('<');
-    if(avIsHtml){
+    const avH=avatarHtml(cu?.uid||'','36px');
+    if(avH.startsWith('<')){
       avel.innerHTML=avH;
-      avel.style.overflow='hidden';avel.style.padding='0';avel.style.fontSize='';
+      avel.style.cssText='width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:visible;background:transparent;border:none;flex-shrink:0;';
     } else {
       avel.textContent=avH;
-      avel.style.overflow='';avel.style.padding='';avel.style.fontSize='20px';
+      avel.style.cssText='width:36px;height:36px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;';
     }
-    avel.style.background='var(--bg3)';
-    avel.style.border='1px solid var(--border)';
   }
   const nameEl=$('my-name-el');
   if(nameEl) nameEl.innerHTML=`<span class="${rank.c} ${rank.fc||''}">${esc(nm)}</span>`;
@@ -1193,7 +1202,7 @@ function renderSidebar(){
     const online=!ig&&isOnline(ou);
     const ts=chat.lastTs?new Date(chat.lastTs.seconds*1000):null;
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
-    const ava=ig?'👥':avatarHtml(ouid||'');
+    const ava=ig?'👥':avatarHtml(ouid||'','42px');
     el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}">${esc(nm)}</div><div class="feed-preview">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div></div>`;
     feed.appendChild(el);
   });
@@ -1217,7 +1226,7 @@ function openChat(cid){
     chAvEl.textContent='👥';
     chAvEl.style.overflow='';chAvEl.style.padding='';chAvEl.style.fontSize='';
   } else {
-    const avH=avatarHtml(ouid||'');
+    const avH=avatarHtml(ouid||'','42px');
     const avIsHtml=avH.startsWith('<');
     if(avIsHtml){
       chAvEl.innerHTML=avH;
@@ -1260,7 +1269,7 @@ function renderMsgs(cid){
     if(msg.senderUid!==ls){
       gEl=document.createElement('div');gEl.className='msg-group'+(own?' own':'');
       const sn=uCache[msg.senderUid]?.displayName||msg.senderName||'User',rank=getRank(uCache[msg.senderUid]?.msgCount||0);
-      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:visible;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid)}</div><div class="msg-sender"><span class="${rank.c} ${rank.fc||''}" style="cursor:pointer;" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
+      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;display:flex;align-items:center;justify-content:center;overflow:visible;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid,'28px')}</div><div class="msg-sender"><span class="${rank.c} ${rank.fc||''}" style="cursor:pointer;" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
       gEl.appendChild(hd);area.insertBefore(gEl,wipe);ls=msg.senderUid;
     }
     const wr=document.createElement('div');wr.className='msg-bubble-wrap';
@@ -1417,7 +1426,7 @@ function buildUsersList(){
   entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:visible;padding:0;">${avatarHtml(uid)}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span></div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:visible;padding:0;">${avatarHtml(uid,'42px')}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span></div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
     list.appendChild(el);
   });
 }
@@ -1486,7 +1495,7 @@ async function renderGroupUsers(){
   Object.entries(uCache).filter(([uid])=>uid!==cu.uid).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),sid='gu_'+uid.replace(/[^a-zA-Z0-9]/g,'_'),el=document.createElement('div');
     el.className='user-item';el.id=sid;
-    el.innerHTML=`<div class="feed-avatar" style="overflow:visible;padding:0;">${avatarHtml(uid)}</div><div class="user-item-info"><div class="user-item-name ${rank.c}">${esc(u.displayName||uid)}</div></div><button class="btn-small" onclick="N.toggleInvitee('${uid}')">ADD</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="overflow:visible;padding:0;">${avatarHtml(uid,'42px')}</div><div class="user-item-info"><div class="user-item-name ${rank.c}">${esc(u.displayName||uid)}</div></div><button class="btn-small" onclick="N.toggleInvitee('${uid}')">ADD</button>`;
     list.appendChild(el);
   });
 }
@@ -3259,20 +3268,10 @@ async function renderFeedbackDone(myRating, alreadyRated){
 
 // ── RAINBOW RING ───────────────────────────────────
 function applyRainbowRing(){
-  // Mark as rated so avatarHtml generates ring everywhere
   cud={...cud,hasRated:true};
   if(cu?.uid) uCache[cu.uid]={...uCache[cu.uid],hasRated:true};
-
-  // Also wrap the sidebar footer avatar specifically
-  const avel=$('my-avatar-el');
-  if(avel&&!avel.parentElement?.classList.contains('avatar-ring-wrap')){
-    const wrap=document.createElement('div');
-    wrap.className='avatar-ring-wrap';
-    wrap.style.cssText='width:36px;height:36px;border-radius:8px;flex-shrink:0;';
-    avel.parentNode.insertBefore(wrap,avel);
-    wrap.appendChild(avel);
-  }
-  // Re-render messages and sidebar so inline rings appear
+  // Re-render everything — avatarHtml will now return .aring spans everywhere
+  renderProfile();
   if(acid) renderMsgs(acid);
   renderSidebar();
 }
