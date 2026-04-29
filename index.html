@@ -379,6 +379,17 @@
   /* Floating particles in credits hero */
   .credits-particle{position:absolute;width:3px;height:3px;border-radius:50%;background:var(--accent);pointer-events:none;}
 
+  /* Owner portal */
+  .ticket-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;}
+  .ticket-item:hover{border-color:rgba(255,51,85,0.3);}
+  .ticket-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .ticket-from{font-weight:600;font-size:13px;}
+  .ticket-time{font-size:10px;color:var(--text-dim);font-family:var(--font-mono);}
+  .ticket-msg{font-size:12px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.6;word-break:break-word;}
+  .admin-action{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;}
+  .admin-action-info{font-size:13px;}
+  .admin-action-desc{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:3px;}
+
 </style>
 </head>
 <body>
@@ -425,8 +436,17 @@
         </div>
         <button class="icon-btn" title="New Group" onclick="N.openModal('group-modal')">➕</button>
         <button class="icon-btn" title="Settings" onclick="N.openModal('settings-modal')">⚙️</button>
-        <button class="icon-btn" title="Credits" onclick="N.openModal('credits-modal')">✦</button>
-        <button class="icon-btn" title="Help" onclick="N.openModal('help-modal')">❓</button>
+        <div style="position:relative;">
+          <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
+          <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:160px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+            <button onclick="N.openModal('credits-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">✦ Credits</button>
+            <button onclick="N.openModal('help-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">❓ Help</button>
+            <div id="owner-portal-btn-wrap" style="display:none;">
+              <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+              <button onclick="N.openModal('owner-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--danger);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(255,51,85,0.1)'" onmouseout="this.style.background='none'">👑 Owner Portal</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="sidebar-search">
         <input type="text" placeholder="🔍  Search conversations…" oninput="N.filterFeed(this.value)">
@@ -504,8 +524,9 @@
 <!-- MODALS -->
 <div class="modal-overlay" id="users-modal">
   <div class="modal">
-    <div class="modal-title">ONLINE USERS</div>
+    <div class="modal-title">FIND USERS</div>
     <button class="modal-close" onclick="N.closeModal('users-modal')">✕</button>
+    <input class="modal-input" id="user-search-input" placeholder="Search by username…" oninput="N.filterUsers(this.value)" style="margin-bottom:12px;">
     <div class="users-list" id="users-list"></div>
   </div>
 </div>
@@ -562,6 +583,23 @@
   </div>
 </div>
 
+
+<!-- OWNER PORTAL MODAL -->
+<div class="modal-overlay" id="owner-modal">
+  <div class="modal" style="width:520px;">
+    <div class="modal-title" style="color:var(--danger);">👑 OWNER PORTAL</div>
+    <button class="modal-close" onclick="N.closeModal('owner-modal')">✕</button>
+    <!-- Tabs -->
+    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border);">
+      <div class="auth-tab active" id="op-tab-tickets" onclick="N.ownerTab('tickets')" style="font-size:10px;">HELP TICKETS</div>
+      <div class="auth-tab" id="op-tab-users" onclick="N.ownerTab('users')" style="font-size:10px;">USERS</div>
+      <div class="auth-tab" id="op-tab-admin" onclick="N.ownerTab('admin')" style="font-size:10px;">ADMIN</div>
+    </div>
+    <div id="op-panel-tickets"></div>
+    <div id="op-panel-users" style="display:none;"></div>
+    <div id="op-panel-admin" style="display:none;"></div>
+  </div>
+</div>
 
 <!-- CREDITS MODAL -->
 <div class="modal-overlay" id="credits-modal">
@@ -1212,24 +1250,54 @@ const cancelWipe=()=>{$('wipe-confirm-slot').innerHTML='';};
 // ── MODALS ─────────────────────────────────────
 function openModal(id){
   $(id).classList.add('open');
-  if(id==='users-modal')renderUsers();
+  if(id==='users-modal'){
+    const si=$('user-search-input');if(si)si.value='';
+    renderUsers();
+  }
   if(id==='inbox-modal')renderInbox();
   if(id==='group-modal')renderGroupUsers();
   if(id==='settings-modal')renderSettings();
   if(id==='bg-modal')openModal_bg();
   if(id==='credits-modal')openCreditsModal();
+  if(id==='owner-modal')ownerTab('tickets');
 }
 const closeModal=id=>{$(id).classList.remove('open');};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
 
-async function renderUsers(){
+let usersFilterQuery='';
+async function renderUsers(query=''){
+  usersFilterQuery=query.toLowerCase().trim();
   const snap=await getDocs(collection(db,'users'));snap.forEach(d=>{uCache[d.id]=d.data();});
-  const list=$('users-list');list.innerHTML='';
-  Object.entries(uCache).filter(([uid])=>uid!==cu.uid).sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
+  buildUsersList();
+}
+
+function buildUsersList(){
+  const list=$('users-list');if(!list)return;
+  list.innerHTML='';
+  const q=usersFilterQuery;
+  let entries=Object.entries(uCache).filter(([uid])=>uid!==cu.uid);
+  if(q){
+    entries=entries.filter(([uid,u])=>{
+      const nm=(u.displayName||'').toLowerCase();
+      const un=(u.username||'').toLowerCase();
+      return nm.includes(q)||un.includes(q);
+    });
+  }
+  if(!entries.length){
+    list.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);text-align:center;padding:20px;">No users found.</div>';
+    return;
+  }
+  entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;">${userEmoji(uid)}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)}</div><div class="user-item-msgs">${u.msgCount||0} messages · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    const device=u.device==='mobile'?'📱':'💻';
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;">${userEmoji(uid)}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span></div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
     list.appendChild(el);
   });
+}
+
+function filterUsers(val){
+  usersFilterQuery=val.toLowerCase().trim();
+  buildUsersList();
 }
 
 async function startDM(tuid){
@@ -1454,24 +1522,26 @@ function renderSettings(){
     }
   }
   if(bioSection){
-    const curPic=esc(cud?.profilePic||'');
+    const rawPic=cud?.profilePic||'';
+    const curPic=esc(rawPic);
+    const bioVal=esc(cud?.bio||'');
     bioSection.innerHTML='<div class="settings-label">YOUR BIO</div>'
-      +'<textarea class="bio-textarea" id="bio-input" maxlength="200" placeholder="Tell people about yourself\u2026">'+esc(cud?.bio||'')+'</textarea>'
+      +'<textarea class="bio-textarea" id="bio-input" maxlength="200" placeholder="Tell people about yourself…">'+bioVal+'</textarea>'
       +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
       +'<span style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">Max 200 chars</span>'
       +'<button class="btn-small primary" onclick="N.saveBio()">SAVE BIO</button>'
       +'</div>'
       +'<div class="settings-label" style="margin-top:16px;">PROFILE PICTURE</div>'
-      +(curPic?'<img src="'+curPic+'" style="width:80px;height:80px;border-radius:12px;object-fit:cover;border:2px solid var(--border);margin-bottom:8px;" onerror="this.style.display=\'none\'">':'')
+      +(rawPic?'<img id="settings-pic-preview" src="'+curPic+'" style="width:72px;height:72px;border-radius:12px;object-fit:cover;border:2px solid var(--border);margin-bottom:8px;display:block;" >':'<div id="settings-pic-preview" style="display:none;"></div>')
       +'<div style="display:flex;gap:8px;margin-bottom:6px;">'
-      +'<input class="modal-input" id="pic-url-input" placeholder="https://example.com/pic.jpg or .gif" value="'+curPic+'" style="flex:1;">'
+      +'<input class="modal-input" id="pic-url-input" placeholder="https://example.com/pic.jpg or GIF URL" value="'+curPic+'" style="flex:1;">'
       +'<button class="btn-small primary" onclick="N.saveProfilePicUrl()">SET</button>'
       +'</div>'
       +'<label class="btn-small" style="cursor:pointer;display:inline-block;">'
       +'📁 UPLOAD PIC'
       +'<input type="file" id="pic-file-input" accept="image/*" style="display:none" onchange="N.saveProfilePicFile(this)">'
       +'</label>'
-      +(curPic?'&nbsp;<button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.clearProfilePic()">✕ REMOVE</button>':'');
+      +(rawPic?' &nbsp;<button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.clearProfilePic()">× REMOVE</button>':'');
   }
 }
 
@@ -1557,11 +1627,16 @@ async function toggleBlock(targetUid){
 async function saveProfilePicUrl(){
   const url=($('pic-url-input')?.value||'').trim();
   if(!url){toast('Enter a URL.','danger');return;}
+  // Validate it's a URL
+  if(!url.startsWith('http')&&!url.startsWith('data:')){toast('Please enter a valid http/https URL.','danger');return;}
   try{
     await updateDoc(doc(db,'users',cu.uid),{profilePic:url});
     cud={...cud,profilePic:url};
     uCache[cu.uid]={...uCache[cu.uid],profilePic:url};
-    toast('Profile picture updated!','success');
+    toast('Profile picture updated! ✓','success');
+    // Update preview immediately
+    const prevImg=document.getElementById('settings-pic-preview');
+    if(prevImg){prevImg.src=url;prevImg.style.display='block';}
     renderSettings();
   }catch(e){toast('Save failed: '+e.message,'danger');}
 }
@@ -2697,6 +2772,234 @@ async function sendHelp(){
   }
 }
 
+// ── MORE MENU ─────────────────────────────────────
+function toggleMoreMenu(){
+  const m=document.getElementById('more-menu');
+  if(!m) return;
+  const open=m.style.display==='block';
+  m.style.display=open?'none':'block';
+  if(!open){
+    // Show owner portal option only for owner
+    checkOwnerAndShowBtn();
+    // Close on outside click
+    setTimeout(()=>document.addEventListener('click',closeMoreMenu,{once:true}),10);
+  }
+}
+function closeMoreMenu(){
+  const m=document.getElementById('more-menu');
+  if(m) m.style.display='none';
+}
+
+let isOwner=false;
+async function checkOwnerAndShowBtn(){
+  if(!cu) return;
+  try{
+    const ownerSnap=await getDocs(query(collection(db,'users'),where('username','==','owner')));
+    isOwner=!ownerSnap.empty&&ownerSnap.docs[0].id===cu.uid;
+    const wrap=document.getElementById('owner-portal-btn-wrap');
+    if(wrap) wrap.style.display=isOwner?'block':'none';
+  }catch{}
+}
+
+// ── OWNER PORTAL ──────────────────────────────
+let ownerCurrentTab='tickets';
+
+function openOwnerModal(){
+  openModal('owner-modal');
+  ownerTab('tickets');
+}
+
+function ownerTab(tab){
+  ownerCurrentTab=tab;
+  ['tickets','users','admin'].forEach(t=>{
+    const btn=document.getElementById('op-tab-'+t);
+    const panel=document.getElementById('op-panel-'+t);
+    if(btn) btn.classList.toggle('active',t===tab);
+    if(panel) panel.style.display=t===tab?'block':'none';
+  });
+  if(tab==='tickets') loadHelpTickets();
+  if(tab==='users') loadOwnerUsers();
+  if(tab==='admin') renderAdminPanel();
+}
+
+async function loadHelpTickets(){
+  const panel=document.getElementById('op-panel-tickets');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading…</div>';
+  // Find the owner chat with each user and look for [HELP REQUEST] messages
+  try{
+    const ownerUid=cu.uid;
+    // Get all DM chats where owner is a member
+    const chatsSnap=await getDocs(query(collection(db,'chats'),where('members','array-contains',ownerUid)));
+    let tickets=[];
+    for(const chatDoc of chatsSnap.docs){
+      const chat=chatDoc.data();
+      if(chat.type!=='dm') continue;
+      const otherUid=chat.members?.find(m=>m!==ownerUid);
+      if(!otherUid) continue;
+      // Get messages from this chat
+      const msgsSnap=await getDocs(query(collection(db,'chats',chatDoc.id,'messages'),orderBy('ts','desc')));
+      for(const msgDoc of msgsSnap.docs){
+        const msg=msgDoc.data();
+        if(msg.text&&msg.text.startsWith('[HELP REQUEST]')){
+          tickets.push({
+            id:msgDoc.id, chatId:chatDoc.id,
+            fromUid:msg.senderUid,
+            fromName:uCache[msg.senderUid]?.displayName||msg.senderName||'Unknown',
+            text:msg.text.replace('[HELP REQUEST] ',''),
+            ts:msg.ts
+          });
+        }
+      }
+    }
+    if(!tickets.length){
+      panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);text-align:center;padding:20px;">No help tickets yet.</div>';
+      return;
+    }
+    panel.innerHTML='';
+    tickets.forEach(t=>{
+      const ts=t.ts?.seconds?new Date(t.ts.seconds*1000):new Date();
+      const el=document.createElement('div');el.className='ticket-item';
+      el.innerHTML=`<div class="ticket-header">
+          <div class="ticket-from">${esc(t.fromName)}</div>
+          <div class="ticket-time">${fmtT(ts)} ${fmtD(ts)}</div>
+        </div>
+        <div class="ticket-msg">${esc(t.text)}</div>
+        <div style="margin-top:8px;display:flex;gap:6px;">
+          <button class="btn-small primary" onclick="N.replyToTicket('${t.fromUid}')">REPLY</button>
+        </div>`;
+      panel.appendChild(el);
+    });
+  }catch(e){
+    panel.innerHTML='<div style="color:var(--danger);font-size:12px;font-family:var(--font-mono);padding:10px;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+async function replyToTicket(uid){
+  closeModal('owner-modal');
+  // Open or create DM with the user
+  const ex=Object.values(aChats).find(c=>c.type==='dm'&&c.members?.includes(cu.uid)&&c.members?.includes(uid));
+  if(ex){openChat(ex.id);return;}
+  const ref=await addDoc(collection(db,'chats'),{type:'dm',members:[cu.uid,uid],createdAt:serverTimestamp(),lastMessage:'',lastTs:serverTimestamp()});
+  openChat(ref.id);
+}
+
+async function loadOwnerUsers(){
+  const panel=document.getElementById('op-panel-users');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading…</div>';
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    panel.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:10px;">'+users.length+' registered users</div>';
+    users.sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).forEach(u=>{
+      const rank=getRank(u.msgCount||0);
+      const el=document.createElement('div');
+      el.className='user-item';
+      el.style.marginBottom='6px';
+      el.innerHTML=`<div class="feed-avatar" style="font-size:18px;">${userEmoji(u.id)}</div>
+        <div class="user-item-info">
+          <div class="${rank.c}" style="font-size:13px;font-weight:600;">${esc(u.displayName||u.id)}</div>
+          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${isOnline(u)?'🟢 Online':'⚫ Offline'}</div>
+        </div>
+        <button class="btn-small" style="border-color:var(--danger);color:var(--danger);font-size:9px;" onclick="N.adminResetMsgs('${u.id}','${esc(u.displayName||'')}')">RESET</button>`;
+      panel.appendChild(el);
+    });
+  }catch(e){
+    panel.innerHTML='<div style="color:var(--danger);font-size:12px;font-family:var(--font-mono);">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+async function adminResetMsgs(uid,name){
+  if(!confirm('Reset message count for '+name+'?')) return;
+  try{
+    await updateDoc(doc(db,'users',uid),{msgCount:0});
+    if(uCache[uid]) uCache[uid].msgCount=0;
+    toast('Message count reset for '+name,'success');
+    loadOwnerUsers();
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+function renderAdminPanel(){
+  const panel=document.getElementById('op-panel-admin');
+  if(!panel) return;
+  panel.innerHTML=`
+    <div class="admin-action">
+      <div class="admin-action-info">
+        <div style="font-weight:600;">Wipe All Chat Messages</div>
+        <div class="admin-action-desc">Deletes every message in every chat. Cannot be undone.</div>
+      </div>
+      <button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.adminWipeAllChats()">WIPE ALL</button>
+    </div>
+    <div class="admin-action">
+      <div class="admin-action-info">
+        <div style="font-weight:600;">Broadcast Announcement</div>
+        <div class="admin-action-desc">Send a message to every user as NEXUS System.</div>
+      </div>
+      <button class="btn-small primary" onclick="N.adminBroadcast()">BROADCAST</button>
+    </div>
+    <div class="admin-action">
+      <div class="admin-action-info">
+        <div style="font-weight:600;">Clear All Help Tickets</div>
+        <div class="admin-action-desc">Delete all [HELP REQUEST] messages from owner DMs.</div>
+      </div>
+      <button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.adminClearTickets()">CLEAR TICKETS</button>
+    </div>`;
+}
+
+async function adminWipeAllChats(){
+  if(!confirm('WIPE ALL MESSAGES IN ALL CHATS? This cannot be undone.')) return;
+  toast('Wiping all chats…','danger');
+  try{
+    const chats=await getDocs(collection(db,'chats'));
+    let count=0;
+    for(const chatDoc of chats.docs){
+      const msgs=await getDocs(collection(db,'chats',chatDoc.id,'messages'));
+      await Promise.all(msgs.docs.map(m=>deleteDoc(m.ref)));
+      await updateDoc(chatDoc.ref,{lastMessage:'',lastTs:serverTimestamp()});
+      count+=msgs.size;
+    }
+    Object.keys(mCache).forEach(k=>{mCache[k]=[];});
+    if(acid) renderMsgs(acid);
+    toast('Wiped '+count+' messages across all chats.','success');
+  }catch(e){toast('Wipe failed: '+e.message,'danger');}
+}
+
+async function adminBroadcast(){
+  const msg=prompt('Enter broadcast message:');
+  if(!msg||!msg.trim()) return;
+  try{
+    const chats=await getDocs(collection(db,'chats'));
+    for(const chatDoc of chats.docs){
+      await addDoc(collection(db,'chats',chatDoc.id,'messages'),{
+        senderUid:'system', senderName:'⬡ NEXUS System',
+        text:'📢 '+msg.trim(), ts:serverTimestamp(), type:'text', reactions:{}
+      });
+      await updateDoc(chatDoc.ref,{lastMessage:'📢 Announcement',lastTs:serverTimestamp()});
+    }
+    toast('Broadcast sent to all chats!','success');
+  }catch(e){toast('Broadcast failed: '+e.message,'danger');}
+}
+
+async function adminClearTickets(){
+  if(!confirm('Delete all help ticket messages?')) return;
+  try{
+    const ownerUid=cu.uid;
+    const chats=await getDocs(query(collection(db,'chats'),where('members','array-contains',ownerUid)));
+    let count=0;
+    for(const chatDoc of chats.docs){
+      const msgs=await getDocs(collection(db,'chats',chatDoc.id,'messages'));
+      for(const msgDoc of msgs.docs){
+        if(msgDoc.data().text?.startsWith('[HELP REQUEST]')){
+          await deleteDoc(msgDoc.ref);count++;
+        }
+      }
+    }
+    toast('Cleared '+count+' help ticket messages.','success');
+    loadHelpTickets();
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -2723,6 +3026,9 @@ window._N = {
   toggleRecording, stopRecording, cancelRecording, playVoice, cycleSpeed,
   flipCamera,
   openCreditsModal, sendHelp,
+  toggleMoreMenu, closeMoreMenu, filterUsers,
+  ownerTab, replyToTicket, adminWipeAllChats, adminBroadcast,
+  adminClearTickets, adminResetMsgs, openOwnerModal,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
