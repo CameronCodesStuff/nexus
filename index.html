@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -285,6 +284,7 @@
             <button class="icon-btn" title="Video Call" onclick="N.startCall('video')">📹</button>
             <button class="icon-btn" title="Screen Share" onclick="N.startCall('screen')">🖥️</button>
             <button class="icon-btn" title="Wipe Chat" onclick="N.confirmWipe()" style="color:var(--danger)">🗑️</button>
+            <button class="icon-btn" id="leave-group-btn" title="Leave Group" onclick="N.confirmLeaveGroup()" style="color:var(--danger);display:none">🚪</button>
           </div>
         </div>
         <div class="messages-area" id="messages-area">
@@ -398,7 +398,7 @@ import {
 import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
   addDoc, updateDoc, deleteDoc, onSnapshot, query, where,
-  orderBy, serverTimestamp, arrayUnion
+  orderBy, serverTimestamp, arrayUnion, arrayRemove
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STARFIELD ──────────────────────────────────
@@ -423,6 +423,11 @@ const FB = {
 const fbApp = initializeApp(FB);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
+
+// Always require fresh login — clear any persisted Firebase session on load
+import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(({setPersistence, browserSessionPersistence})=>{
+  setPersistence(auth, browserSessionPersistence).catch(()=>{});
+});
 
 // ── STATE ──────────────────────────────────────
 let cu=null,cud=null,acid=null,pf=null;
@@ -541,8 +546,9 @@ async function doLogout(){
   try{await updateDoc(doc(db,'users',cu.uid),{online:false});}catch{}
   Object.values(clsnrs).forEach(u=>u());
   if(acunsub)acunsub();
+  if(incomingCallUnsub){incomingCallUnsub();incomingCallUnsub=null;}
   clsnrs={};acunsub=null;acid=null;aChats={};mCache={};
-  if(ctimer)endCall();
+  if(activeCallId)endCall();
   await signOut(auth);
 }
 
@@ -554,6 +560,7 @@ async function enterApp(){
   const snap=await getDocs(collection(db,'users'));
   snap.forEach(d=>{uCache[d.id]=d.data();});
   setupChatsListener();
+  listenForIncomingCalls();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
 }
@@ -606,6 +613,8 @@ function openChat(cid){
   $('ch-avatar').className='feed-avatar'+(ig?' group':'');
   $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}">${esc(nm)}</span>`;
   $('ch-sub').textContent=(ig?`${chat.members?.length||0} members · `:'')+(ig?'':(ou.online?'🟢 Online':'⚫ Offline'));
+  const leaveBtn=$('leave-group-btn');
+  if(leaveBtn) leaveBtn.style.display=ig?'flex':'none';
   subMsgs(cid);renderSidebar();
 }
 
@@ -801,42 +810,447 @@ function renderSettings(){
   $('rank-progress-display').innerHTML=`<div style="margin-bottom:16px;"><div style="font-size:13px;margin-bottom:8px;">Messages sent: <strong style="color:var(--accent)">${mc}</strong></div><div class="rank-info"><span class="${rank.c}">${rank.l}</span>${rank.nx?`<span>${mc} / ${rank.nx}</span>`:''}</div>${rank.nx?`<div class="progress-bar"><div class="progress-bar-fill" style="width:${rank.p}%"></div></div>`:''}</div><div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:2.2;"><span class="rank-grey">● GREY</span> = 0 &nbsp;<span class="rank-blue">● BLUE</span> = 10 &nbsp;<span class="rank-cyan">● CYAN</span> = 100<br><span class="rank-gold">● GOLD</span> = 500 &nbsp;<span class="rank-rainbow">● RAINBOW</span> = 1000</div>`;
 }
 
-// ── CALLS ──────────────────────────────────────
+// ── CALLS (WebRTC + Firestore signaling) ────────
+// Firestore structure:
+//   calls/{callId}  → { chatId, callerId, callerName, mode, members[], status, createdAt }
+//   calls/{callId}/signals/{signalId} → { from, to, type:'offer'|'answer'|'ice', payload }
+
+const ICE_SERVERS = {
+  iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {urls:'stun:stun2.l.google.com:19302'},
+  ]
+};
+
+let incomingCallUnsub = null;// listener for incoming calls (declared early)
+let activeCallId   = null;   // Firestore call doc id
+let peerConns      = {};     // { uid: RTCPeerConnection }
+let localStream    = null;
+let screenStream2  = null;   // separate from old sstream to avoid naming clash
+let signalUnsubs   = [];     // Firestore listeners to clean up
+let callUnsub      = null;   // call doc listener
+
+// Start listening for incoming calls right after login
+function startCallTimer(){
+  if(ctimer)clearInterval(ctimer);
+  csecs=0;
+  ctimer=setInterval(()=>{csecs++;
+    const m=String(~~(csecs/60)).padStart(2,'0');
+    const s=String(csecs%60).padStart(2,'0');
+    const el=document.getElementById('call-timer');
+    if(el)el.textContent=m+':'+s;
+  },1000);
+}
+
+function listenForIncomingCalls(){
+  if(incomingCallUnsub) incomingCallUnsub();
+  // Watch calls where I'm a member and status = 'ringing'
+  const q = query(
+    collection(db,'calls'),
+    where('members','array-contains', cu.uid),
+    where('status','==','ringing')
+  );
+  incomingCallUnsub = onSnapshot(q, snap=>{
+    snap.docChanges().forEach(ch=>{
+      if(ch.type==='added'){
+        const call={id:ch.doc.id,...ch.doc.data()};
+        if(call.callerId !== cu.uid) showIncomingCall(call);
+      }
+    });
+  });
+}
+
+function showIncomingCall(call){
+  // Don't show if already in a call
+  if(activeCallId) return;
+  const callerName = call.callerName || 'Someone';
+  const modeLabel  = call.mode==='video'?'📹 Video':'🔊 Audio';
+  // Remove any existing banner
+  document.getElementById('incoming-call-banner')?.remove();
+  const banner = document.createElement('div');
+  banner.id = 'incoming-call-banner';
+  banner.style.cssText=`position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:20px 28px;z-index:9999;box-shadow:0 0 40px var(--glow);display:flex;flex-direction:column;align-items:center;gap:14px;min-width:280px;`;
+  banner.innerHTML=`
+    <div style="font-family:var(--font-display);font-size:12px;letter-spacing:3px;color:var(--accent)">${modeLabel} CALL</div>
+    <div style="font-size:18px;font-weight:700;">${esc(callerName)}</div>
+    <div style="display:flex;gap:12px;">
+      <button onclick="N.answerCall('${call.id}')" style="background:var(--success);border:none;border-radius:10px;padding:10px 24px;color:#000;font-family:var(--font-display);font-size:11px;letter-spacing:2px;cursor:pointer;">ANSWER</button>
+      <button onclick="N.rejectCall('${call.id}')" style="background:var(--danger);border:none;border-radius:10px;padding:10px 24px;color:#fff;font-family:var(--font-display);font-size:11px;letter-spacing:2px;cursor:pointer;">DECLINE</button>
+    </div>`;
+  document.body.appendChild(banner);
+  // Auto-dismiss if call disappears
+  const autoRemove = onSnapshot(doc(db,'calls',call.id), snap=>{
+    if(!snap.exists() || snap.data().status !== 'ringing'){
+      banner.remove(); autoRemove();
+    }
+  });
+  // Play ring tone (simple beep via Web Audio)
+  try{
+    const ac=new AudioContext();
+    let t=0;
+    const ring=()=>{
+      if(!document.getElementById('incoming-call-banner'))return;
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=880;g.gain.setValueAtTime(0.3,ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.4);
+      o.start(ac.currentTime);o.stop(ac.currentTime+0.4);
+      setTimeout(ring,1200);
+    };
+    ring();
+  }catch{}
+}
+
 async function startCall(mode){
-  if(!acid)return;const chat=aChats[acid],ouid=chat?.members?.find(m=>m!==cu.uid),onm=uCache[ouid]?.displayName||'User';
-  $('call-overlay').classList.add('open');
-  $('call-title').textContent=mode==='audio'?'🔊 AUDIO CALL':mode==='video'?'📹 VIDEO CALL':'🖥️ SCREEN SHARE';
-  $('btn-cam').style.display=mode!=='audio'?'flex':'none';$('btn-screen').style.display=mode!=='audio'?'flex':'none';
-  const body=$('call-body');cstreams={};micOn=true;camOn=true;
-  if(mode==='audio'){
-    body.innerHTML=`<div class="audio-call-display"><div style="position:relative;display:flex;align-items:center;justify-content:center;width:140px;height:140px;"><div class="pulse-ring"></div><div class="call-avatar-big">${onm[0].toUpperCase()}</div></div><div class="call-name-big">${esc(onm)}</div><div class="call-status">Connected</div></div>`;
-    try{cstreams.local=await navigator.mediaDevices.getUserMedia({audio:true});}catch{toast('Mic access denied.','danger');}
-  }else if(mode==='video'){
-    body.innerHTML=`<div class="video-grid two-col"><div class="video-tile"><video id="lv" autoplay muted playsinline></video><div class="video-tile-label">You</div></div><div class="video-tile"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-dim);font-size:13px;font-family:var(--font-mono)">Waiting for ${esc(onm)}…</div><div class="video-tile-label">${esc(onm)}</div></div></div>`;
-    try{cstreams.local=await navigator.mediaDevices.getUserMedia({video:true,audio:true});$('lv').srcObject=cstreams.local;}catch{toast('Camera/mic denied.','danger');}
-  }else{
-    body.innerHTML=`<div class="video-grid"><div class="video-tile"><video id="sv" autoplay playsinline></video><div class="video-tile-label">🖥️ Your Screen</div></div></div>`;
-    try{sstream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});$('sv').srcObject=sstream;sstream.getVideoTracks()[0].onended=()=>endCall();}
-    catch{endCall();toast('Screen share cancelled.','danger');return;}
+  if(!acid||!cu) return;
+  const chat = aChats[acid];
+  if(!chat) return;
+  const otherMembers = chat.members.filter(m=>m!==cu.uid);
+  if(!otherMembers.length){ toast('No one else in this chat.','danger'); return; }
+
+  // Get local media first
+  try{
+    if(mode==='audio'){
+      localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
+    } else if(mode==='video'){
+      localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+    } else {
+      // screen share
+      localStream = await navigator.mediaDevices.getDisplayMedia({video:true, audio:true});
+    }
+  }catch(e){
+    toast('Media access denied: '+e.message,'danger'); return;
   }
-  csecs=0;if(ctimer)clearInterval(ctimer);
-  ctimer=setInterval(()=>{csecs++;$('call-timer').textContent=`${String(~~(csecs/60)).padStart(2,'0')}:${String(csecs%60).padStart(2,'0')}`;},1000);
+
+  // Create call document in Firestore
+  const callRef = await addDoc(collection(db,'calls'),{
+    chatId: acid,
+    callerId: cu.uid,
+    callerName: cud?.displayName||'User',
+    mode,
+    members: chat.members,           // everyone including caller
+    status: 'ringing',
+    createdAt: serverTimestamp()
+  });
+  activeCallId = callRef.id;
+
+  openCallUI(mode, true);
+  startCallTimer();
+
+  // Create a peer connection for each remote member
+  for(const uid of otherMembers){
+    await createPeerConnection(uid, true, callRef.id, mode);
+  }
+
+  // Watch for the call to be declined/ended by others
+  watchCallDoc(callRef.id);
+}
+
+async function answerCall(callId){
+  document.getElementById('incoming-call-banner')?.remove();
+  const callSnap = await getDoc(doc(db,'calls',callId));
+  if(!callSnap.exists()) return;
+  const call = callSnap.data();
+  if(call.status !== 'ringing'){ toast('Call already ended.','danger'); return; }
+
+  activeCallId = callId;
+
+  // Get local media
+  try{
+    if(call.mode==='audio'){
+      localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false});
+    } else if(call.mode==='video'){
+      localStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+    } else {
+      localStream = await navigator.mediaDevices.getDisplayMedia({video:true});
+    }
+  }catch(e){
+    toast('Media access denied: '+e.message,'danger');
+    await updateDoc(doc(db,'calls',callId),{status:'ended'});
+    activeCallId=null; return;
+  }
+
+  await updateDoc(doc(db,'calls',callId),{status:'active'});
+
+  openCallUI(call.mode, false);
+  startCallTimer();
+
+  // Connect to caller (and any other members already in the call)
+  const otherMembers = call.members.filter(m=>m!==cu.uid);
+  for(const uid of otherMembers){
+    await createPeerConnection(uid, false, callId, call.mode);
+  }
+
+  watchCallDoc(callId);
+}
+
+async function rejectCall(callId){
+  document.getElementById('incoming-call-banner')?.remove();
+  try{ await updateDoc(doc(db,'calls',callId),{status:'rejected'}); }catch{}
+}
+
+function watchCallDoc(callId){
+  if(callUnsub) callUnsub();
+  callUnsub = onSnapshot(doc(db,'calls',callId), snap=>{
+    if(!snap.exists()) { endCall(); return; }
+    const s=snap.data().status;
+    if(s==='ended'||s==='rejected') endCall();
+  });
+}
+
+async function createPeerConnection(remoteUid, isInitiator, callId, mode){
+  const pc = new RTCPeerConnection(ICE_SERVERS);
+  peerConns[remoteUid] = pc;
+
+  // Add local tracks
+  if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
+
+  // Handle remote stream → attach to video tile
+  const remoteStream = new MediaStream();
+  pc.ontrack = e=>{
+    e.streams[0].getTracks().forEach(t=>remoteStream.addTrack(t));
+    attachRemoteStream(remoteUid, remoteStream, mode);
+  };
+
+  // ICE candidates → write to Firestore
+  pc.onicecandidate = async e=>{
+    if(!e.candidate) return;
+    await addDoc(collection(db,'calls',callId,'signals'),{
+      from: cu.uid, to: remoteUid,
+      type:'ice', payload: e.candidate.toJSON(),
+      ts: serverTimestamp()
+    });
+  };
+
+  pc.onconnectionstatechange = ()=>{
+    if(pc.connectionState==='failed'||pc.connectionState==='disconnected'){
+      toast('Connection to '+( uCache[remoteUid]?.displayName||'peer')+' lost.','danger');
+    }
+  };
+
+  // Listen for signals from remoteUid → me
+  const sigQ = query(
+    collection(db,'calls',callId,'signals'),
+    where('from','==',remoteUid),
+    where('to','==',cu.uid)
+  );
+  const unsub = onSnapshot(sigQ, snap=>{
+    snap.docChanges().forEach(async ch=>{
+      if(ch.type!=='added') return;
+      const sig = ch.doc.data();
+      if(sig.type==='offer'){
+        await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await addDoc(collection(db,'calls',callId,'signals'),{
+          from:cu.uid, to:remoteUid,
+          type:'answer', payload:{type:answer.type, sdp:answer.sdp},
+          ts: serverTimestamp()
+        });
+      } else if(sig.type==='answer'){
+        if(pc.signalingState==='have-local-offer')
+          await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+      } else if(sig.type==='ice'){
+        try{ await pc.addIceCandidate(new RTCIceCandidate(sig.payload)); }catch{}
+      }
+    });
+  });
+  signalUnsubs.push(unsub);
+
+  // Initiator creates and sends the offer
+  if(isInitiator){
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await addDoc(collection(db,'calls',callId,'signals'),{
+      from:cu.uid, to:remoteUid,
+      type:'offer', payload:{type:offer.type, sdp:offer.sdp},
+      ts: serverTimestamp()
+    });
+  }
+}
+
+function openCallUI(mode, isCaller){
+  $('call-overlay').classList.add('open');
+  $('call-title').textContent = mode==='audio'?'🔊 AUDIO CALL': mode==='video'?'📹 VIDEO CALL':'🖥️ SCREEN SHARE';
+  $('btn-cam').style.display  = mode==='video'?'flex':'none';
+  $('btn-screen').style.display = mode==='video'?'flex':'none';
+  micOn=true; camOn=true;
+  $('btn-mute').textContent='🎙️';
+  $('btn-cam').textContent='📷';
+
+  const body=$('call-body');
+  body.innerHTML='';
+
+  if(mode==='audio'){
+    const chat=aChats[acid]||{};
+    const othersHtml = (chat.members||[]).filter(m=>m!==cu.uid).map(uid=>{
+      const nm=uCache[uid]?.displayName||'User';
+      return `<div class="audio-call-display" id="audio-tile-${uid}">
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:100px;height:100px;">
+          <div class="pulse-ring"></div>
+          <div class="call-avatar-big" style="width:80px;height:80px;font-size:28px;">${nm[0].toUpperCase()}</div>
+        </div>
+        <div style="font-family:var(--font-display);font-size:14px;letter-spacing:2px;">${esc(nm)}</div>
+        <div class="call-status" id="status-${uid}">Connecting…</div>
+      </div>`;
+    }).join('');
+    body.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:32px;align-items:center;justify-content:center;">${othersHtml}</div>`;
+  } else {
+    // Video grid — start with just local tile, remote tiles added as streams arrive
+    const grid=document.createElement('div');
+    grid.className='video-grid'; grid.id='video-grid';
+    const localTile=document.createElement('div');
+    localTile.className='video-tile'; localTile.id='tile-local';
+    localTile.innerHTML=`<video id="local-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></video><div class="video-tile-label">You</div>`;
+    grid.appendChild(localTile);
+    body.appendChild(grid);
+    const lv=document.getElementById('local-video');
+    if(localStream) lv.srcObject=localStream;
+    updateVideoGrid();
+  }
+}
+
+function attachRemoteStream(uid, stream, mode){
+  if(mode==='audio'){
+    // Attach audio only — play via hidden audio element
+    let ael=document.getElementById('audio-el-'+uid);
+    if(!ael){ael=document.createElement('audio');ael.id='audio-el-'+uid;ael.autoplay=true;document.body.appendChild(ael);}
+    ael.srcObject=stream;
+    const st=document.getElementById('status-'+uid);
+    if(st) st.textContent='🟢 Connected';
+    const pr=document.querySelector(`#audio-tile-${uid} .pulse-ring`);
+    if(pr) pr.style.borderColor='var(--success)';
+  } else {
+    // Add or update video tile
+    const grid=document.getElementById('video-grid');
+    if(!grid) return;
+    let tile=document.getElementById('tile-'+uid);
+    if(!tile){
+      tile=document.createElement('div');tile.className='video-tile';tile.id='tile-'+uid;
+      const nm=uCache[uid]?.displayName||'User';
+      tile.innerHTML=`<video autoplay playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></video><div class="video-tile-label">${esc(nm)}</div>`;
+      grid.appendChild(tile);
+      updateVideoGrid();
+    }
+    tile.querySelector('video').srcObject=stream;
+  }
+}
+
+function updateVideoGrid(){
+  const grid=document.getElementById('video-grid');
+  if(!grid) return;
+  const n=grid.children.length;
+  grid.className='video-grid'+(n>=2?' two-col':'');
 }
 
 function endCall(){
+  // Clean up peer connections
+  Object.values(peerConns).forEach(pc=>pc.close());
+  peerConns={};
+  // Stop local media
+  localStream?.getTracks().forEach(t=>t.stop());
+  localStream=null;
+  screenStream2?.getTracks().forEach(t=>t.stop());
+  screenStream2=null;
+  // Remove audio elements
+  document.querySelectorAll('[id^="audio-el-"]').forEach(e=>e.remove());
+  // Firestore signals listeners
+  signalUnsubs.forEach(u=>u()); signalUnsubs=[];
+  if(callUnsub){callUnsub();callUnsub=null;}
+  // Mark call as ended in Firestore
+  if(activeCallId){
+    updateDoc(doc(db,'calls',activeCallId),{status:'ended'}).catch(()=>{});
+    activeCallId=null;
+  }
+  // Stop timer
   if(ctimer){clearInterval(ctimer);ctimer=null;}
-  Object.values(cstreams).forEach(s=>s.getTracks().forEach(t=>t.stop()));
-  if(sstream){sstream.getTracks().forEach(t=>t.stop());sstream=null;}
-  cstreams={};$('call-overlay').classList.remove('open');$('call-timer').textContent='00:00';
+  csecs=0;
+  // Hide UI
+  $('call-overlay').classList.remove('open');
+  $('call-timer').textContent='00:00';
+  document.getElementById('incoming-call-banner')?.remove();
 }
 
-function toggleMute(){micOn=!micOn;if(cstreams.local)cstreams.local.getAudioTracks().forEach(t=>t.enabled=micOn);$('btn-mute').textContent=micOn?'🎙️':'🔇';$('btn-mute').classList.toggle('active',!micOn);}
-function toggleCamera(){camOn=!camOn;if(cstreams.local)cstreams.local.getVideoTracks().forEach(t=>t.enabled=camOn);$('btn-cam').textContent=camOn?'📷':'📵';$('btn-cam').classList.toggle('active',!camOn);}
-async function toggleScreenShare(){
-  if(sstream){sstream.getTracks().forEach(t=>t.stop());sstream=null;$('btn-screen').classList.remove('active');$('screenshare-tile')?.remove();}
-  else{try{sstream=await navigator.mediaDevices.getDisplayMedia({video:true});const tile=document.createElement('div');tile.id='screenshare-tile';tile.className='screenshare-tile';tile.innerHTML='<video autoplay playsinline></video>';tile.querySelector('video').srcObject=sstream;$('call-body').appendChild(tile);$('btn-screen').classList.add('active');sstream.getVideoTracks()[0].onended=()=>toggleScreenShare();}catch{toast('Screen share failed.','danger');}}
+function toggleMute(){
+  micOn=!micOn;
+  localStream?.getAudioTracks().forEach(t=>t.enabled=micOn);
+  $('btn-mute').textContent=micOn?'🎙️':'🔇';
+  $('btn-mute').classList.toggle('active',!micOn);
 }
-function toggleFullscreen(){const o=$('call-overlay');if(!document.fullscreenElement)o.requestFullscreen().catch(()=>{});else document.exitFullscreen();}
+function toggleCamera(){
+  camOn=!camOn;
+  localStream?.getVideoTracks().forEach(t=>t.enabled=camOn);
+  $('btn-cam').textContent=camOn?'📷':'📵';
+  $('btn-cam').classList.toggle('active',!camOn);
+}
+async function toggleScreenShare(){
+  if(screenStream2){
+    screenStream2.getTracks().forEach(t=>t.stop());
+    screenStream2=null;
+    $('btn-screen').classList.remove('active');
+    // Revert to camera
+    try{
+      const camStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+      const vTrack=camStream.getVideoTracks()[0];
+      Object.values(peerConns).forEach(pc=>{
+        const sender=pc.getSenders().find(s=>s.track?.kind==='video');
+        if(sender) sender.replaceTrack(vTrack);
+      });
+    }catch{}
+  } else {
+    try{
+      screenStream2=await navigator.mediaDevices.getDisplayMedia({video:true});
+      const vTrack=screenStream2.getVideoTracks()[0];
+      Object.values(peerConns).forEach(pc=>{
+        const sender=pc.getSenders().find(s=>s.track?.kind==='video');
+        if(sender) sender.replaceTrack(vTrack);
+      });
+      $('btn-screen').classList.add('active');
+      vTrack.onended=()=>toggleScreenShare();
+    }catch{ toast('Screen share failed.','danger'); }
+  }
+}
+function toggleFullscreen(){
+  const o=$('call-overlay');
+  if(!document.fullscreenElement) o.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+}
+
+// ── LEAVE GROUP ────────────────────────────────
+function confirmLeaveGroup(){
+  const chat=aChats[acid];
+  const nm=chat?.name||'this group';
+  $('wipe-confirm-slot').innerHTML=`<div class="wipe-confirm">
+    <span>⚠️ Leave <strong>${esc(nm)}</strong>?</span>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.doLeaveGroup()">LEAVE</button>
+      <button class="btn-small" onclick="N.cancelWipe()">CANCEL</button>
+    </div>
+  </div>`;
+}
+
+async function doLeaveGroup(){
+  if(!acid||!cu) return;
+  const chat=aChats[acid];
+  if(!chat||chat.type!=='group') return;
+  try{
+    await updateDoc(doc(db,'chats',acid),{members: arrayRemove(cu.uid)});
+    const updatedSnap=await getDoc(doc(db,'chats',acid));
+    if(updatedSnap.exists()&&(updatedSnap.data().members||[]).length===0){
+      const msgsSnap=await getDocs(collection(db,'chats',acid,'messages'));
+      await Promise.all(msgsSnap.docs.map(d=>deleteDoc(d.ref)));
+      await deleteDoc(doc(db,'chats',acid));
+    }
+    acid=null;
+    $('active-chat').style.display='none';
+    $('chat-empty').style.display='flex';
+    cancelWipe();
+    toast('You left the group.','success');
+  }catch(e){
+    toast('Failed to leave: '+e.message,'danger');
+  }
+}
 
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
@@ -850,8 +1264,10 @@ window._N = {
   openChat, sendMessage, handleInputKey, autoResize,
   handleFileAttach, toggleEmojiPicker,
   confirmWipe, doWipe, cancelWipe,
-  startDM, startCall, endCall, toggleMute, toggleCamera, toggleScreenShare, toggleFullscreen,
+  startDM, startCall, endCall, answerCall, rejectCall,
+  toggleMute, toggleCamera, toggleScreenShare, toggleFullscreen,
   acceptInvite, declineInvite, toggleInvitee, createGroup,
+  confirmLeaveGroup, doLeaveGroup,
   addRxn, applyTheme,
 };
 // Also copy onto N directly in case Proxy isn't supported
