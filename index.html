@@ -764,6 +764,16 @@ function userEmoji(uid){
   return AVATAR_EMOJIS[h%AVATAR_EMOJIS.length];
 }
 
+// Returns HTML for an avatar — profile pic if set, else emoji
+function avatarHtml(uid, size='100%'){
+  const u=uCache[uid]||{};
+  const emoji=userEmoji(uid);
+  if(u.profilePic){
+    return '<img src="'+esc(u.profilePic)+'" style="width:'+size+';height:'+size+';object-fit:cover;border-radius:inherit;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+emoji+'\');">';
+  }
+  return emoji;
+}
+
 
 
 // True online = flag is true AND lastSeen within last 75 seconds (heartbeat is 30s)
@@ -1024,9 +1034,15 @@ function renderProfile(){
   // Update sidebar footer avatar
   const avel=$('my-avatar-el');
   if(avel){
-    avel.textContent=userEmoji(cu?.uid||'');
+    const avH=avatarHtml(cu?.uid||'');
+    if(avH.startsWith('<img')){
+      avel.innerHTML=avH;
+      avel.style.overflow='hidden';avel.style.padding='0';avel.style.fontSize='';
+    } else {
+      avel.textContent=avH;
+      avel.style.overflow='';avel.style.padding='';avel.style.fontSize='20px';
+    }
     avel.style.background='var(--bg3)';
-    avel.style.fontSize='20px';
     avel.style.border='1px solid var(--border)';
   }
   const nameEl=$('my-name-el');
@@ -1082,7 +1098,7 @@ function renderSidebar(){
     const online=!ig&&isOnline(ou);
     const ts=chat.lastTs?new Date(chat.lastTs.seconds*1000):null;
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
-    const ava=ig?'👥':userEmoji(ouid||'');
+    const ava=ig?'👥':avatarHtml(ouid||'');
     el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}">${esc(nm)}</div><div class="feed-preview">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div></div>`;
     feed.appendChild(el);
   });
@@ -1101,7 +1117,20 @@ function openChat(cid){
   $('chat-empty').style.display='none';$('active-chat').style.display='flex';
   const ig=chat.type==='group',ouid=ig?null:chat.members?.find(m=>m!==cu.uid),ou=ouid?(uCache[ouid]||{}):{}; 
   const nm=ig?(chat.name||'Group'):(ou.displayName||'Unknown'),rank=getRank(ig?0:(ou.msgCount||0));
-  $('ch-avatar').textContent=ig?'👥':userEmoji(ouid||'');
+  const chAvEl=$('ch-avatar');
+  if(ig){
+    chAvEl.textContent='👥';
+    chAvEl.style.overflow='';chAvEl.style.padding='';
+  } else {
+    const avH=avatarHtml(ouid||'');
+    if(avH.startsWith('<img')){
+      chAvEl.innerHTML=avH;
+      chAvEl.style.overflow='hidden';chAvEl.style.padding='0';
+    } else {
+      chAvEl.textContent=avH;
+      chAvEl.style.overflow='';chAvEl.style.padding='';
+    }
+  }
   $('ch-avatar').className='feed-avatar'+(ig?' group':'');
   const chNameClick=!ig?`onclick="N.openProfileModal('${ouid}')" style="cursor:pointer;"`:"";  
   $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}" ${chNameClick}>${esc(nm)}</span>`;
@@ -1135,7 +1164,7 @@ function renderMsgs(cid){
     if(msg.senderUid!==ls){
       gEl=document.createElement('div');gEl.className='msg-group'+(own?' own':'');
       const sn=uCache[msg.senderUid]?.displayName||msg.senderName||'User',rank=getRank(uCache[msg.senderUid]?.msgCount||0);
-      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;" onclick="N.openProfileModal('${msg.senderUid}')">${userEmoji(msg.senderUid)}</div><div class="msg-sender"><span class="${rank.c} ${rank.fc||''}" style="cursor:pointer;" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
+      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:hidden;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid)}</div><div class="msg-sender"><span class="${rank.c} ${rank.fc||''}" style="cursor:pointer;" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
       gEl.appendChild(hd);area.insertBefore(gEl,wipe);ls=msg.senderUid;
     }
     const wr=document.createElement('div');wr.className='msg-bubble-wrap';
@@ -1290,7 +1319,7 @@ function buildUsersList(){
   entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;">${userEmoji(uid)}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span></div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;">${avatarHtml(uid)}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span></div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
     list.appendChild(el);
   });
 }
@@ -1359,7 +1388,7 @@ async function renderGroupUsers(){
   Object.entries(uCache).filter(([uid])=>uid!==cu.uid).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),sid='gu_'+uid.replace(/[^a-zA-Z0-9]/g,'_'),el=document.createElement('div');
     el.className='user-item';el.id=sid;
-    el.innerHTML=`<div class="feed-avatar" style="font-size:20px;">${userEmoji(uid)}</div><div class="user-item-info"><div class="user-item-name ${rank.c}">${esc(u.displayName||uid)}</div></div><button class="btn-small" onclick="N.toggleInvitee('${uid}')">ADD</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="overflow:hidden;padding:0;">${avatarHtml(uid)}</div><div class="user-item-info"><div class="user-item-name ${rank.c}">${esc(u.displayName||uid)}</div></div><button class="btn-small" onclick="N.toggleInvitee('${uid}')">ADD</button>`;
     list.appendChild(el);
   });
 }
@@ -2512,11 +2541,14 @@ function openProfileModal(uid){
   const isBlocked=(cud?.blocked||[]).includes(uid);
   const deviceEmoji=u.device==='mobile'?'📱':'💻';
   const deviceLabel=u.device==='mobile'?'Mobile':'Desktop';
-  const picHtml=u.profilePic?`<img src="${esc(u.profilePic)}" class="profile-pic-big" alt="Profile pic" onerror="this.style.display='none'">`:'';
+  // Avatar slot: profile pic takes priority over emoji
+  const avatarContent=u.profilePic
+    ?`<img src="${esc(u.profilePic)}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;display:block;" alt="" onerror="this.style.display='none';this.parentElement.textContent='${emoji}'">`
+    :emoji;
   container.innerHTML=`
     <div class="profile-banner" style="${bannerStyle};position:relative;">${bannerInner}</div>
     <div class="profile-header-row">
-      <div class="profile-avatar-big">${emoji}</div>
+      <div class="profile-avatar-big" style="overflow:hidden;padding:0;">${avatarContent}</div>
       <div style="flex:1;min-width:0;padding-bottom:4px;">
         <div class="profile-name-highlight">
           <span class="${rank.c} ${rank.fc||''}" style="font-size:17px;font-weight:700;line-height:1.3;">${esc(nm)}</span>
@@ -2527,8 +2559,7 @@ function openProfileModal(uid){
       ${!isMe?`<button class="btn-small primary" style="margin-bottom:4px;flex-shrink:0;" onclick="N.startDM('${uid}');N.closeModal('profile-modal');">MESSAGE</button>`:''}
     </div>
     <div style="padding:0 20px 20px;">
-      ${picHtml}
-      <div style="font-family:var(--font-display);font-size:10px;letter-spacing:3px;color:var(--text-dim);margin-bottom:8px;margin-top:${picHtml?'12px':'0'}">ABOUT</div>
+      <div style="font-family:var(--font-display);font-size:10px;letter-spacing:3px;color:var(--text-dim);margin-bottom:8px;">ABOUT</div>
       ${bio?`<div class="profile-bio">${esc(bio)}</div>`:`<div class="profile-bio-empty">${isMe?'You haven\'t set a bio yet. Add one in Settings.':'No bio set.'}</div>`}
       <div style="margin-top:16px;display:flex;gap:12px;">
         <div style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">
