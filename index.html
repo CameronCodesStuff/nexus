@@ -401,19 +401,32 @@
   /* Sidebar footer ring (DOM-wrapped) */
   .avatar-ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
   .avatar-ring-wrap::before{
-    content:'';position:absolute;inset:-3px;border-radius:10px;
-    background:conic-gradient(#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);
-    animation:ring-spin 2s linear infinite;
+    content:'';position:absolute;inset:-4px;border-radius:10px;
+    background:conic-gradient(#ff0080 0%,#ff6600 15%,#ffe100 30%,#00ff88 45%,#00c8ff 60%,#9933ff 75%,#ff0080 100%);
+    animation:ring-spin 1.5s linear infinite;
+    z-index:-1;border-radius:inherit;
+    filter:brightness(1.3) saturate(1.4);
+  }
+  .avatar-ring-wrap::after{
+    content:'';position:absolute;inset:-1px;
+    background:var(--panel,#080810);
     z-index:-1;border-radius:inherit;
   }
   /* Inline ring for messages, user list, anywhere avatarHtml() is used */
   .avatar-ring-inline::before{
-    content:'';position:absolute;inset:-3px;
-    background:conic-gradient(#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);
-    animation:ring-spin 2s linear infinite;
+    content:'';position:absolute;inset:-4px;
+    background:conic-gradient(#ff0080 0%,#ff6600 15%,#ffe100 30%,#00ff88 45%,#00c8ff 60%,#9933ff 75%,#ff0080 100%);
+    animation:ring-spin 1.5s linear infinite;
+    z-index:0;border-radius:inherit;
+    filter:brightness(1.3) saturate(1.4);
+  }
+  /* Thin dark separator so ring pops against any background */
+  .avatar-ring-inline::after{
+    content:'';position:absolute;inset:-1px;
+    background:var(--bg3,#0f0f1a);
     z-index:0;border-radius:inherit;
   }
-  /* Inner content sits above the ring */
+  /* Inner content sits above both rings */
   .avatar-ring-inline>*{position:relative;z-index:1;border-radius:inherit;width:100%;height:100%;display:block;}
   .avatar-ring-inline{overflow:visible;}
   /* Changelog items */
