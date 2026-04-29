@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -476,10 +477,9 @@ const fbApp = initializeApp(FB);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
 
-// Always require fresh login — clear any persisted Firebase session on load
-import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(({setPersistence, browserSessionPersistence})=>{
-  setPersistence(auth, browserSessionPersistence).catch(()=>{});
-});
+// Always require fresh login — sign out any cached session immediately on load
+// This runs synchronously before onAuthStateChanged is registered below
+await signOut(auth).catch(()=>{});
 
 // ── STATE ──────────────────────────────────────
 let cu=null,cud=null,acid=null,pf=null;
@@ -663,7 +663,8 @@ function openChat(cid){
   const nm=ig?(chat.name||'Group'):(ou.displayName||'Unknown'),rank=getRank(ig?0:(ou.msgCount||0));
   $('ch-avatar').textContent=ig?'👥':nm[0].toUpperCase();
   $('ch-avatar').className='feed-avatar'+(ig?' group':'');
-  const chNameClick=!ig?`onclick="N.openProfileModal('${otherUid}')" style="cursor:pointer;"`:"";  $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}" ${chNameClick}>${esc(nm)}</span>`;
+  const chNameClick=!ig?`onclick="N.openProfileModal('${ouid}')" style="cursor:pointer;"`:"";  
+  $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}" ${chNameClick}>${esc(nm)}</span>`;
   $('ch-sub').textContent=(ig?`${chat.members?.length||0} members · `:'')+(ig?'':(ou.online?'🟢 Online':'⚫ Offline'));
   const leaveBtn=$('leave-group-btn');
   if(leaveBtn) leaveBtn.style.display=ig?'flex':'none';
@@ -885,21 +886,27 @@ function renderSettings(){
   const mc=cud?.msgCount||0,rank=getRank(mc);
   $('rank-progress-display').innerHTML=`<div style="margin-bottom:16px;"><div style="font-size:13px;margin-bottom:8px;">Messages sent: <strong style="color:var(--accent)">${mc}</strong></div><div class="rank-info"><span class="${rank.c}">${rank.l}</span>${rank.nx?`<span>${mc} / ${rank.nx}</span>`:''}</div>${rank.nx?`<div class="progress-bar"><div class="progress-bar-fill" style="width:${rank.p}%"></div></div>`:''}</div><div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:2.2;"><span class="rank-grey">● GREY</span> = 0 &nbsp;<span class="rank-blue">● BLUE</span> = 10 &nbsp;<span class="rank-cyan">● CYAN</span> = 100<br><span class="rank-gold">● GOLD</span> = 500 &nbsp;<span class="rank-rainbow">● RAINBOW</span> = 1000</div>`;
 
-  // Bio section — injected after rank display via the settings modal HTML
+  // Bio section
   let bioSection=$('settings-bio-section');
   if(!bioSection){
     const settingsModal=document.querySelector('#settings-modal .modal');
-    bioSection=document.createElement('div');bioSection.id='settings-bio-section';bioSection.className='settings-section';
-    // Insert before account section
-    const accountSection=settingsModal.querySelector('.settings-section:last-of-type');
-    settingsModal.insertBefore(bioSection,accountSection);
+    if(settingsModal){
+      bioSection=document.createElement('div');
+      bioSection.id='settings-bio-section';
+      bioSection.className='settings-section';
+      const acctSection=settingsModal.querySelector('.settings-section:last-of-type');
+      if(acctSection) settingsModal.insertBefore(bioSection,acctSection);
+      else settingsModal.appendChild(bioSection);
+    }
   }
-  bioSection.innerHTML=`<div class="settings-label">YOUR BIO</div>
+  if(bioSection){
+    bioSection.innerHTML=`<div class="settings-label">YOUR BIO</div>
     <textarea class="bio-textarea" id="bio-input" maxlength="200" placeholder="Tell people about yourself…">${esc(cud?.bio||'')}</textarea>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
       <span style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">Max 200 chars</span>
       <button class="btn-small primary" onclick="N.saveBio()">SAVE BIO</button>
     </div>`;
+  }
 }
 
 async function saveBio(){
@@ -1374,7 +1381,7 @@ function openProfileModal(uid){
       ${!isMe?`<button class="btn-small primary" onclick="N.startDM('${uid}');N.closeModal('profile-modal');">MESSAGE</button>`:''}
     </div>
     <div style="font-family:var(--font-display);font-size:10px;letter-spacing:3px;color:var(--text-dim);margin-bottom:6px;">ABOUT</div>
-    ${bio?`<div class="profile-bio">${esc(bio)}</div>`:`<div class="profile-bio-empty">${isMe?'You haven't set a bio yet. Add one in Settings.':'No bio set.'}</div>`}
+    ${bio?`<div class="profile-bio">${esc(bio)}</div>`:`<div class="profile-bio-empty">${isMe?'You haven\'t set a bio yet. Add one in Settings.':'No bio set.'}</div>`}
     <div style="margin-top:14px;display:flex;gap:16px;">
       <div style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">
         <div style="font-family:var(--font-display);font-size:18px;color:var(--accent)">${u.msgCount||0}</div>
