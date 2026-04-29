@@ -398,14 +398,24 @@
 
   /* ── RAINBOW AVATAR RING ── */
   @keyframes ring-spin{to{transform:rotate(360deg);}}
+  /* Sidebar footer ring (DOM-wrapped) */
   .avatar-ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
   .avatar-ring-wrap::before{
     content:'';position:absolute;inset:-3px;border-radius:10px;
-    background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);
-    background-size:300%;
-    animation:ring-spin 2s linear infinite,logo-shine 2s linear infinite;
-    z-index:-1;
+    background:conic-gradient(#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);
+    animation:ring-spin 2s linear infinite;
+    z-index:-1;border-radius:inherit;
   }
+  /* Inline ring for messages, user list, anywhere avatarHtml() is used */
+  .avatar-ring-inline::before{
+    content:'';position:absolute;inset:-2px;
+    background:conic-gradient(#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);
+    animation:ring-spin 2s linear infinite;
+    z-index:0;border-radius:inherit;
+  }
+  .avatar-ring-inline>*,.avatar-ring-inline>img{position:relative;z-index:1;border-radius:inherit;}
+  /* When inner content is just text (emoji), we need to show it above the ring */
+  .avatar-ring-inline{overflow:hidden;}
   /* Changelog items */
   .cl-item{padding:12px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;}
   .cl-item:hover{border-color:rgba(68,102,255,0.3);}
@@ -815,11 +825,21 @@ function avatarHtml(uid, size='100%'){
   // For own user always use cud (most up-to-date), else uCache
   const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
   const emoji=userEmoji(uid);
+  const hasRing=u.hasRated===true;
+
+  let inner;
   if(u.profilePic){
     const safeEmoji=emoji.replace(/'/g,"\'");
-    return '<img src="'+esc(u.profilePic)+'" style="width:'+size+';height:'+size+';object-fit:cover;border-radius:inherit;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\');">';
+    inner='<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\');">';
+  } else {
+    inner=emoji;
   }
-  return emoji;
+
+  if(hasRing){
+    // Wrap in a rainbow ring span that works inline in any container
+    return '<span class="avatar-ring-inline" style="display:inline-flex;align-items:center;justify-content:center;width:'+size+';height:'+size+';border-radius:inherit;position:relative;">'+inner+'</span>';
+  }
+  return inner;
 }
 
 
@@ -1123,6 +1143,11 @@ function setupChatsListener(){
   usersUnsub=onSnapshot(collection(db,'users'),snap=>{
     snap.docChanges().forEach(ch=>{
       uCache[ch.doc.id]={...ch.doc.data()};
+      // Sync own user's live data into cud (e.g. after profile update from another tab)
+      if(ch.doc.id===cu?.uid&&cud){
+        const d=ch.doc.data();
+        cud={...cud,...d};
+      }
     });
     renderSidebar();
     // Refresh open chat header online status
@@ -3219,22 +3244,26 @@ async function renderFeedbackDone(myRating, alreadyRated){
 
 // ── RAINBOW RING ───────────────────────────────────
 function applyRainbowRing(){
+  // Mark as rated so avatarHtml generates ring everywhere
+  cud={...cud,hasRated:true};
+  if(cu?.uid) uCache[cu.uid]={...uCache[cu.uid],hasRated:true};
+
+  // Also wrap the sidebar footer avatar specifically
   const avel=$('my-avatar-el');
-  if(!avel) return;
-  // Wrap the avatar in a ring div if not already
-  if(!avel.parentElement?.classList.contains('avatar-ring-wrap')){
+  if(avel&&!avel.parentElement?.classList.contains('avatar-ring-wrap')){
     const wrap=document.createElement('div');
     wrap.className='avatar-ring-wrap';
     wrap.style.cssText='width:36px;height:36px;border-radius:8px;flex-shrink:0;';
     avel.parentNode.insertBefore(wrap,avel);
     wrap.appendChild(avel);
   }
-  // Store that user has rated so ring persists across renders
-  cud={...cud,hasRated:true};
+  // Re-render messages and sidebar so inline rings appear
+  if(acid) renderMsgs(acid);
+  renderSidebar();
 }
 
 function restoreRainbowRingIfRated(){
-  if(cud?.hasRated) applyRainbowRing();
+  if(cud?.hasRated||uCache[cu?.uid]?.hasRated) applyRainbowRing();
 }
 
 // ── GLOBAL EVENTS ──────────────────────────────
