@@ -464,7 +464,7 @@
   #announce-banner.active{display:flex;align-items:center;justify-content:center;gap:12px;}
   #announce-close{background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;text-align:center;flex-shrink:0;}
   /* Font picker */
-  .font-pick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;max-height:380px;overflow-y:auto;padding-right:2px;}
+  .font-pick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;max-height:400px;overflow-y:auto;padding-right:2px;}
   .font-pick-grid::-webkit-scrollbar{width:3px;}
   .font-pick-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
   .font-pick-btn{background:var(--bg3);border:2px solid var(--border);border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left;transition:all 0.15s;position:relative;}
@@ -1346,7 +1346,7 @@ function renderSidebar(){
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
-    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}">${esc(nm)}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
+    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}">${esc(nm)}${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
     feed.appendChild(el);
   });
 }
@@ -1706,7 +1706,7 @@ function buildUsersList(){
   entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;">${avatarHtml(uid,'42px')}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span></div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;">${avatarHtml(uid,'42px')}${isOnline(u)?'<div class="online-dot"></div>':''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
     list.appendChild(el);
   });
 }
@@ -3228,7 +3228,6 @@ function openCreditsModal(){
         <span style="color:var(--accent);">© 2025 NEXUS</span> · All rights reserved
       </div>
     </div>`;
-  openModal('credits-modal');
 }
 
 // ── HELP ────────────────────────────────────────
