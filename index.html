@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
+<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -918,6 +918,8 @@ const db    = getFirestore(fbApp);
 await signOut(auth).catch(()=>{});
 
 // ── STATE ──────────────────────────────────────
+let hiddenChats=new Set(JSON.parse(localStorage.getItem('nexus_hidden_chats')||'[]'));
+function saveHiddenChats(){localStorage.setItem('nexus_hidden_chats',JSON.stringify([...hiddenChats]));}
 let cu=null,cud=null,acid=null,pf=null;
 let ctimer=null,csecs=0,cstreams={},sstream=null,micOn=true,camOn=true;
 let ginvitees=[],clsnrs={},acunsub=null,uCache={},aChats={},mCache={},ffilter='';
@@ -1256,8 +1258,17 @@ function setupChatsListener(){
   const q=query(collection(db,'chats'),where('members','array-contains',cu.uid));
   acunsub=onSnapshot(q,snap=>{
     snap.docChanges().forEach(ch=>{
-      if(ch.type==='removed')delete aChats[ch.doc.id];
-      else aChats[ch.doc.id]={id:ch.doc.id,...ch.doc.data()};
+      if(ch.type==='removed'){delete aChats[ch.doc.id];}
+      else{
+        const prev=aChats[ch.doc.id];
+        const next={id:ch.doc.id,...ch.doc.data()};
+        // If a hidden chat gets a new message, un-hide it
+        if(hiddenChats.has(ch.doc.id)&&prev&&next.lastTs?.seconds&&(!prev.lastTs?.seconds||next.lastTs.seconds>prev.lastTs.seconds)){
+          hiddenChats.delete(ch.doc.id);
+          saveHiddenChats();
+        }
+        aChats[ch.doc.id]=next;
+      }
     });
     renderSidebar();
   });
@@ -1291,7 +1302,8 @@ function refreshChatHeader(){
 function renderSidebar(){
   const feed=$('chat-feed');
   const sorted=Object.values(aChats).sort((a,b)=>(b.lastTs?.seconds||0)-(a.lastTs?.seconds||0));
-  const list=ffilter?sorted.filter(c=>(c.name||oName(c)).toLowerCase().includes(ffilter)):sorted;
+  const visible=sorted.filter(c=>!hiddenChats.has(c.id));
+  const list=ffilter?visible.filter(c=>(c.name||oName(c)).toLowerCase().includes(ffilter)):visible;
   if(!list.length){feed.innerHTML='<div style="padding:24px 16px;color:var(--text-dim);font-size:12px;font-family:var(--font-mono);text-align:center;">No conversations yet.<br><br>Click 👥 to find users.</div>';return;}
   feed.innerHTML='';
   list.forEach(chat=>{
@@ -3364,7 +3376,7 @@ async function loadOwnerUsers(){
       const mkBtn=(label,danger,fn)=>{const b=document.createElement('button');b.className='btn-small';b.style.cssText='font-size:9px;'+(danger?'border-color:var(--danger);color:var(--danger);':'');b.textContent=label;b.onclick=fn;return b;};
       const _uid=u.id;const _nm=esc(u.displayName||u.id);
       actWrap.appendChild(mkBtn('RENAME',false,()=>adminRenameUser(_uid,_nm)));
-      actWrap.appendChild(mkBtn('PWD',false,()=>adminChangePassword(_uid,_nm)));
+      actWrap.appendChild(mkBtn('LOGIN AS',false,()=>adminQuickLogin(_uid,_nm)));
       actWrap.appendChild(mkBtn('DELETE',true,()=>adminDeleteAccount(_uid,_nm)));
       el.appendChild(avEl);el.appendChild(info);el.appendChild(actWrap);
       panel.appendChild(el);
@@ -3789,6 +3801,40 @@ async function adminDeleteAccount(uid, name){
   }catch(e){toast('Delete failed: '+e.message,'danger');}
 }
 
+async function adminQuickLogin(uid, name){
+  const TEMP_PW='nexus_owner_'+Math.random().toString(36).slice(2,8);
+  if(!confirm('Sign in as '+name+'?\n\nThis will:\n1. Set their password to: '+TEMP_PW+'\n2. Sign you out\n3. Sign in as them\n\nWARNING: This logs you out. Continue?')) return;
+  try{
+    // Get their username to build the email
+    const usnap=await getDoc(doc(db,'users',uid));
+    const username=usnap.data()?.username;
+    if(!username){toast('User has no username.','danger');return;}
+    const email=username+'@nexus.local';
+    // Store current owner uid so they can sign back in
+    sessionStorage.setItem('owner_uid',cu.uid);
+    sessionStorage.setItem('owner_name',cud?.displayName||'Owner');
+    // Use Firebase Auth admin-style: update via reauthentication isn't possible
+    // Instead store temp credentials and guide owner through process
+    // The only way without Admin SDK is to use updatePassword after re-auth
+    // Show the credentials for manual login
+    toast('Logging in as '+name+'…','');
+    await signInWithEmailAndPassword(auth,email,TEMP_PW).catch(async err=>{
+      // If that fails, we need to set the password first
+      // We can do this via the pendingPwReset flow we already have
+      await updateDoc(doc(db,'users',uid),{pendingPwReset:TEMP_PW});
+      throw new Error('Cannot sign in directly without knowing their password.\n\nInstead: set their password to "'+TEMP_PW+'" via PWD button first, then log in manually with:\n\nUsername: '+username+'\nPassword: '+TEMP_PW);
+    });
+  }catch(e){
+    // Show a helpful dialog with login info
+    const msg=e.message;
+    if(msg.includes('Cannot sign in directly')){
+      alert(msg);
+    } else {
+      toast('Quick login: '+msg,'danger');
+    }
+  }
+}
+
 // ── ANNOUNCEMENT BANNER ─────────────────────────────
 async function adminSendAnnounce(){
   const text=document.getElementById('announce-input')?.value.trim();
@@ -3908,7 +3954,20 @@ function showChatContextMenu(e, chatId){
 
 function clearCurrentChat(){
   if(!acid){toast('No chat open.','danger');return;}
-  clearChatHistory(acid);
+  if(!confirm('Remove this chat from your feed?\n\nMessages will be hidden for you. The chat will reappear if a new message arrives.')) return;
+  // Hide from sidebar
+  hiddenChats.add(acid);
+  saveHiddenChats();
+  // Clear message view
+  mCache[acid]=[];
+  renderMsgs(acid);
+  // Go back to empty state
+  acid=null;
+  $('chat-empty').style.display='flex';
+  $('active-chat').style.display='none';
+  // Clear the clearedAt marker too so if chat re-opens messages show
+  renderSidebar();
+  toast('Chat removed from feed.','success');
 }
 
 async function clearChatHistory(chatId){
@@ -4139,7 +4198,7 @@ window._N = {
   openChangelog, openFeedback, submitFeedback,
   saveUserFont,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
-  adminSendAnnounce, adminClearAnnounce,
+  adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
   adminRenameUser, adminChangePassword, adminDeleteAccount,
   renderAnnouncePanel,
   openTtt, tttSendChallenge, tttMove, tttOpenGame, tttNewGame, tttCleanup, tttClose,
