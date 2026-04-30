@@ -606,7 +606,7 @@
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-              <button onclick="N.openModal('owner-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--danger);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(255,51,85,0.1)'" onmouseout="this.style.background='none'">👑 Owner Portal</button>
+              <button onclick="N.openOwnerPortal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--danger);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(255,51,85,0.1)'" onmouseout="this.style.background='none'">👑 Owner Portal</button>
             </div>
           </div>
         </div>
@@ -1472,7 +1472,7 @@ function renderMsgs(cid){
         wr.appendChild(imgEl);
       } else {
         const fm=document.createElement('div');fm.className='file-msg';
-        fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)}</div></div>`;
+        fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)} · Click to download</div></div>`;
         fm.onclick=()=>dlFile(msg.fileData,msg.fileName);wr.appendChild(fm);
       }
     } else if(msg.type==='voice'){
@@ -1576,19 +1576,35 @@ const autoResize=el=>{el.style.height='22px';el.style.height=Math.min(el.scrollH
 
 function handleFileAttach(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>900000){toast('File too large. Max ~900KB.','danger');input.value='';return;}
+  // Warn (but don't block) for very large files — Firestore doc limit is ~1MB after base64
+  if(file.size>750000){
+    toast('Large file ('+fmtB(file.size)+') — may fail if over ~750KB for Firestore.','');
+  }
   pf=file;
   const h=$('input-hint');h.style.display='block';h.textContent=`📎 ${file.name} (${fmtB(file.size)}) — Press Send`;
   $('msg-input').placeholder='Add a message or just send the file…';
 }
 
 async function sendFile(file){
-  new Promise(res=>{const r=new FileReader();r.onload=async e=>{
-    pf=null;$('input-hint').style.display='none';$('msg-input').placeholder='Send a message…';$('file-input').value='';
-    try{
-      await addDoc(collection(db,'chats',acid,'messages'),{senderUid:cu.uid,senderName:cud?.displayName||'User',ts:serverTimestamp(),type:'file',fileName:file.name,fileSize:file.size,fileData:e.target.result,reactions:{}});
-      await updateDoc(doc(db,'chats',acid),{lastMessage:`📎 ${file.name}`,lastTs:serverTimestamp()});
-    }catch{toast('File send failed.','danger');}res();};r.readAsDataURL(file);});
+  return new Promise(res=>{
+    const r=new FileReader();
+    r.onload=async e=>{
+      pf=null;$('input-hint').style.display='none';$('msg-input').placeholder='Send a message…';$('file-input').value='';
+      try{
+        await addDoc(collection(db,'chats',acid,'messages'),{
+          senderUid:cu.uid,senderName:cud?.displayName||'User',
+          ts:serverTimestamp(),type:'file',
+          fileName:file.name,fileSize:file.size,
+          fileData:e.target.result,reactions:{}
+        });
+        await updateDoc(doc(db,'chats',acid),{lastMessage:`📎 ${file.name}`,lastTs:serverTimestamp()});
+      }catch(err){
+        toast('File too large for Firestore (max ~750KB). '+err.message,'danger');
+      }
+      res();
+    };
+    r.readAsDataURL(file);
+  });
 }
 
 const dlFile=(d,n)=>{const a=document.createElement('a');a.href=d;a.download=n;a.click();};
@@ -1677,7 +1693,7 @@ function openModal(id){
   if(id==='settings-modal')renderSettings();
   if(id==='bg-modal')openModal_bg();
   if(id==='credits-modal')openCreditsModal();
-  if(id==='owner-modal')ownerTab('tickets');
+  if(id==='owner-modal'){ownerTab('tickets');}
   if(id==='gc-members-modal'){}  // rendered by openGcMembers()
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
@@ -2091,7 +2107,7 @@ async function saveProfilePicUrl(){
 
 function saveProfilePicFile(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>400000){toast('Image too large. Max ~400KB.','danger');input.value='';return;}
+  if(file.size>750000){toast('Image too large for Firestore (max ~750KB).','danger');input.value='';return;}
   const reader=new FileReader();
   reader.onload=async e=>{
     const data=e.target.result;
@@ -2869,14 +2885,19 @@ function endCall(){
   // Firestore listeners
   signalUnsubs.forEach(u=>{ try{u();}catch{} }); signalUnsubs=[];
   if(callUnsub){callUnsub();callUnsub=null;}
-  // Mark call ended in Firestore and delete signals
+  // Delete call doc + signals to save Firestore storage
   if(activeCallId){
     const cid=activeCallId; activeCallId=null;
-    updateDoc(doc(db,'calls',cid),{status:'ended'}).catch(()=>{});
-    // Clean up signals subcollection
+    // Delete signals first, then the call doc itself
     getDocs(collection(db,'calls',cid,'signals')).then(snap=>{
-      snap.docs.forEach(d=>deleteDoc(d.ref).catch(()=>{}));
-    }).catch(()=>{});
+      const deletes=snap.docs.map(d=>deleteDoc(d.ref).catch(()=>{}));
+      return Promise.all(deletes);
+    }).then(()=>{
+      deleteDoc(doc(db,'calls',cid)).catch(()=>{});
+    }).catch(()=>{
+      // Fallback: just mark ended if delete fails (permissions)
+      updateDoc(doc(db,'calls',cid),{status:'ended'}).catch(()=>{});
+    });
   }
   if(ctimer){clearInterval(ctimer);ctimer=null;}
   csecs=0;
@@ -3232,8 +3253,8 @@ async function openCreditsModal(){
     </div>`;
   };
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
-  const ownerCard=await makeCard('owner','FOUNDER · DEVELOPER','badge-creator','CREATOR');
-  const testerCard=await makeCard('j_frosty','IDEAS · TESTER','badge-tester','TESTER');
+  const ownerCard=await makeCard('owner','FOUNDER · LEAD DEVELOPER','badge-creator','CREATOR');
+  const testerCard=await makeCard('j_frosty','QUALITY ASSURANCE · TESTER','badge-tester','TESTER');
   el.innerHTML=`
     <div class="credits-hero">
       <div class="credits-nexus-logo">NEXUS</div>
@@ -3315,6 +3336,30 @@ async function checkOwnerAndShowBtn(){
     const wrap=document.getElementById('owner-portal-btn-wrap');
     if(wrap) wrap.style.display=isOwner?'block':'none';
   }catch{}
+}
+
+let ownerVerified=false; // stays true for the session once verified
+
+async function openOwnerPortal(){
+  if(!isOwner){toast('Access denied.','danger');return;}
+  if(ownerVerified){
+    openModal('owner-modal');
+    return;
+  }
+  // Prompt for password to verify identity
+  const pw=prompt('🔒 OWNER PORTAL\n\nEnter your account password to continue:');
+  if(!pw) return;
+  try{
+    // Re-authenticate by signing in with owner credentials
+    const email=toEmail('owner');
+    await signInWithEmailAndPassword(auth,email,pw);
+    ownerVerified=true;
+    toast('Access granted.','success');
+    openModal('owner-modal');
+  }catch(e){
+    toast('Wrong password. Access denied.','danger');
+    ownerVerified=false;
+  }
 }
 
 // ── OWNER PORTAL ──────────────────────────────
@@ -4453,7 +4498,7 @@ window._N = {
   openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
-  ownerTab, loadRolesPanel, replyToTicket, adminWipeAllChats, adminBroadcast,
+  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
   adminClearTickets, adminResetMsgs, openOwnerModal,
 };
 // Also copy onto N directly in case Proxy isn't supported
