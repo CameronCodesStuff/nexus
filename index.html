@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -624,7 +625,7 @@
             <button class="icon-btn" title="Video Call" onclick="N.startCall('video')">📹</button>
             <button class="icon-btn" title="Screen Share" onclick="N.startCall('screen')">🖥️</button>
             <button class="icon-btn" title="Wipe Chat" onclick="N.confirmWipe()" style="color:var(--danger)">🗑️</button>
-            <button class="icon-btn" title="Clear chat for me" onclick="N.clearChatHistory(acid)" style="color:var(--text-dim)">🧹</button>
+            <button class="icon-btn" title="Clear chat for me" onclick="N.clearCurrentChat()" style="color:var(--text-dim)">🧹</button>
             <button class="icon-btn" id="leave-group-btn" title="Leave Group" onclick="N.confirmLeaveGroup()" style="color:var(--danger);display:none">🚪</button>
             <button class="icon-btn" title="Chat Background" onclick="N.openModal('bg-modal')">🖼️</button>
           </div>
@@ -3167,8 +3168,8 @@ function openCreditsModal(){
       <div class="credits-card">
         <div class="credits-avatar" style="background:linear-gradient(135deg,#050520,#1a1a60);">👑</div>
         <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">detla</div>
-          <div class="credits-role">FOUNDER · LEAD DEVELOPER</div>
+          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Owner</div>
+          <div class="credits-role">FOUNDER · DEVELOPER</div>
         </div>
         <span class="credits-badge badge-creator">CREATOR</span>
       </div>
@@ -3177,8 +3178,8 @@ function openCreditsModal(){
       <div class="credits-card">
         <div class="credits-avatar" style="background:linear-gradient(135deg,#200040,#600080);">🧪</div>
         <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Add your testers here</div>
-          <div class="credits-role">QUALITY ASSURANCE</div>
+          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">J_Frosty</div>
+          <div class="credits-role">TESTER</div>
         </div>
         <span class="credits-badge badge-tester">TESTER</span>
       </div>
@@ -3904,6 +3905,11 @@ function showChatContextMenu(e, chatId){
   setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),10);
 }
 
+function clearCurrentChat(){
+  if(!acid){toast('No chat open.','danger');return;}
+  clearChatHistory(acid);
+}
+
 async function clearChatHistory(chatId){
   if(!chatId){toast('No chat selected.','danger');return;}
   if(!confirm('Clear all messages in this chat?\n\nThis only hides them for you.')) return;
@@ -4123,7 +4129,7 @@ window._N = {
   openCreditsModal, sendHelp,
   openChangelog, openFeedback, submitFeedback,
   saveUserFont,
-  showChatContextMenu, clearChatHistory,
+  showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce,
   adminRenameUser, adminChangePassword, adminDeleteAccount,
   renderAnnouncePanel,
