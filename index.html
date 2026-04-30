@@ -442,6 +442,23 @@
   .msg-reply-btn:hover{background:var(--bg3);color:var(--text);}
 
 
+  /* Image preview in chat */
+  .msg-img{max-width:280px;max-height:220px;border-radius:10px;display:block;cursor:pointer;border:1px solid var(--border);transition:opacity 0.2s;}
+  .msg-img:hover{opacity:0.9;}
+  /* Lightbox */
+  #lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+  #lightbox.open{display:flex;}
+  #lightbox img{max-width:92vw;max-height:82vh;border-radius:10px;object-fit:contain;}
+  #lightbox-close{position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;opacity:0.7;line-height:1;}
+  #lightbox-close:hover{opacity:1;}
+  #lightbox-dl{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-family:var(--font-display);font-size:11px;letter-spacing:2px;cursor:pointer;}
+  #lightbox-dl:hover{filter:brightness(1.15);}
+  /* Delete message button */
+  .msg-del-btn{background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0;transition:opacity 0.15s;}
+  .msg-bubble-wrap:hover .msg-del-btn{opacity:1;}
+  .msg-del-btn:hover{background:rgba(255,51,85,0.12);color:var(--danger);}
+
+
 </style>
 </head>
 <body>
@@ -1333,9 +1350,21 @@ function renderMsgs(cid){
       wr.appendChild(rq);
     }
     if(msg.type==='file'){
-      const fm=document.createElement('div');fm.className='file-msg';
-      fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)}</div></div>`;
-      fm.onclick=()=>dlFile(msg.fileData,msg.fileName);wr.appendChild(fm);
+      if(isImgFile(msg.fileName)&&msg.fileData){
+        // Show inline image preview
+        const imgEl=document.createElement('img');
+        imgEl.className='msg-img';
+        imgEl.src=msg.fileData;
+        imgEl.alt=msg.fileName||'Image';
+        imgEl.loading='lazy';
+        imgEl.title=msg.fileName||'Image';
+        imgEl.onclick=()=>openLightbox(msg.fileData,msg.fileName);
+        wr.appendChild(imgEl);
+      } else {
+        const fm=document.createElement('div');fm.className='file-msg';
+        fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)}</div></div>`;
+        fm.onclick=()=>dlFile(msg.fileData,msg.fileName);wr.appendChild(fm);
+      }
     } else if(msg.type==='voice'){
       wr.appendChild(renderVoiceNote(msg));
 
@@ -1343,7 +1372,14 @@ function renderMsgs(cid){
       const b=document.createElement('div');b.className='msg-bubble';b.innerHTML=fmtMsg(msg.text);wr.appendChild(b);
     }
     const abRow=document.createElement('div');abRow.className='msg-actions-row';
-    abRow.appendChild(rb);abRow.appendChild(ab);
+    abRow.appendChild(rb);
+    if(msg.senderUid===cu.uid){
+      const db_btn=document.createElement('button');db_btn.className='msg-del-btn';db_btn.textContent='🗑';db_btn.title='Delete message';
+      const _mid=msg.id;const _cid=cid;
+      db_btn.onclick=()=>deleteMessage(_mid,_cid);
+      abRow.appendChild(db_btn);
+    }
+    abRow.appendChild(ab);
     wr.appendChild(abRow);
     if(msg.reactions&&Object.keys(msg.reactions).length){
       const rd=document.createElement('div');rd.className='msg-reactions';
@@ -1430,6 +1466,40 @@ async function sendFile(file){
 }
 
 const dlFile=(d,n)=>{const a=document.createElement('a');a.href=d;a.download=n;a.click();};
+
+// ── LIGHTBOX ───────────────────────────────────
+let _lbData='',_lbName='';
+function openLightbox(dataUrl, fileName){
+  _lbData=dataUrl;_lbName=fileName||'image';
+  const lb=document.getElementById('lightbox');
+  const img=document.getElementById('lightbox-img');
+  if(lb&&img){img.src=dataUrl;lb.classList.add('open');}
+  // Close on Escape
+  document.addEventListener('keydown',_lbEscHandler);
+}
+function closeLightbox(){
+  document.getElementById('lightbox')?.classList.remove('open');
+  const img=document.getElementById('lightbox-img');
+  if(img) img.src='';
+  document.removeEventListener('keydown',_lbEscHandler);
+}
+const _lbEscHandler=e=>{if(e.key==='Escape')closeLightbox();};
+function dlLightbox(){dlFile(_lbData,_lbName);}
+
+// ── DELETE MESSAGE ───────────────────────────────
+async function deleteMessage(msgId, chatId){
+  try{
+    await deleteDoc(doc(db,'chats',chatId,'messages',msgId));
+    // If it was the last message, update the preview
+    const msgs=mCache[chatId]||[];
+    const remaining=msgs.filter(m=>m.id!==msgId);
+    const last=remaining[remaining.length-1];
+    await updateDoc(doc(db,'chats',chatId),{
+      lastMessage: last? (last.text||'📎 Attachment').substring(0,80) : '',
+      lastTs: last?.ts||serverTimestamp()
+    });
+  }catch(e){toast('Delete failed: '+e.message,'danger');}
+}
 
 // ── REACTIONS ──────────────────────────────────
 function showRP(e,mid,cid){
@@ -3568,6 +3638,7 @@ window._N = {
   openChangelog, openFeedback, submitFeedback,
   showTnC, hideTnC,
   setReply, clearReply, scrollToMsg,
+  openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
   ownerTab, replyToTicket, adminWipeAllChats, adminBroadcast,
@@ -3577,5 +3648,10 @@ window._N = {
 Object.assign(window.N, window._N);
 
 </script>
+<div id="lightbox" onclick="if(event.target===this)closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+  <button id="lightbox-dl" onclick="dlLightbox()">⬇ DOWNLOAD</button>
+</div>
 </body>
 </html>
