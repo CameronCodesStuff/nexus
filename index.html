@@ -967,6 +967,7 @@ const fmtT=d=>d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const fmtD=d=>{const t=new Date();if(d.toDateString()===t.toDateString())return'TODAY';const y=new Date(t);y.setDate(y.getDate()-1);return d.toDateString()===y.toDateString()?'YESTERDAY':d.toLocaleDateString([],{month:'short',day:'numeric'});};
 const fmtB=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
 const fIcon=n=>{const e=(n||'').split('.').pop().toLowerCase();return({pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp4:'🎬',mov:'🎬',mp3:'🎵',wav:'🎵',zip:'📦',rar:'📦',js:'💻',ts:'💻',py:'💻',txt:'📃',md:'📃'})[e]||'📁';};
+const isImgFile=n=>Boolean(n?.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff?|avif|heic)/i));
 
 // Emoji avatars — consistent per user based on uid
 const AVATAR_EMOJIS=['👑','🦊','🐺','🦁','🐯','🦋','🐉','🦄','🔥','⚡','🌊','🌙','⭐','🎭','🎯','💎','🛸','🌸','🍀','🎪','🦅','🐬','🐧','🦈','🦚','🎸','🎺','🎲','🌋','🎃','🌀','🦜','🐲','🌺','🎋','🦩','🐙','🌵','🍄','💫','🔮','🧿','⚔️','🏹','🪄','🎠','🌈','🏔️','🗿','🧬','🪐','💀','🦂','🐍'];
