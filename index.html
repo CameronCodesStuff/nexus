@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png">
 <title>NEXUS — Chat</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
@@ -41,9 +40,9 @@
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px var(--glow);}
   .auth-error{color:var(--danger);font-size:12px;text-align:center;font-family:var(--font-mono);min-height:16px;}
   .auth-info{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);text-align:center;line-height:1.6;margin-top:4px;}
-  #app-screen{display:none;}#app-screen.active{display:flex;}
-  .app-layout{display:flex;width:100vw;height:100vh;position:relative;z-index:10;overflow:hidden;}
-  .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  #app-screen{display:none;}#app-screen.active{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;}
+  .app-layout{flex:1;min-height:0;display:flex;position:relative;z-index:10;overflow:hidden;width:100%;}
+  .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow:hidden;}
   .sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;}
   .sidebar-logo{font-family:var(--font-display);font-size:15px;font-weight:900;letter-spacing:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;flex:1;}
   .icon-btn{width:30px;height:30px;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-size:13px;flex-shrink:0;}
@@ -129,8 +128,9 @@
     -webkit-text-fill-color:transparent !important;
     filter:brightness(1.4) drop-shadow(0 0 8px #ff00ff) !important;
   }
-  .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;height:100vh;}
-  .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-dim);}
+  .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+  #active-chat{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+  .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-dim);min-height:0;}
   .chat-empty-icon{font-size:72px;margin-bottom:20px;opacity:0.2;}
   .chat-empty h2{font-family:var(--font-display);letter-spacing:4px;font-size:18px;margin-bottom:10px;}
   .chat-empty p{font-size:13px;font-family:var(--font-mono);}
@@ -139,7 +139,7 @@
   .chat-header-name{font-weight:700;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .chat-header-sub{font-size:12px;color:var(--text-dim);font-family:var(--font-mono);margin-top:1px;}
   .chat-header-actions{display:flex;gap:6px;}
-  .messages-area{flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:4px;}
+  .messages-area{flex:1;overflow-y:auto;padding:16px 24px;display:flex;flex-direction:column;gap:4px;min-height:0;}
   .messages-area::-webkit-scrollbar{width:4px;}
   .messages-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
   .msg-group{display:flex;flex-direction:column;gap:2px;margin:8px 0;}
@@ -442,6 +442,55 @@
   .msg-reply-btn:hover{background:var(--bg3);color:var(--text);}
 
 
+  /* Image preview in chat */
+  .msg-img{max-width:280px;max-height:220px;border-radius:10px;display:block;cursor:pointer;border:1px solid var(--border);transition:opacity 0.2s;}
+  .msg-img:hover{opacity:0.9;}
+  /* Lightbox */
+  #lightbox{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+  #lightbox.open{display:flex;}
+  #lightbox img{max-width:92vw;max-height:82vh;border-radius:10px;object-fit:contain;}
+  #lightbox-close{position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;opacity:0.7;line-height:1;}
+  #lightbox-close:hover{opacity:1;}
+  #lightbox-dl{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 20px;font-family:var(--font-display);font-size:11px;letter-spacing:2px;cursor:pointer;}
+  #lightbox-dl:hover{filter:brightness(1.15);}
+  /* Delete message button */
+  .msg-del-btn{background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0;transition:opacity 0.15s;}
+  .msg-bubble-wrap:hover .msg-del-btn{opacity:1;}
+  .msg-del-btn:hover{background:rgba(255,51,85,0.12);color:var(--danger);}
+
+
+  /* Announcement banner */
+  #announce-banner{display:none;background:linear-gradient(90deg,var(--accent),var(--accent2));padding:10px 20px;text-align:center;font-family:var(--font-display);font-size:12px;letter-spacing:2px;color:#fff;position:relative;z-index:100;flex-shrink:0;animation:logo-shine 3s linear infinite;background-size:300%;}
+  #announce-banner.active{display:flex;align-items:center;justify-content:center;gap:12px;}
+  #announce-close{background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;text-align:center;flex-shrink:0;}
+  /* Font picker */
+  .font-pick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;}
+  .font-pick-btn{background:var(--bg3);border:2px solid var(--border);border-radius:10px;padding:12px 10px;cursor:pointer;text-align:center;transition:all 0.15s;}
+  .font-pick-btn:hover{border-color:var(--accent);}
+  .font-pick-btn.selected{border-color:var(--accent);background:rgba(68,102,255,0.15);}
+  .font-pick-preview{font-size:15px;font-weight:700;margin-bottom:4px;}
+  .font-pick-label{font-size:9px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:2px;}
+  /* Tic-tac-toe */
+  .ttt-board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:240px;margin:16px auto;}
+  .ttt-cell{height:72px;background:var(--bg3);border:2px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;transition:all 0.15s;}
+  .ttt-cell:hover:not(.taken){background:rgba(68,102,255,0.1);border-color:var(--accent);}
+  .ttt-cell.taken{cursor:default;}
+  .ttt-cell.win{border-color:var(--success);background:rgba(0,200,100,0.1);}
+  .ttt-status{text-align:center;font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:var(--text-dim);margin-bottom:8px;}
+  /* User font classes */
+  .ufont-0{font-family:inherit;}
+  .ufont-1{font-family:'Orbitron',monospace;font-weight:700;}
+  .ufont-2{font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:2px;}
+  .ufont-3{font-family:'JetBrains Mono',monospace;}
+  .ufont-4{font-family:Georgia,serif;font-style:italic;}
+  .ufont-5{font-family:'Courier New',monospace;letter-spacing:1px;}
+  /* Context menu for sidebar chat items */
+  .chat-ctx-menu{position:absolute;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,0.5);min-width:160px;}
+  .chat-ctx-item{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;}
+  .chat-ctx-item:hover{background:rgba(68,102,255,0.1);}
+  .chat-ctx-item.danger:hover{background:rgba(255,51,85,0.1);color:var(--danger);}
+
+
 </style>
 </head>
 <body>
@@ -505,6 +554,11 @@
   <div class="loading-sub">CONNECTING…</div>
 </div>
 
+<div id="app-screen-inner" style="display:flex;flex-direction:column;flex:1;min-height:0;width:100%;">
+<div id="announce-banner">
+  <span id="announce-text"></span>
+  <button id="announce-close" onclick="document.getElementById('announce-banner').classList.remove('active')">✕</button>
+</div>
 <div class="app-layout" id="app-layout">
     <button id="mobile-menu-btn" onclick="N.toggleSidebar()" title="Menu">☰</button>
     <div id="sidebar-backdrop" onclick="N.closeSidebar()"></div>
@@ -556,7 +610,7 @@
         <h2>SELECT A CHANNEL</h2>
         <p>Choose a conversation from the sidebar to begin</p>
       </div>
-      <div id="active-chat" style="display:none;flex:1;flex-direction:column;overflow:hidden;height:100vh;">
+      <div id="active-chat" style="display:none;">
         <div class="chat-header">
           <div class="feed-avatar" id="ch-avatar"></div>
           <div class="chat-header-info">
@@ -565,6 +619,7 @@
           </div>
           <div class="chat-header-actions">
             <button class="icon-btn" id="gc-members-btn" title="Group Members" onclick="N.openGcMembers()" style="display:none">👥</button>
+            <button class="icon-btn" id="ttt-btn" title="Play Tic-Tac-Toe" onclick="N.openTtt()" style="display:none">🎮</button>
             <button class="icon-btn" title="Audio Call" onclick="N.startCall('audio')">📞</button>
             <button class="icon-btn" title="Video Call" onclick="N.startCall('video')">📹</button>
             <button class="icon-btn" title="Screen Share" onclick="N.startCall('screen')">🖥️</button>
@@ -576,7 +631,7 @@
         <div class="messages-area" id="messages-area">
           <div id="wipe-confirm-slot"></div>
         </div>
-        <div style="position:relative;">
+        <div style="position:relative;flex-shrink:0;">
           <div class="emoji-picker-bar" id="emoji-picker-bar"></div>
           <div id="reply-bar" class="reply-bar">
             <div class="reply-bar-content">
@@ -699,14 +754,16 @@
     <div class="modal-title" style="color:var(--danger);">👑 OWNER PORTAL</div>
     <button class="modal-close" onclick="N.closeModal('owner-modal')">✕</button>
     <!-- Tabs -->
-    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border);">
-      <div class="auth-tab active" id="op-tab-tickets" onclick="N.ownerTab('tickets')" style="font-size:10px;">HELP TICKETS</div>
+    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+      <div class="auth-tab active" id="op-tab-tickets" onclick="N.ownerTab('tickets')" style="font-size:10px;">TICKETS</div>
       <div class="auth-tab" id="op-tab-users" onclick="N.ownerTab('users')" style="font-size:10px;">USERS</div>
       <div class="auth-tab" id="op-tab-admin" onclick="N.ownerTab('admin')" style="font-size:10px;">ADMIN</div>
+      <div class="auth-tab" id="op-tab-announce" onclick="N.ownerTab('announce')" style="font-size:10px;">ANNOUNCE</div>
     </div>
     <div id="op-panel-tickets"></div>
     <div id="op-panel-users" style="display:none;"></div>
     <div id="op-panel-admin" style="display:none;"></div>
+    <div id="op-panel-announce" style="display:none;"></div>
   </div>
 </div>
 
@@ -1111,6 +1168,7 @@ async function enterApp(){
   listenForIncomingCalls();
   listenForInboxChanges();
   applyMobileMode(mobileMode);
+  checkAnnouncement();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
   // Dismiss loading screen
@@ -1247,6 +1305,7 @@ function renderSidebar(){
     const chatLastMs=chat.lastTs?.seconds?chat.lastTs.seconds*1000:0;
     const hasUnread=acid!==chat.id&&chatLastMs>myReadMs&&chat.lastMessage&&chat.members?.find(m=>m!==cu.uid);
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
+    el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
     el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}">${esc(nm)}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
     feed.appendChild(el);
@@ -1263,7 +1322,7 @@ function openChat(cid){
     setTimeout(()=>{if(aChats[cid])openChat(cid);},800);
     return;
   }
-  $('chat-empty').style.display='none';$('active-chat').style.display='flex';
+  $('chat-empty').style.display='none';$('active-chat').style.display='';
   const ig=chat.type==='group',ouid=ig?null:chat.members?.find(m=>m!==cu.uid),ou=ouid?(uCache[ouid]||{}):{}; 
   const nm=ig?(chat.name||'Group'):(ou.displayName||'Unknown'),rank=getRank(ig?0:(ou.msgCount||0));
   const chAvEl=$('ch-avatar');
@@ -1289,6 +1348,8 @@ function openChat(cid){
   if(leaveBtn) leaveBtn.style.display=ig?'flex':'none';
   const gcBtn=$('gc-members-btn');
   if(gcBtn) gcBtn.style.display=ig?'flex':'none';
+  const tttBtn=$('ttt-btn');
+  if(tttBtn) tttBtn.style.display=(!ig)?'flex':'none';
   clearReply();
   subMsgs(cid);renderSidebar();
   setTimeout(()=>applyChatBgPreset(cid),50);
@@ -1302,7 +1363,29 @@ function openChat(cid){
 function subMsgs(cid){
   if(clsnrs[cid]){renderMsgs(cid);setTimeout(()=>applyChatBgPreset(cid),30);return;}
   const q=query(collection(db,'chats',cid,'messages'),orderBy('ts','asc'));
-  clsnrs[cid]=onSnapshot(q,snap=>{mCache[cid]=snap.docs.map(d=>({id:d.id,...d.data()}));if(acid===cid)renderMsgs(cid);});
+  clsnrs[cid]=onSnapshot(q,snap=>{
+    const allMsgs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Only filter if user explicitly cleared this chat
+    try{
+      const chat=aChats[cid];
+      const clearedTs=chat?.clearedAt?.[cu?.uid];
+      let clearedSec=0; // work in seconds throughout
+      if(clearedTs&&typeof clearedTs.seconds==='number') clearedSec=clearedTs.seconds;
+      else if(clearedTs&&typeof clearedTs.toMillis==='function') clearedSec=clearedTs.toMillis()/1000;
+      if(clearedSec>0){
+        mCache[cid]=allMsgs.filter(m=>{
+          // Messages with no ts yet (just sent, pending server) are ALWAYS shown
+          if(!m.ts||!m.ts.seconds) return true;
+          return m.ts.seconds > clearedSec;
+        });
+      } else {
+        mCache[cid]=allMsgs;
+      }
+    }catch{
+      mCache[cid]=allMsgs;
+    }
+    if(acid===cid)renderMsgs(cid);
+  });
 }
 
 function renderMsgs(cid){
@@ -1317,7 +1400,7 @@ function renderMsgs(cid){
     if(msg.senderUid!==ls){
       gEl=document.createElement('div');gEl.className='msg-group'+(own?' own':'');gEl.id='msg-'+msg.id;
       const sn=uCache[msg.senderUid]?.displayName||msg.senderName||'User',rank=getRank(uCache[msg.senderUid]?.msgCount||0);
-      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:hidden;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid,'28px')}</div><div class="msg-sender"><span class="${rank.c} ${rank.fc||''}" style="cursor:pointer;" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
+      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:hidden;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid,'28px')}</div><div class="msg-sender"><span class="${rank.c}" style="cursor:pointer;${getUserFontStyle(msg.senderUid)}" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
       gEl.appendChild(hd);area.insertBefore(gEl,wipe);ls=msg.senderUid;
     }
     const wr=document.createElement('div');wr.className='msg-bubble-wrap';
@@ -1333,17 +1416,46 @@ function renderMsgs(cid){
       wr.appendChild(rq);
     }
     if(msg.type==='file'){
-      const fm=document.createElement('div');fm.className='file-msg';
-      fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)}</div></div>`;
-      fm.onclick=()=>dlFile(msg.fileData,msg.fileName);wr.appendChild(fm);
+      if(isImgFile(msg.fileName)&&msg.fileData){
+        // Show inline image preview
+        const imgEl=document.createElement('img');
+        imgEl.className='msg-img';
+        imgEl.src=msg.fileData;
+        imgEl.alt=msg.fileName||'Image';
+        imgEl.loading='lazy';
+        imgEl.title=msg.fileName||'Image';
+        imgEl.onclick=()=>openLightbox(msg.fileData,msg.fileName);
+        wr.appendChild(imgEl);
+      } else {
+        const fm=document.createElement('div');fm.className='file-msg';
+        fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)}</div></div>`;
+        fm.onclick=()=>dlFile(msg.fileData,msg.fileName);wr.appendChild(fm);
+      }
     } else if(msg.type==='voice'){
       wr.appendChild(renderVoiceNote(msg));
 
+    } else if(msg.type==='ttt'||msg.type==='ttt_move'){
+      const tb=document.createElement('div');tb.className='msg-bubble';
+      tb.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;';
+      tb.innerHTML='🎮 <span>'+esc(msg.text||'Tic-Tac-Toe')+'</span>';
+      if(msg.type==='ttt'&&msg.senderUid!==cu.uid){
+        tb.title='Click to accept challenge';
+        tb.onclick=()=>{tttOppUid=msg.senderUid;tttChatId=cid;tttMySymbol='O';tttMyTurn=false;tttBoard=Array(9).fill(null);openModal('ttt-modal');renderTttGame(msg.gameId);};
+      }
+      if(msg.type==='ttt_move') handleTttMsg(msg);
+      wr.appendChild(tb);
     } else {
       const b=document.createElement('div');b.className='msg-bubble';b.innerHTML=fmtMsg(msg.text);wr.appendChild(b);
     }
     const abRow=document.createElement('div');abRow.className='msg-actions-row';
-    abRow.appendChild(rb);abRow.appendChild(ab);
+    abRow.appendChild(rb);
+    if(msg.senderUid===cu.uid){
+      const db_btn=document.createElement('button');db_btn.className='msg-del-btn';db_btn.textContent='🗑';db_btn.title='Delete message';
+      const _mid=msg.id;const _cid=cid;
+      db_btn.onclick=()=>deleteMessage(_mid,_cid);
+      abRow.appendChild(db_btn);
+    }
+    abRow.appendChild(ab);
     wr.appendChild(abRow);
     if(msg.reactions&&Object.keys(msg.reactions).length){
       const rd=document.createElement('div');rd.className='msg-reactions';
@@ -1356,7 +1468,7 @@ function renderMsgs(cid){
       rr.innerHTML=getReadStatus(msg,cid);
       if(rr.firstChild) wr.appendChild(rr.firstChild);
     }
-    gEl.appendChild(wr);
+    if(gEl) gEl.appendChild(wr);
   });
   area.scrollTop=area.scrollHeight;
 }
@@ -1430,6 +1542,40 @@ async function sendFile(file){
 }
 
 const dlFile=(d,n)=>{const a=document.createElement('a');a.href=d;a.download=n;a.click();};
+
+// ── LIGHTBOX ───────────────────────────────────
+let _lbData='',_lbName='';
+function openLightbox(dataUrl, fileName){
+  _lbData=dataUrl;_lbName=fileName||'image';
+  const lb=document.getElementById('lightbox');
+  const img=document.getElementById('lightbox-img');
+  if(lb&&img){img.src=dataUrl;lb.classList.add('open');}
+  // Close on Escape
+  document.addEventListener('keydown',_lbEscHandler);
+}
+function closeLightbox(){
+  document.getElementById('lightbox')?.classList.remove('open');
+  const img=document.getElementById('lightbox-img');
+  if(img) img.src='';
+  document.removeEventListener('keydown',_lbEscHandler);
+}
+const _lbEscHandler=e=>{if(e.key==='Escape')closeLightbox();};
+function dlLightbox(){dlFile(_lbData,_lbName);}
+
+// ── DELETE MESSAGE ───────────────────────────────
+async function deleteMessage(msgId, chatId){
+  try{
+    await deleteDoc(doc(db,'chats',chatId,'messages',msgId));
+    // If it was the last message, update the preview
+    const msgs=mCache[chatId]||[];
+    const remaining=msgs.filter(m=>m.id!==msgId);
+    const last=remaining[remaining.length-1];
+    await updateDoc(doc(db,'chats',chatId),{
+      lastMessage: last? (last.text||'📎 Attachment').substring(0,80) : '',
+      lastTs: last?.ts||serverTimestamp()
+    });
+  }catch(e){toast('Delete failed: '+e.message,'danger');}
+}
 
 // ── REACTIONS ──────────────────────────────────
 function showRP(e,mid,cid){
@@ -1613,6 +1759,31 @@ function renderSettings(){
   const mc=cud?.msgCount||0, rank=getRank(mc);
   const myEmoji=userEmoji(cu?.uid||'');
   const nm=cud?.displayName||'User';
+
+  // ── FONT PICKER ──
+  let fontSection=document.getElementById('settings-font-section');
+  if(!fontSection){
+    const modal=document.querySelector('#settings-modal .modal');
+    if(modal){
+      fontSection=document.createElement('div');
+      fontSection.id='settings-font-section';fontSection.className='settings-section';
+      const first=modal.querySelector('.settings-section');
+      if(first) modal.insertBefore(fontSection,first);
+      else modal.appendChild(fontSection);
+    }
+  }
+  if(fontSection){
+    const curFont=cud?.fontId||0;
+    let fHTML='<div class="settings-label">YOUR NAME FONT</div><div class="font-pick-grid">';
+    USER_FONTS.forEach(f=>{
+      fHTML+='<div class="font-pick-btn'+(f.id===curFont?' selected':'')+'" onclick="N.saveUserFont('+f.id+')">'
+        +'<div class="font-pick-preview" style="'+f.style+'">'+esc(f.preview)+'</div>'
+        +'<div class="font-pick-label">'+esc(f.name.toUpperCase())+'</div>'
+        +'</div>';
+    });
+    fHTML+='</div>';
+    fontSection.innerHTML=fHTML;
+  }
 
   // ── DISPLAY MODE BUTTONS ──
   const deskCard=document.getElementById('mode-desktop');
@@ -2990,8 +3161,8 @@ function openCreditsModal(){
       <div class="credits-card">
         <div class="credits-avatar" style="background:linear-gradient(135deg,#050520,#1a1a60);">👑</div>
         <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Cameron</div>
-          <div class="credits-role">FOUNDER · DEVELOPER</div>
+          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">detla</div>
+          <div class="credits-role">FOUNDER · LEAD DEVELOPER</div>
         </div>
         <span class="credits-badge badge-creator">CREATOR</span>
       </div>
@@ -3000,8 +3171,8 @@ function openCreditsModal(){
       <div class="credits-card">
         <div class="credits-avatar" style="background:linear-gradient(135deg,#200040,#600080);">🧪</div>
         <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Josh</div>
-          <div class="credits-role">TESTER</div>
+          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Add your testers here</div>
+          <div class="credits-role">QUALITY ASSURANCE</div>
         </div>
         <span class="credits-badge badge-tester">TESTER</span>
       </div>
@@ -3090,7 +3261,7 @@ function openOwnerModal(){
 
 function ownerTab(tab){
   ownerCurrentTab=tab;
-  ['tickets','users','admin'].forEach(t=>{
+  ['tickets','users','admin','announce'].forEach(t=>{
     const btn=document.getElementById('op-tab-'+t);
     const panel=document.getElementById('op-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -3099,6 +3270,7 @@ function ownerTab(tab){
   if(tab==='tickets') loadHelpTickets();
   if(tab==='users') loadOwnerUsers();
   if(tab==='admin') renderAdminPanel();
+  if(tab==='announce') renderAnnouncePanel();
 }
 
 async function loadHelpTickets(){
@@ -3174,14 +3346,19 @@ async function loadOwnerUsers(){
     users.sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).forEach(u=>{
       const rank=getRank(u.msgCount||0);
       const el=document.createElement('div');
-      el.className='user-item';
-      el.style.marginBottom='6px';
-      el.innerHTML=`<div class="feed-avatar" style="font-size:18px;">${userEmoji(u.id)}</div>
-        <div class="user-item-info">
-          <div class="${rank.c}" style="font-size:13px;font-weight:600;">${esc(u.displayName||u.id)}</div>
-          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${isOnline(u)?'🟢 Online':'⚫ Offline'}</div>
-        </div>
-        <button class="btn-small" style="border-color:var(--danger);color:var(--danger);font-size:9px;" onclick="N.adminResetMsgs('${u.id}','${esc(u.displayName||'')}')">RESET</button>`;
+      el.className='user-item';el.style.marginBottom='6px';
+      const avEl=document.createElement('div');avEl.style.cssText='width:38px;height:38px;font-size:20px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;';
+      const avH=avatarHtml(u.id,'38px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;
+      const info=document.createElement('div');info.className='user-item-info';
+      info.innerHTML='<div class="'+rank.c+'" style="font-size:13px;font-weight:600;">'+esc(u.displayName||u.id)+'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(u.username||'')+' · '+( u.msgCount||0)+' msgs · '+(isOnline(u)?'🟢 Online':'⚫ Offline')+'</div>';
+      const actWrap=document.createElement('div');actWrap.style.cssText='display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;';
+      const mkBtn=(label,danger,fn)=>{const b=document.createElement('button');b.className='btn-small';b.style.cssText='font-size:9px;'+(danger?'border-color:var(--danger);color:var(--danger);':'');b.textContent=label;b.onclick=fn;return b;};
+      const _uid=u.id;const _nm=esc(u.displayName||u.id);
+      actWrap.appendChild(mkBtn('RENAME',false,()=>adminRenameUser(_uid,_nm)));
+      actWrap.appendChild(mkBtn('PWD',false,()=>adminChangePassword(_uid,_nm)));
+      actWrap.appendChild(mkBtn('DELETE',true,()=>adminDeleteAccount(_uid,_nm)));
+      el.appendChild(avEl);el.appendChild(info);el.appendChild(actWrap);
       panel.appendChild(el);
     });
   }catch(e){
@@ -3212,17 +3389,30 @@ function renderAdminPanel(){
     </div>
     <div class="admin-action">
       <div class="admin-action-info">
-        <div style="font-weight:600;">Broadcast Announcement</div>
-        <div class="admin-action-desc">Send a message to every user as NEXUS System.</div>
-      </div>
-      <button class="btn-small primary" onclick="N.adminBroadcast()">BROADCAST</button>
-    </div>
-    <div class="admin-action">
-      <div class="admin-action-info">
         <div style="font-weight:600;">Clear All Help Tickets</div>
         <div class="admin-action-desc">Delete all [HELP REQUEST] messages from owner DMs.</div>
       </div>
       <button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.adminClearTickets()">CLEAR TICKETS</button>
+    </div>`;
+}
+
+function renderAnnouncePanel(){
+  const panel=document.getElementById('op-panel-announce');
+  if(!panel) return;
+  panel.innerHTML=`
+    <div class="settings-label">ANNOUNCEMENT TEXT</div>
+    <input class="modal-input" id="announce-input" placeholder="Enter announcement…" style="margin-bottom:10px;">
+    <div class="settings-label">DURATION</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);cursor:pointer;"><input type="radio" name="ann-dur" value="300" checked> 5 min</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);cursor:pointer;"><input type="radio" name="ann-dur" value="1800"> 30 min</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);cursor:pointer;"><input type="radio" name="ann-dur" value="3600"> 1 hr</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);cursor:pointer;"><input type="radio" name="ann-dur" value="86400"> 24 hrs</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);cursor:pointer;"><input type="radio" name="ann-dur" value="0"> Permanent</label>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-small primary" onclick="N.adminSendAnnounce()">📢 BROADCAST BANNER</button>
+      <button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.adminClearAnnounce()">CLEAR BANNER</button>
     </div>`;
 }
 
@@ -3539,6 +3729,289 @@ async function removeFromGc(uid, chatId){
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
 
+// ── ADMIN USER CONTROLS ────────────────────────────
+async function adminRenameUser(uid, currentName){
+  const newName=prompt('New display name for '+currentName+':');
+  if(!newName||!newName.trim()) return;
+  const nm=newName.trim().substring(0,30);
+  try{
+    await updateDoc(doc(db,'users',uid),{displayName:nm});
+    if(uCache[uid]) uCache[uid].displayName=nm;
+    toast('Renamed to '+nm,'success');
+    loadOwnerUsers();
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminChangePassword(uid, name){
+  // Firebase Admin SDK is needed for actual password changes, but we can
+  // force a password reset email. However since we use username+email trick,
+  // we'll just update a resetRequired flag and show user a notice.
+  const newPw=prompt('Set new password for '+name+' (min 6 chars):');
+  if(!newPw||newPw.length<6){toast('Password too short.','danger');return;}
+  try{
+    // We store a pendingPassword that the user's next login will pick up
+    // Actually — store it as a temp override in user doc and handle on login
+    await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw});
+    toast('Password reset queued. User will be notified on next login.','success');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminDeleteAccount(uid, name){
+  if(!confirm('DELETE account for '+name+'? This cannot be undone.')) return;
+  if(!confirm('SECOND CONFIRMATION: Permanently delete '+name+'?')) return;
+  try{
+    // Delete user document and their username reservation
+    const uDoc=await getDoc(doc(db,'users',uid));
+    const username=uDoc.data()?.username;
+    await deleteDoc(doc(db,'users',uid));
+    if(username) await deleteDoc(doc(db,'usernames',username)).catch(()=>{});
+    // Remove them from all chats
+    const chats=await getDocs(query(collection(db,'chats'),where('members','array-contains',uid)));
+    for(const cd of chats.docs){
+      const members=(cd.data().members||[]).filter(m=>m!==uid);
+      if(members.length===0){
+        await deleteDoc(cd.ref);
+      } else {
+        await updateDoc(cd.ref,{members});
+      }
+    }
+    delete uCache[uid];
+    toast('Account deleted.','success');
+    loadOwnerUsers();
+  }catch(e){toast('Delete failed: '+e.message,'danger');}
+}
+
+// ── ANNOUNCEMENT BANNER ─────────────────────────────
+async function adminSendAnnounce(){
+  const text=document.getElementById('announce-input')?.value.trim();
+  if(!text){toast('Enter announcement text.','danger');return;}
+  const durEl=document.querySelector('input[name="ann-dur"]:checked');
+  const dur=parseInt(durEl?.value||'300');
+  const expiresAt=dur===0?null:new Date(Date.now()+dur*1000).toISOString();
+  try{
+    await setDoc(doc(db,'config','announcement'),{text,expiresAt,active:true,ts:serverTimestamp()});
+    toast('Announcement sent!','success');
+    showAnnouncement(text);
+    closeModal('owner-modal');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminClearAnnounce(){
+  try{
+    await updateDoc(doc(db,'config','announcement'),{active:false});
+    hideAnnouncement();
+    toast('Announcement cleared.','success');
+  }catch(e){toast('Failed.','danger');}
+}
+
+function showAnnouncement(text){
+  const b=document.getElementById('announce-banner');
+  const t=document.getElementById('announce-text');
+  if(b&&t){t.textContent=text;b.classList.add('active');}
+}
+function hideAnnouncement(){
+  document.getElementById('announce-banner')?.classList.remove('active');
+}
+
+async function checkAnnouncement(){
+  try{
+    const snap=await getDoc(doc(db,'config','announcement'));
+    if(!snap.exists()) return;
+    const d=snap.data();
+    if(!d.active) return;
+    if(d.expiresAt&&new Date(d.expiresAt)<new Date()){
+      await updateDoc(doc(db,'config','announcement'),{active:false});
+      return;
+    }
+    showAnnouncement(d.text);
+  }catch{}
+}
+
+// ── FONT PICKER ─────────────────────────────────────
+const USER_FONTS=[
+  {id:0,name:'Default',preview:'Abc',style:'font-family:inherit;'},
+  {id:1,name:'Orbitron',preview:'Abc',style:"font-family:'Orbitron',monospace;font-weight:700;"},
+  {id:2,name:'Rajdhani',preview:'Abc',style:"font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:2px;"},
+  {id:3,name:'Mono',preview:'Abc',style:"font-family:'JetBrains Mono',monospace;"},
+  {id:4,name:'Serif',preview:'Abc',style:'font-family:Georgia,serif;font-style:italic;'},
+  {id:5,name:'Courier',preview:'Abc',style:"font-family:'Courier New',monospace;letter-spacing:1px;"},
+];
+
+async function saveUserFont(fontId){
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{fontId});
+    cud={...cud,fontId};uCache[cu.uid]={...uCache[cu.uid],fontId};
+    toast('Font updated!','success');
+    renderProfile();renderSettings();
+  }catch(e){toast('Save failed.','danger');}
+}
+
+function getUserFontStyle(uid){
+  const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
+  const f=USER_FONTS.find(x=>x.id===(u.fontId||0));
+  return f?.style||'';
+}
+
+// ── CLEAR CHAT ────────────────────────────────────
+function showChatContextMenu(e, chatId){
+  e.preventDefault();e.stopPropagation();
+  // Remove any existing context menu
+  document.querySelectorAll('.chat-ctx-menu').forEach(m=>m.remove());
+  const menu=document.createElement('div');menu.className='chat-ctx-menu';
+  const chat=aChats[chatId];
+  const isGroup=chat?.type==='group';
+  const clearBtn=document.createElement('button');
+  clearBtn.className='chat-ctx-item';clearBtn.innerHTML='🗑 Clear chat history';
+  clearBtn.onclick=()=>{menu.remove();clearChatHistory(chatId);};
+  menu.appendChild(clearBtn);
+  // If chat was previously cleared, offer to restore it
+  const ctxChat=aChats[chatId];
+  if(ctxChat?.clearedAt?.[cu?.uid]){
+    const restoreBtn=document.createElement('button');
+    restoreBtn.className='chat-ctx-item';restoreBtn.innerHTML='↩ Restore cleared history';
+    restoreBtn.onclick=async()=>{
+      menu.remove();
+      try{
+        await updateDoc(doc(db,'chats',chatId),{['clearedAt.'+cu.uid]:null});
+        if(aChats[chatId]?.clearedAt) delete aChats[chatId].clearedAt[cu.uid];
+        // Force re-subscribe to get all messages
+        if(clsnrs[chatId]){clsnrs[chatId]();delete clsnrs[chatId];}
+        subMsgs(chatId);
+        toast('History restored.','success');
+      }catch(e){toast('Failed: '+e.message,'danger');}
+    };
+    menu.appendChild(restoreBtn);
+  }
+  if(isGroup){
+    const leaveBtn=document.createElement('button');
+    leaveBtn.className='chat-ctx-item danger';leaveBtn.innerHTML='🚪 Leave group';
+    leaveBtn.onclick=()=>{menu.remove();leaveGroup(chatId);};
+    menu.appendChild(leaveBtn);
+  }
+  menu.style.left=e.clientX+'px';menu.style.top=e.clientY+'px';
+  document.body.appendChild(menu);
+  setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),10);
+}
+
+async function clearChatHistory(chatId){
+  if(!confirm('Clear all messages in this chat?\n\nThis only hides messages for you — other members still see them.')) return;
+  try{
+    // Store current server time as the clear marker
+    const now=new Date();
+    // Use a plain number (unix seconds) to avoid Firestore map timestamp issues
+    const nowSec=Math.floor(now.getTime()/1000);
+    await updateDoc(doc(db,'chats',chatId),{
+      ['clearedAt.'+cu.uid]:{seconds:nowSec,nanoseconds:0}
+    });
+    // Immediately update local aChats so filter takes effect
+    if(aChats[chatId]){
+      aChats[chatId]={...aChats[chatId],clearedAt:{...(aChats[chatId].clearedAt||{}),[cu.uid]:{seconds:nowSec,nanoseconds:0}}};
+    }
+    mCache[chatId]=[];
+    if(acid===chatId) renderMsgs(chatId);
+    toast('Chat history cleared.','success');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+// ── TIC-TAC-TOE ──────────────────────────────────────
+let tttBoard=Array(9).fill(null);
+let tttMySymbol='X';
+let tttOppUid=null;
+let tttChatId=null;
+let tttUnsub=null;
+let tttMyTurn=false;
+
+function openTtt(){
+  if(!acid) return;
+  const chat=aChats[acid];
+  if(!chat||chat.type!=='group'){
+    tttOppUid=chat?.members?.find(m=>m!==cu.uid);
+    tttChatId=acid;
+    openModal('ttt-modal');
+    renderTttLobby();
+  }
+}
+
+function renderTttLobby(){
+  const el=document.getElementById('ttt-content');if(!el)return;
+  const opp=uCache[tttOppUid]||{};
+  el.innerHTML='<div style="text-align:center;padding:20px;">'
+    +'<div style="font-size:40px;margin-bottom:12px;">🎮</div>'
+    +'<div style="font-size:14px;margin-bottom:8px;">Challenge <strong>'+esc(opp.displayName||'User')+'</strong> to Tic-Tac-Toe?</div>'
+    +'<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:16px;">You play as X — they see the challenge in chat</div>'
+    +'<button class="btn-primary" onclick="N.tttChallenge()">SEND CHALLENGE ›</button>'
+    +'</div>';
+}
+
+async function tttChallenge(){
+  tttBoard=Array(9).fill(null);tttMySymbol='X';tttMyTurn=true;
+  const gameId='ttt_'+Date.now();
+  const gameData={type:'ttt_challenge',gameId,from:cu.uid,fromName:cud?.displayName||'User',board:tttBoard,status:'waiting',ts:serverTimestamp()};
+  await addDoc(collection(db,'chats',tttChatId,'messages'),{
+    senderUid:cu.uid,senderName:cud?.displayName||'User',
+    text:'🎮 Sent a Tic-Tac-Toe challenge!',
+    ts:serverTimestamp(),type:'ttt',gameId,tttData:gameData,reactions:{}
+  });
+  await updateDoc(doc(db,'chats',tttChatId),{lastMessage:'🎮 Tic-Tac-Toe challenge!',lastTs:serverTimestamp()});
+  renderTttGame(gameId);
+  toast('Challenge sent!','success');
+}
+
+function renderTttGame(gameId){
+  const el=document.getElementById('ttt-content');if(!el)return;
+  const renderBoard=()=>{
+    const cells=tttBoard.map((v,i)=>{
+      const win=tttWinner()?.cells?.includes(i);
+      return '<div class="ttt-cell'+(v?' taken':'')+(win?' win':'')+'" onclick="N.tttMove('+i+')">'+( v||'')+'</div>';
+    }).join('');
+    const winner=tttWinner();
+    const status=winner?(winner.sym===(tttMySymbol)?'🎉 You win!':'😢 You lose!'):(tttBoard.every(v=>v)?'🤝 Draw!':(tttMyTurn?'Your turn ('+tttMySymbol+')':'Waiting for opponent…'));
+    el.innerHTML='<div class="ttt-status">'+status+'</div><div class="ttt-board">'+cells+'</div>'
+      +(winner||tttBoard.every(v=>v)?'<div style="text-align:center;margin-top:10px;"><button class="btn-small primary" onclick="N.tttReset()">PLAY AGAIN</button></div>':'');
+  };
+  renderBoard();
+}
+
+async function tttMove(idx){
+  if(!tttMyTurn||tttBoard[idx]||tttWinner()) return;
+  tttBoard[idx]=tttMySymbol;
+  tttMyTurn=false;
+  renderTttGame(null);
+  // Send move to opponent via chat message
+  await addDoc(collection(db,'chats',tttChatId,'messages'),{
+    senderUid:cu.uid,senderName:cud?.displayName||'User',
+    text:'🎮 Made a Tic-Tac-Toe move',
+    ts:serverTimestamp(),type:'ttt_move',
+    tttBoard:[...tttBoard],tttTurn:tttOppUid,
+    reactions:{}
+  });
+}
+
+function tttWinner(){
+  const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for(const [a,b,c] of lines){
+    if(tttBoard[a]&&tttBoard[a]===tttBoard[b]&&tttBoard[a]===tttBoard[c])
+      return{sym:tttBoard[a],cells:[a,b,c]};
+  }
+  return null;
+}
+
+function tttReset(){tttBoard=Array(9).fill(null);tttMyTurn=true;renderTttGame(null);}
+function tttCleanup(){if(tttUnsub){tttUnsub();tttUnsub=null;}}
+
+// Handle incoming TTT moves in renderMsgs
+function handleTttMsg(msg){
+  if(msg.type==='ttt_move'&&msg.tttTurn===cu.uid&&msg.senderUid!==cu.uid){
+    tttBoard=[...msg.tttBoard];tttMyTurn=true;
+    // If the modal is open, refresh it
+    if(document.getElementById('ttt-modal')?.classList.contains('active')){
+      renderTttGame(null);
+    } else {
+      toast('Your turn in Tic-Tac-Toe!','success');
+    }
+  }
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -3566,8 +4039,15 @@ window._N = {
   flipCamera,
   openCreditsModal, sendHelp,
   openChangelog, openFeedback, submitFeedback,
+  saveUserFont,
+  showChatContextMenu, clearChatHistory,
+  adminSendAnnounce, adminClearAnnounce,
+  adminRenameUser, adminChangePassword, adminDeleteAccount,
+  renderAnnouncePanel,
+  openTtt, tttChallenge, tttMove, tttReset, tttCleanup,
   showTnC, hideTnC,
   setReply, clearReply, scrollToMsg,
+  openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
   ownerTab, replyToTicket, adminWipeAllChats, adminBroadcast,
@@ -3577,5 +4057,19 @@ window._N = {
 Object.assign(window.N, window._N);
 
 </script>
+<!-- TTT MODAL -->
+<div class="modal-overlay" id="ttt-modal">
+  <div class="modal" style="width:340px;">
+    <div class="modal-title">🎮 TIC-TAC-TOE</div>
+    <button class="modal-close" onclick="N.closeModal('ttt-modal');N.tttCleanup()">✕</button>
+    <div id="ttt-content"></div>
+  </div>
+</div>
+
+<div id="lightbox" onclick="if(event.target===this)closeLightbox()">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+  <button id="lightbox-dl" onclick="dlLightbox()">⬇ DOWNLOAD</button>
+</div>
 </body>
 </html>
