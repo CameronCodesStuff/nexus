@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Exo+2:wght@300;400;700;900&family=Share+Tech+Mono&family=Teko:wght@300;400;500;600;700&family=Righteous&family=Bungee&family=Audiowide&family=Nova+Square&family=Michroma&family=Press+Start+2P&family=Silkscreen&family=Bebas+Neue&family=Major+Mono+Display&family=VT323&family=Syne:wght@400;700;800&family=Chakra+Petch:wght@300;400;600;700&family=Black+Ops+One&family=Cinzel:wght@400;700&family=Permanent+Marker&family=Special+Elite&display=swap');
   :root {
     --bg:#050508;--bg2:#0a0a12;--bg3:#0f0f1a;--panel:#080810;
     --border:rgba(100,100,255,0.15);--accent:#4466ff;--accent2:#00d4ff;
@@ -465,12 +464,15 @@
   #announce-banner.active{display:flex;align-items:center;justify-content:center;gap:12px;}
   #announce-close{background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;text-align:center;flex-shrink:0;}
   /* Font picker */
-  .font-pick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;}
-  .font-pick-btn{background:var(--bg3);border:2px solid var(--border);border-radius:10px;padding:12px 10px;cursor:pointer;text-align:center;transition:all 0.15s;}
-  .font-pick-btn:hover{border-color:var(--accent);}
+  .font-pick-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;max-height:380px;overflow-y:auto;padding-right:2px;}
+  .font-pick-grid::-webkit-scrollbar{width:3px;}
+  .font-pick-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  .font-pick-btn{background:var(--bg3);border:2px solid var(--border);border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left;transition:all 0.15s;position:relative;}
+  .font-pick-btn:hover{border-color:var(--accent);background:rgba(68,102,255,0.06);}
   .font-pick-btn.selected{border-color:var(--accent);background:rgba(68,102,255,0.15);}
-  .font-pick-preview{font-size:15px;font-weight:700;margin-bottom:4px;}
-  .font-pick-label{font-size:9px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:2px;}
+  .font-pick-preview{font-size:18px;margin-bottom:4px;line-height:1.2;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .font-pick-label{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);display:block;}
+  .font-pick-tag{position:absolute;top:6px;right:6px;font-size:7px;font-family:var(--font-display);letter-spacing:1px;padding:1px 5px;border-radius:4px;background:var(--bg2);color:var(--text-dim);border:1px solid var(--border);}
   /* Tic-tac-toe */
   .ttt-board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:240px;margin:16px auto;}
   .ttt-cell{height:72px;background:var(--bg3);border:2px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;transition:all 0.15s;}
@@ -490,6 +492,18 @@
   .chat-ctx-item{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;}
   .chat-ctx-item:hover{background:rgba(68,102,255,0.1);}
   .chat-ctx-item.danger:hover{background:rgba(255,51,85,0.1);color:var(--danger);}
+
+
+  /* ── ROLES ── */
+  .role-og{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#001133,#002266);color:#4488ff;border:1px solid #2255cc;box-shadow:0 0 8px rgba(68,136,255,0.7),0 0 20px rgba(68,136,255,0.3);vertical-align:middle;margin-left:4px;}
+  @keyframes feedback-pulse{0%,100%{box-shadow:0 0 6px rgba(255,30,60,0.5);}50%{box-shadow:0 0 18px rgba(255,30,60,1),0 0 32px rgba(255,30,60,0.4);}}
+  .role-feedback{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#330008,#660010);color:#ff3355;border:1px solid #cc1133;animation:feedback-pulse 1.5s ease infinite;vertical-align:middle;margin-left:4px;}
+  @keyframes gold-shine{0%,100%{background-position:0% center;}50%{background-position:200% center;}}
+  .role-bugfinder{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(90deg,#5a3f00,#ffcc00,#fff8c0,#ffcc00,#5a3f00);background-size:300%;color:#1a1000;border:1px solid #cc9900;animation:gold-shine 2s linear infinite;font-weight:700;vertical-align:middle;margin-left:4px;}
+  @keyframes role-rainbow{to{background-position:300% center;}}
+  .role-tester{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite;font-weight:700;vertical-align:middle;margin-left:4px;}
+  @keyframes owner-pulse{0%,100%{transform:scale(1);filter:brightness(1);}50%{transform:scale(1.08);filter:brightness(1.5);}}
+  .role-owner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite,owner-pulse 2s ease infinite;font-weight:900;vertical-align:middle;margin-left:4px;}
 
 
 </style>
@@ -556,6 +570,10 @@
 </div>
 
 <div id="app-screen-inner" style="display:flex;flex-direction:column;flex:1;min-height:0;width:100%;">
+<div id="impersonate-banner" style="display:none;background:linear-gradient(90deg,#ff3355,#ff6600);padding:8px 20px;display:none;align-items:center;justify-content:center;gap:12px;font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:#fff;flex-shrink:0;z-index:101;">
+  <span>👑 OWNER VIEW — signed in as <strong id="impersonate-name"></strong></span>
+  <button onclick="N.returnToOwner()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.4);color:#fff;border-radius:6px;padding:4px 12px;font-family:var(--font-display);font-size:10px;letter-spacing:1px;cursor:pointer;">↩ BACK TO OWNER</button>
+</div>
 <div id="announce-banner">
   <span id="announce-text"></span>
   <button id="announce-close" onclick="document.getElementById('announce-banner').classList.remove('active')">✕</button>
@@ -759,11 +777,13 @@
     <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
       <div class="auth-tab active" id="op-tab-tickets" onclick="N.ownerTab('tickets')" style="font-size:10px;">TICKETS</div>
       <div class="auth-tab" id="op-tab-users" onclick="N.ownerTab('users')" style="font-size:10px;">USERS</div>
+      <div class="auth-tab" id="op-tab-roles" onclick="N.ownerTab('roles')" style="font-size:10px;">ROLES</div>
       <div class="auth-tab" id="op-tab-admin" onclick="N.ownerTab('admin')" style="font-size:10px;">ADMIN</div>
       <div class="auth-tab" id="op-tab-announce" onclick="N.ownerTab('announce')" style="font-size:10px;">ANNOUNCE</div>
     </div>
     <div id="op-panel-tickets"></div>
     <div id="op-panel-users" style="display:none;"></div>
+    <div id="op-panel-roles" style="display:none;"></div>
     <div id="op-panel-admin" style="display:none;"></div>
     <div id="op-panel-announce" style="display:none;"></div>
   </div>
@@ -1181,6 +1201,11 @@ async function enterApp(){
     ls.classList.add('fade-out');
     setTimeout(()=>{ls.style.display='none';ls.classList.remove('fade-out');},450);
   }
+  // Show impersonation banner if owner is signed in as someone else
+  const impAs=sessionStorage.getItem('nexus_impersonating');
+  if(impAs){
+    showImpersonationBanner(impAs);
+  }
 }
 
 // ── PRESENCE ─────────────────────────────────────
@@ -1414,7 +1439,7 @@ function renderMsgs(cid){
     if(msg.senderUid!==ls){
       gEl=document.createElement('div');gEl.className='msg-group'+(own?' own':'');gEl.id='msg-'+msg.id;
       const sn=uCache[msg.senderUid]?.displayName||msg.senderName||'User',rank=getRank(uCache[msg.senderUid]?.msgCount||0);
-      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:hidden;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid,'28px')}</div><div class="msg-sender"><span class="${rank.c}" style="cursor:pointer;${getUserFontStyle(msg.senderUid)}" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span></div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
+      const hd=document.createElement('div');hd.className='msg-header';hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:hidden;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid,'28px')}</div><div class="msg-sender"><span class="${rank.c}" style="cursor:pointer;${getUserFontStyle(msg.senderUid)}" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span>${getRoleBadge(msg.senderUid)}</div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
       gEl.appendChild(hd);area.insertBefore(gEl,wipe);ls=msg.senderUid;
     }
     const wr=document.createElement('div');wr.className='msg-bubble-wrap';
@@ -1797,8 +1822,9 @@ function renderSettings(){
     let fHTML='<div class="settings-label">YOUR NAME FONT</div><div class="font-pick-grid">';
     USER_FONTS.forEach(f=>{
       fHTML+='<div class="font-pick-btn'+(f.id===curFont?' selected':'')+'" onclick="N.saveUserFont('+f.id+')">'
+        +(f.tag?'<div class="font-pick-tag">'+esc(f.tag)+'</div>':'')
         +'<div class="font-pick-preview" style="'+f.style+'">'+esc(f.preview)+'</div>'
-        +'<div class="font-pick-label">'+esc(f.name.toUpperCase())+'</div>'
+        +'<div class="font-pick-label">'+esc(f.name)+'</div>'
         +'</div>';
     });
     fHTML+='</div>';
@@ -3181,8 +3207,8 @@ function openCreditsModal(){
       <div class="credits-card">
         <div class="credits-avatar" style="background:linear-gradient(135deg,#050520,#1a1a60);">👑</div>
         <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Owner</div>
-          <div class="credits-role">FOUNDER · DEVELOPER</div>
+          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">detla</div>
+          <div class="credits-role">FOUNDER · LEAD DEVELOPER</div>
         </div>
         <span class="credits-badge badge-creator">CREATOR</span>
       </div>
@@ -3191,8 +3217,8 @@ function openCreditsModal(){
       <div class="credits-card">
         <div class="credits-avatar" style="background:linear-gradient(135deg,#200040,#600080);">🧪</div>
         <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">J_Frosty</div>
-          <div class="credits-role">TESTER</div>
+          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Add your testers here</div>
+          <div class="credits-role">QUALITY ASSURANCE</div>
         </div>
         <span class="credits-badge badge-tester">TESTER</span>
       </div>
@@ -3281,7 +3307,7 @@ function openOwnerModal(){
 
 function ownerTab(tab){
   ownerCurrentTab=tab;
-  ['tickets','users','admin','announce'].forEach(t=>{
+  ['tickets','users','roles','admin','announce'].forEach(t=>{
     const btn=document.getElementById('op-tab-'+t);
     const panel=document.getElementById('op-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -3289,6 +3315,7 @@ function ownerTab(tab){
   });
   if(tab==='tickets') loadHelpTickets();
   if(tab==='users') loadOwnerUsers();
+  if(tab==='roles') loadRolesPanel();
   if(tab==='admin') renderAdminPanel();
   if(tab==='announce') renderAnnouncePanel();
 }
@@ -3362,24 +3389,113 @@ async function loadOwnerUsers(){
   try{
     const snap=await getDocs(collection(db,'users'));
     const users=snap.docs.map(d=>({id:d.id,...d.data()}));
-    panel.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:10px;">'+users.length+' registered users</div>';
-    users.sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).forEach(u=>{
+    panel.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:12px;">'+users.length+' registered users</div>';
+    users.sort((a,b)=>(a.username||'').localeCompare(b.username||'')).forEach(u=>{
+      if(u.id===cu.uid) return; // skip owner themselves
       const rank=getRank(u.msgCount||0);
-      const el=document.createElement('div');
-      el.className='user-item';el.style.marginBottom='6px';
-      const avEl=document.createElement('div');avEl.style.cssText='width:38px;height:38px;font-size:20px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;';
-      const avH=avatarHtml(u.id,'38px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;
-      const info=document.createElement('div');info.className='user-item-info';
-      info.innerHTML='<div class="'+rank.c+'" style="font-size:13px;font-weight:600;">'+esc(u.displayName||u.id)+'</div>'
-        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(u.username||'')+' · '+( u.msgCount||0)+' msgs · '+(isOnline(u)?'🟢 Online':'⚫ Offline')+'</div>';
-      const actWrap=document.createElement('div');actWrap.style.cssText='display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;';
-      const mkBtn=(label,danger,fn)=>{const b=document.createElement('button');b.className='btn-small';b.style.cssText='font-size:9px;'+(danger?'border-color:var(--danger);color:var(--danger);':'');b.textContent=label;b.onclick=fn;return b;};
-      const _uid=u.id;const _nm=esc(u.displayName||u.id);
-      actWrap.appendChild(mkBtn('RENAME',false,()=>adminRenameUser(_uid,_nm)));
-      actWrap.appendChild(mkBtn('LOGIN AS',false,()=>adminQuickLogin(_uid,_nm)));
-      actWrap.appendChild(mkBtn('DELETE',true,()=>adminDeleteAccount(_uid,_nm)));
-      el.appendChild(avEl);el.appendChild(info);el.appendChild(actWrap);
-      panel.appendChild(el);
+      const card=document.createElement('div');
+      card.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;';
+
+      // Header row: avatar + name + online
+      const hdr=document.createElement('div');
+      hdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:10px;';
+      const avEl=document.createElement('div');avEl.style.cssText='width:36px;height:36px;font-size:18px;border-radius:8px;background:var(--bg2);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;';
+      const avH=avatarHtml(u.id,'36px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;
+      const hdInfo=document.createElement('div');hdInfo.style.flex='1';
+      hdInfo.innerHTML='<div class="'+rank.c+'" style="font-size:13px;font-weight:700;">'+esc(u.displayName||'?')+'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(u.username||'')+(isOnline(u)?' · 🟢':' · ⚫')+'</div>';
+      hdr.appendChild(avEl);hdr.appendChild(hdInfo);
+      card.appendChild(hdr);
+
+      // Editable fields
+      const fields=document.createElement('div');fields.style.cssText='display:flex;flex-direction:column;gap:6px;margin-bottom:10px;';
+
+      // Display name field
+      const dnRow=document.createElement('div');dnRow.style.cssText='display:flex;gap:6px;align-items:center;';
+      const dnLabel=document.createElement('span');dnLabel.style.cssText='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);width:50px;flex-shrink:0;';dnLabel.textContent='NAME';
+      const dnInput=document.createElement('input');dnInput.className='modal-input';dnInput.style.cssText='flex:1;padding:6px 10px;font-size:12px;';
+      dnInput.value=u.displayName||'';dnInput.placeholder='Display name';
+      const dnBtn=document.createElement('button');dnBtn.className='btn-small primary';dnBtn.style.fontSize='9px';dnBtn.textContent='SAVE';
+      dnBtn.onclick=()=>adminSaveName(u.id,dnInput.value.trim());
+      dnRow.appendChild(dnLabel);dnRow.appendChild(dnInput);dnRow.appendChild(dnBtn);
+      fields.appendChild(dnRow);
+
+      // Username field
+      const unRow=document.createElement('div');unRow.style.cssText='display:flex;gap:6px;align-items:center;';
+      const unLabel=document.createElement('span');unLabel.style.cssText='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);width:50px;flex-shrink:0;';unLabel.textContent='USER';
+      const unInput=document.createElement('input');unInput.className='modal-input';unInput.style.cssText='flex:1;padding:6px 10px;font-size:12px;';
+      unInput.value=u.username||'';unInput.placeholder='Username';
+      const unBtn=document.createElement('button');unBtn.className='btn-small primary';unBtn.style.fontSize='9px';unBtn.textContent='SAVE';
+      unBtn.onclick=()=>adminSaveUsername(u.id,u.username||'',unInput.value.trim());
+      unRow.appendChild(unLabel);unRow.appendChild(unInput);unRow.appendChild(unBtn);
+      fields.appendChild(unRow);
+
+      // Password field
+      const pwRow=document.createElement('div');pwRow.style.cssText='display:flex;gap:6px;align-items:center;';
+      const pwLabel=document.createElement('span');pwLabel.style.cssText='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);width:50px;flex-shrink:0;';pwLabel.textContent='PASS';
+      const pwInput=document.createElement('input');pwInput.className='modal-input';pwInput.type='text';
+      pwInput.style.cssText='flex:1;padding:6px 10px;font-size:12px;font-family:var(--font-mono);';
+      pwInput.placeholder='Set new password…';
+      const pwBtn=document.createElement('button');pwBtn.className='btn-small primary';pwBtn.style.fontSize='9px';pwBtn.textContent='SET';
+      pwBtn.onclick=()=>adminSetPassword(u.id,u.username||'',pwInput.value.trim(),()=>{pwInput.value='';pwInput.placeholder='Password set ✓';});
+      pwRow.appendChild(pwLabel);pwRow.appendChild(pwInput);pwRow.appendChild(pwBtn);
+      fields.appendChild(pwRow);
+      card.appendChild(fields);
+
+      // Action buttons
+      const acts=document.createElement('div');acts.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+      const mkBtn=(label,danger,fn)=>{const b=document.createElement('button');b.className='btn-small';b.style.cssText='font-size:10px;'+(danger?'border-color:var(--danger);color:var(--danger);':'');b.textContent=label;b.onclick=fn;return b;};
+      acts.appendChild(mkBtn('🔑 LOGIN AS',false,()=>adminQuickLogin(u.id,u.username||'',u.displayName||'User')));
+      acts.appendChild(mkBtn('🗑 DELETE',true,()=>adminDeleteAccount(u.id,esc(u.displayName||u.id))));
+      card.appendChild(acts);
+      panel.appendChild(card);
+    });
+  }catch(e){
+    panel.innerHTML='<div style="color:var(--danger);font-size:12px;font-family:var(--font-mono);">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+async function loadRolesPanel(){
+  const panel=document.getElementById('op-panel-roles');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading…</div>';
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    panel.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:12px;">Assign roles — they appear on profiles and in chat.</div>';
+    users.sort((a,b)=>(a.username||'').localeCompare(b.username||'')).forEach(u=>{
+      if(u.id===cu.uid) return;
+      const card=document.createElement('div');
+      card.style.cssText='display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;';
+      const avEl=document.createElement('div');avEl.style.cssText='width:34px;height:34px;font-size:18px;border-radius:8px;background:var(--bg2);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;';
+      const avH=avatarHtml(u.id,'34px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;
+      const info=document.createElement('div');info.style.cssText='flex:1;min-width:0;';
+      const curRole=u.role||'';
+      const curBadge=getRoleBadge(u.id);
+      info.innerHTML='<div style="font-size:13px;font-weight:600;">'+esc(u.displayName||u.id)+' '+curBadge+'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(u.username||'')+'</div>';
+      const sel=document.createElement('select');
+      sel.style.cssText='background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-family:var(--font-mono);font-size:11px;cursor:pointer;flex-shrink:0;';
+      ROLES.forEach(r=>{
+        const opt=document.createElement('option');
+        opt.value=r.id;opt.textContent=r.label;
+        if(r.id===curRole) opt.selected=true;
+        sel.appendChild(opt);
+      });
+      const _uid=u.id,_info=info;
+      sel.onchange=async()=>{
+        const newRole=sel.value;
+        try{
+          await updateDoc(doc(db,'users',_uid),{role:newRole||null});
+          if(uCache[_uid]) uCache[_uid].role=newRole||null;
+          const nb=getRoleBadge(_uid);
+          const nd=_info.querySelector('div');
+          if(nd) nd.innerHTML=esc(u.displayName||u.id)+' '+nb;
+          toast('Role set.','success');
+        }catch(e){toast('Failed: '+e.message,'danger');}
+      };
+      card.appendChild(avEl);card.appendChild(info);card.appendChild(sel);
+      panel.appendChild(card);
     });
   }catch(e){
     panel.innerHTML='<div style="color:var(--danger);font-size:12px;font-family:var(--font-mono);">Error: '+esc(e.message)+'</div>';
@@ -3750,16 +3866,51 @@ async function removeFromGc(uid, chatId){
 }
 
 // ── ADMIN USER CONTROLS ────────────────────────────
-async function adminRenameUser(uid, currentName){
-  const newName=prompt('New display name for '+currentName+':');
-  if(!newName||!newName.trim()) return;
-  const nm=newName.trim().substring(0,30);
+async function adminSaveName(uid, name){
+  if(!name){toast('Enter a name.','danger');return;}
+  const nm=name.substring(0,30);
   try{
     await updateDoc(doc(db,'users',uid),{displayName:nm});
     if(uCache[uid]) uCache[uid].displayName=nm;
-    toast('Renamed to '+nm,'success');
-    loadOwnerUsers();
+    toast('Name updated.','success');
   }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminSaveUsername(uid, oldUsername, newUsername){
+  if(!newUsername||newUsername.length<2){toast('Username too short.','danger');return;}
+  if(!/^[a-zA-Z0-9_]+$/.test(newUsername)){toast('Letters, numbers, underscores only.','danger');return;}
+  const nl=newUsername.toLowerCase();
+  try{
+    // Check if new username is taken
+    const existing=await getDoc(doc(db,'usernames',nl));
+    if(existing.exists()&&existing.data().uid!==uid){toast('Username already taken.','danger');return;}
+    // Update username doc
+    if(oldUsername) await deleteDoc(doc(db,'usernames',oldUsername.toLowerCase())).catch(()=>{});
+    await setDoc(doc(db,'usernames',nl),{uid,createdAt:serverTimestamp()});
+    await updateDoc(doc(db,'users',uid),{username:nl,displayName:newUsername});
+    if(uCache[uid]){uCache[uid].username=nl;uCache[uid].displayName=newUsername;}
+    toast('Username updated to @'+nl,'success');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminSetPassword(uid, username, newPw, onSuccess){
+  if(!newPw||newPw.length<6){toast('Password must be 6+ chars.','danger');return;}
+  if(!username){toast('User has no username.','danger');return;}
+  try{
+    // Store the new password in a secure Firestore field
+    // The user's next login will pick it up, OR the owner uses it to LOGIN AS
+    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
+    toast('Password set. Use LOGIN AS to sign in with it.','success');
+    if(onSuccess) onSuccess();
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminRenameUser(uid, currentName){
+  // Legacy wrapper
+  const newName=prompt('New display name for '+currentName+':');
+  if(!newName||!newName.trim()) return;
+  await adminSaveName(uid,newName.trim());
+  loadOwnerUsers();
 }
 
 async function adminChangePassword(uid, name){
@@ -3801,37 +3952,35 @@ async function adminDeleteAccount(uid, name){
   }catch(e){toast('Delete failed: '+e.message,'danger');}
 }
 
-async function adminQuickLogin(uid, name){
-  const TEMP_PW='nexus_owner_'+Math.random().toString(36).slice(2,8);
-  if(!confirm('Sign in as '+name+'?\n\nThis will:\n1. Set their password to: '+TEMP_PW+'\n2. Sign you out\n3. Sign in as them\n\nWARNING: This logs you out. Continue?')) return;
+async function adminQuickLogin(uid, username, displayName){
+  // Requires a password to have been set via SET button, or stored in _ownerSetPw
   try{
-    // Get their username to build the email
     const usnap=await getDoc(doc(db,'users',uid));
-    const username=usnap.data()?.username;
-    if(!username){toast('User has no username.','danger');return;}
-    const email=username+'@nexus.local';
-    // Store current owner uid so they can sign back in
-    sessionStorage.setItem('owner_uid',cu.uid);
-    sessionStorage.setItem('owner_name',cud?.displayName||'Owner');
-    // Use Firebase Auth admin-style: update via reauthentication isn't possible
-    // Instead store temp credentials and guide owner through process
-    // The only way without Admin SDK is to use updatePassword after re-auth
-    // Show the credentials for manual login
-    toast('Logging in as '+name+'…','');
-    await signInWithEmailAndPassword(auth,email,TEMP_PW).catch(async err=>{
-      // If that fails, we need to set the password first
-      // We can do this via the pendingPwReset flow we already have
-      await updateDoc(doc(db,'users',uid),{pendingPwReset:TEMP_PW});
-      throw new Error('Cannot sign in directly without knowing their password.\n\nInstead: set their password to "'+TEMP_PW+'" via PWD button first, then log in manually with:\n\nUsername: '+username+'\nPassword: '+TEMP_PW);
-    });
-  }catch(e){
-    // Show a helpful dialog with login info
-    const msg=e.message;
-    if(msg.includes('Cannot sign in directly')){
-      alert(msg);
-    } else {
-      toast('Quick login: '+msg,'danger');
+    const udata=usnap.data()||{};
+    const uname=username||udata.username;
+    const storedPw=udata._ownerSetPw;
+    if(!uname){toast('User has no username.','danger');return;}
+
+    if(!storedPw){
+      // No password set — show instructions
+      toast('Set a password for this user first using the PASS field, then click LOGIN AS.','');
+      return;
     }
+
+    if(!confirm('Sign in as @'+uname+'?\n\nYou will be logged out of the owner account. Use the "↩ Back to Owner" button to return.')) return;
+
+    // Save owner credentials in sessionStorage so we can return
+    sessionStorage.setItem('nexus_owner_pw', btoa('owner_session'));
+    sessionStorage.setItem('nexus_owner_name', cud?.displayName||'Owner');
+    sessionStorage.setItem('nexus_impersonating', uname);
+
+    const email=uname+'@nexus.local';
+    await signInWithEmailAndPassword(auth, email, storedPw);
+    // enterApp will fire and show the app as this user
+    // The impersonation banner will be shown
+    toast('Signed in as @'+uname,'success');
+  }catch(e){
+    toast('Login failed: '+e.message,'danger');
   }
 }
 
@@ -3888,12 +4037,36 @@ function checkAnnouncement(){
 
 // ── FONT PICKER ─────────────────────────────────────
 const USER_FONTS=[
-  {id:0,name:'Default',preview:'Abc',style:'font-family:inherit;'},
-  {id:1,name:'Orbitron',preview:'Abc',style:"font-family:'Orbitron',monospace;font-weight:700;"},
-  {id:2,name:'Rajdhani',preview:'Abc',style:"font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:2px;"},
-  {id:3,name:'Mono',preview:'Abc',style:"font-family:'JetBrains Mono',monospace;"},
-  {id:4,name:'Serif',preview:'Abc',style:'font-family:Georgia,serif;font-style:italic;'},
-  {id:5,name:'Courier',preview:'Abc',style:"font-family:'Courier New',monospace;letter-spacing:1px;"},
+  // Clean / Default
+  {id:0,  name:'Default',       preview:'Hello',  tag:'',          style:'font-family:inherit;'},
+  // Futuristic / Sci-fi
+  {id:1,  name:'Orbitron',      preview:'NEXUS',  tag:'TECH',      style:"font-family:'Orbitron',monospace;font-weight:700;"},
+  {id:2,  name:'Audiowide',     preview:'Hello',  tag:'CYBER',     style:"font-family:'Audiowide',sans-serif;"},
+  {id:3,  name:'Michroma',      preview:'Hello',  tag:'SPACE',     style:"font-family:'Michroma',sans-serif;letter-spacing:2px;"},
+  {id:4,  name:'Nova Square',   preview:'Hello',  tag:'FUTURE',    style:"font-family:'Nova Square',sans-serif;"},
+  {id:5,  name:'Chakra Petch',  preview:'Hello',  tag:'HUD',       style:"font-family:'Chakra Petch',sans-serif;font-weight:600;letter-spacing:1px;"},
+  {id:6,  name:'Exo 2',         preview:'Hello',  tag:'SLEEK',     style:"font-family:'Exo 2',sans-serif;font-weight:700;"},
+  {id:7,  name:'Syne',          preview:'Hello',  tag:'MODERN',    style:"font-family:'Syne',sans-serif;font-weight:800;letter-spacing:1px;"},
+  // Bold / Impact
+  {id:8,  name:'Bebas Neue',    preview:'HELLO',  tag:'BOLD',      style:"font-family:'Bebas Neue',sans-serif;letter-spacing:3px;"},
+  {id:9,  name:'Bungee',        preview:'HELLO',  tag:'STREET',    style:"font-family:'Bungee',sans-serif;letter-spacing:2px;"},
+  {id:10, name:'Righteous',     preview:'Hello',  tag:'RETRO',     style:"font-family:'Righteous',sans-serif;"},
+  {id:11, name:'Teko',          preview:'HELLO',  tag:'DISPLAY',   style:"font-family:'Teko',sans-serif;font-weight:600;letter-spacing:2px;font-size:1.15em;"},
+  {id:12, name:'Black Ops One', preview:'HELLO',  tag:'MILITARY',  style:"font-family:'Black Ops One',sans-serif;letter-spacing:2px;"},
+  // Mono / Code
+  {id:13, name:'JetBrains',     preview:'Hello',  tag:'CODE',      style:"font-family:'JetBrains Mono',monospace;font-weight:500;"},
+  {id:14, name:'Share Tech',    preview:'Hello_', tag:'TERMINAL',  style:"font-family:'Share Tech Mono',monospace;letter-spacing:1px;"},
+  {id:15, name:'Major Mono',    preview:'hello',  tag:'GLITCH',    style:"font-family:'Major Mono Display',monospace;"},
+  // Pixel / Retro
+  {id:16, name:'Press Start',   preview:'Hi',     tag:'8-BIT',     style:"font-family:'Press Start 2P',sans-serif;font-size:0.7em;"},
+  {id:17, name:'Silkscreen',    preview:'Hello',  tag:'PIXEL',     style:"font-family:'Silkscreen',sans-serif;"},
+  {id:18, name:'VT323',         preview:'Hello',  tag:'CRT',       style:"font-family:'VT323',monospace;font-size:1.3em;letter-spacing:1px;"},
+  // Elegant / Stylish
+  {id:19, name:'Cinzel',        preview:'Hello',  tag:'ELEGANT',   style:"font-family:'Cinzel',serif;font-weight:700;letter-spacing:2px;"},
+  {id:20, name:'Rajdhani',      preview:'HELLO',  tag:'SHARP',     style:"font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:3px;text-transform:uppercase;"},
+  // Handwritten / Fun
+  {id:21, name:'Permanent Marker', preview:'Hello', tag:'MARKER', style:"font-family:'Permanent Marker',cursive;"},
+  {id:22, name:'Special Elite', preview:'Hello',  tag:'TYPEWRITER',style:"font-family:'Special Elite',cursive;letter-spacing:1px;"},
 ];
 
 async function saveUserFont(fontId){
@@ -3909,6 +4082,29 @@ function getUserFontStyle(uid){
   const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
   const f=USER_FONTS.find(x=>x.id===(u.fontId||0));
   return f?.style||'';
+}
+
+const ROLES=[
+  {id:'',          label:'No Role'},
+  {id:'owner',     label:'Owner'},
+  {id:'tester',    label:'Tester'},
+  {id:'bugfinder', label:'Bug Finder'},
+  {id:'feedback',  label:'Feedback'},
+  {id:'og',        label:'OG'},
+];
+
+function getRoleBadge(uid){
+  const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
+  const role=u.role;
+  if(!role) return '';
+  const map={
+    owner:    '<span class="role-owner">OWNER</span>',
+    tester:   '<span class="role-tester">TESTER</span>',
+    bugfinder:'<span class="role-bugfinder">BUG FINDER</span>',
+    feedback: '<span class="role-feedback">FEEDBACK</span>',
+    og:       '<span class="role-og">OG</span>',
+  };
+  return map[role]||'';
 }
 
 // ── CLEAR CHAT ────────────────────────────────────
@@ -4169,6 +4365,22 @@ function tttCleanup(){
   tttGameId=null;tttMySymbol=null;
 }
 
+// ── IMPERSONATION ───────────────────────────────
+function showImpersonationBanner(username){
+  const b=document.getElementById('impersonate-banner');
+  const n=document.getElementById('impersonate-name');
+  if(b&&n){n.textContent='@'+username;b.style.display='flex';}
+}
+
+async function returnToOwner(){
+  sessionStorage.removeItem('nexus_impersonating');
+  sessionStorage.removeItem('nexus_owner_pw');
+  // Sign out the impersonated account and sign back in as owner
+  // Owner must log back in manually since we can't store their password
+  await signOut(auth).catch(()=>{});
+  toast('Signed out. Please log back in as the owner.','success');
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -4199,6 +4411,8 @@ window._N = {
   saveUserFont,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
+  adminSaveName, adminSaveUsername, adminSetPassword,
+  showImpersonationBanner, returnToOwner,
   adminRenameUser, adminChangePassword, adminDeleteAccount,
   renderAnnouncePanel,
   openTtt, tttSendChallenge, tttMove, tttOpenGame, tttNewGame, tttCleanup, tttClose,
@@ -4207,7 +4421,7 @@ window._N = {
   openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
-  ownerTab, replyToTicket, adminWipeAllChats, adminBroadcast,
+  ownerTab, loadRolesPanel, replyToTicket, adminWipeAllChats, adminBroadcast,
   adminClearTickets, adminResetMsgs, openOwnerModal,
 };
 // Also copy onto N directly in case Proxy isn't supported
