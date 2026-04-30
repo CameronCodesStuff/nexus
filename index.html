@@ -495,15 +495,19 @@
 
 
   /* ── ROLES ── */
-  .role-og{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#001133,#002266);color:#4488ff;border:1px solid #2255cc;box-shadow:0 0 8px rgba(68,136,255,0.7),0 0 20px rgba(68,136,255,0.3);vertical-align:middle;margin-left:8px;}
+  /* Ensure role badge text is always visible regardless of parent colour */
+  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner{
+    -webkit-text-fill-color:initial !important;
+  }
+  .role-og{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#001133,#002266);color:#4488ff;border:1px solid #2255cc;box-shadow:0 0 8px rgba(68,136,255,0.7),0 0 20px rgba(68,136,255,0.3);vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   @keyframes feedback-pulse{0%,100%{box-shadow:0 0 6px rgba(255,30,60,0.5);}50%{box-shadow:0 0 18px rgba(255,30,60,1),0 0 32px rgba(255,30,60,0.4);}}
-  .role-feedback{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#330008,#660010);color:#ff3355;border:1px solid #cc1133;animation:feedback-pulse 1.5s ease infinite;vertical-align:middle;margin-left:8px;}
+  .role-feedback{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#330008,#660010);color:#ff3355;border:1px solid #cc1133;animation:feedback-pulse 1.5s ease infinite;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   @keyframes gold-shine{0%,100%{background-position:0% center;}50%{background-position:200% center;}}
-  .role-bugfinder{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(90deg,#5a3f00,#ffcc00,#fff8c0,#ffcc00,#5a3f00);background-size:300%;color:#1a1000;border:1px solid #cc9900;animation:gold-shine 2s linear infinite;font-weight:700;vertical-align:middle;margin-left:8px;}
+  .role-bugfinder{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(90deg,#5a3f00,#ffcc00,#fff8c0,#ffcc00,#5a3f00);background-size:300%;color:#1a1000;border:1px solid #cc9900;animation:gold-shine 2s linear infinite;font-weight:700;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   @keyframes role-rainbow{to{background-position:300% center;}}
-  .role-tester{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);}
+  .role-tester{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);-webkit-text-fill-color:initial;}
   @keyframes owner-pulse{0%,100%{transform:scale(1);filter:brightness(1);}50%{transform:scale(1.08);filter:brightness(1.5);}}
-  .role-owner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite,owner-pulse 2s ease infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);}
+  .role-owner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite,owner-pulse 2s ease infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);-webkit-text-fill-color:initial;}
 
 
 </style>
@@ -1272,7 +1276,7 @@ function renderProfile(){
     }
   }
   const nameEl=$('my-name-el');
-  if(nameEl) nameEl.innerHTML=`<span class="${rank.c} ${rank.fc||''}">${esc(nm)}</span>`;
+  if(nameEl) nameEl.innerHTML=`<span class="${rank.c} ${rank.fc||''}" style="${getUserFontStyle(cu?.uid||'')}">${esc(nm)}</span>${getRoleBadge(cu?.uid||'')}`;
   const rankEl=$('my-rank-el');
   if(rankEl) rankEl.textContent=rank.l;
 }
@@ -1346,7 +1350,7 @@ function renderSidebar(){
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
-    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}">${esc(nm)}${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
+    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${online?'<div class="online-dot"></div>':''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
     feed.appendChild(el);
   });
 }
@@ -1381,7 +1385,7 @@ function openChat(cid){
   }
   $('ch-avatar').className='feed-avatar'+(ig?' group':'');
   const chNameClick=!ig?`onclick="N.openProfileModal('${ouid}')" style="cursor:pointer;"`:"";  
-  $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}" ${chNameClick}>${esc(nm)}</span>`;
+  $('ch-name').innerHTML=ig?esc(nm):`<span class="${rank.c}" style="${getUserFontStyle(ouid||'')}" ${chNameClick}>${esc(nm)}</span>${getRoleBadge(ouid||'')} `;
   $('ch-sub').textContent=(ig?`${chat.members?.length||0} members · `:'')+(ig?'':(isOnline(ou)?'🟢 Online':'⚫ Offline'));
   const leaveBtn=$('leave-group-btn');
   if(leaveBtn) leaveBtn.style.display=ig?'flex':'none';
@@ -3194,9 +3198,39 @@ function closeSidebar(){
 const _origOpenChat_mobile = window._N?.openChat;
 
 // ── CREDITS ────────────────────────────────────
-function openCreditsModal(){
+async function openCreditsModal(){
   const el=document.getElementById('credits-content');
   if(!el) return;
+  // Load live data for owner and j_frosty from Firestore
+  const makeCard=async(username, roleLine, badgeClass, badgeLabel)=>{
+    // Find user by username
+    let u=Object.values(uCache).find(x=>(x.username||'').toLowerCase()===username.toLowerCase());
+    if(!u){
+      try{
+        const s=await getDocs(query(collection(db,'users'),where('username','==',username.toLowerCase())));
+        if(!s.empty){u=s.docs[0].data();u._id=s.docs[0].id;uCache[s.docs[0].id]=u;}
+      }catch{}
+    }
+    const uid=u?._id||(Object.entries(uCache).find(([,v])=>(v.username||'').toLowerCase()===username.toLowerCase())||[])[0];
+    const nm=u?.displayName||username;
+    const rank=getRank(u?.msgCount||0);
+    const emoji=uid?userEmoji(uid):'👤';
+    const fontStyle=uid?getUserFontStyle(uid):'';
+    const roleBadges=uid?getRoleBadge(uid):'';
+    const picHtml=u?.profilePic?`<img src="${esc(u.profilePic)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.style.display='none'">`:emoji;
+    return `<div class="credits-card">
+      <div class="credits-avatar" style="overflow:hidden;padding:0;font-size:22px;">${picHtml}</div>
+      <div style="flex:1;min-width:0;">
+        <div class="credits-name ${rank.c}" style="${fontStyle};-webkit-text-fill-color:unset;">${esc(nm)} ${roleBadges}</div>
+        <div class="credits-role">${roleLine}</div>
+        <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">@${esc(username.toLowerCase())} · ${u?.msgCount||0} msgs · ${rank.l}</div>
+      </div>
+      <span class="credits-badge ${badgeClass}">${badgeLabel}</span>
+    </div>`;
+  };
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
+  const ownerCard=await makeCard('owner','FOUNDER · LEAD DEVELOPER','badge-creator','CREATOR');
+  const testerCard=await makeCard('j_frosty','QUALITY ASSURANCE · TESTER','badge-tester','TESTER');
   el.innerHTML=`
     <div class="credits-hero">
       <div class="credits-nexus-logo">NEXUS</div>
@@ -3204,25 +3238,9 @@ function openCreditsModal(){
     </div>
     <div class="credits-body">
       <div class="credits-section-title"><span class="credits-star">✦</span> CREATORS</div>
-      <div class="credits-card">
-        <div class="credits-avatar" style="background:linear-gradient(135deg,#050520,#1a1a60);">👑</div>
-        <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">detla</div>
-          <div class="credits-role">FOUNDER · LEAD DEVELOPER</div>
-        </div>
-        <span class="credits-badge badge-creator">CREATOR</span>
-      </div>
-
+      ${ownerCard}
       <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star" style="animation-direction:reverse;">◈</span> TESTERS</div>
-      <div class="credits-card">
-        <div class="credits-avatar" style="background:linear-gradient(135deg,#200040,#600080);">🧪</div>
-        <div style="flex:1;">
-          <div class="credits-name" style="background:linear-gradient(90deg,#9933ff,#ff66dd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Add your testers here</div>
-          <div class="credits-role">QUALITY ASSURANCE</div>
-        </div>
-        <span class="credits-badge badge-tester">TESTER</span>
-      </div>
-
+      ${testerCard}
       <div style="margin-top:24px;text-align:center;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:2;">
         Built with Firebase · WebRTC · Pure HTML<br>
         <span style="color:var(--accent);">© 2025 NEXUS</span> · All rights reserved
