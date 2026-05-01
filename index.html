@@ -638,8 +638,8 @@
         <div style="padding:20px;color:var(--text-dim);font-size:12px;font-family:var(--font-mono);text-align:center;">Connecting…</div>
       </div>
       <div class="sidebar-footer">
-        <div class="my-avatar-wrap" style="position:relative;">
-          <div class="my-avatar" id="my-avatar-el" onclick="N.toggleStatusPicker()" style="cursor:pointer;" title="Change status"></div>
+        <div class="my-avatar-wrap" style="position:relative;cursor:pointer;" onclick="N.toggleStatusPicker()" title="Change status">
+          <div class="my-avatar" id="my-avatar-el"></div>
           <div class="my-status-dot" id="my-status-dot"></div>
           <!-- Status picker popup -->
           <div class="status-popup" id="status-popup">
@@ -1033,9 +1033,8 @@ function avatarHtml(uid, sizePx){
 
 // True online = flag is true AND lastSeen within last 75 seconds (heartbeat is 30s)
 function isOnline(u){
-  if(!u) return false;
-  if(!u.online) return false;
-  if(u.status==='dnd'||u.status==='idle') return false; // treat non-online statuses as offline for green dot
+  // Returns true if user has a fresh heartbeat (regardless of status)
+  if(!u||!u.online) return false;
   const ls=u.lastSeen;
   if(!ls) return false;
   let ms=0;
@@ -1047,14 +1046,22 @@ function isOnline(u){
 }
 
 function getStatusDotClass(u){
+  // Returns CSS class string for the online-dot, or '' if user is offline/stale
   if(!u||!u.online) return '';
+  // Check lastSeen freshness
   const ls=u.lastSeen;
+  if(!ls) return '';
   let ms=0;
-  if(ls?.seconds) ms=ls.seconds*1000;
-  else if(ls?.toMillis) ms=ls.toMillis();
-  if((Date.now()-ms)>75000) return ''; // stale = offline
+  if(typeof ls.seconds==='number') ms=ls.seconds*1000;
+  else if(typeof ls.toMillis==='function') ms=ls.toMillis();
+  else if(ls instanceof Date) ms=ls.getTime();
+  else return '';
+  if((Date.now()-ms)>75000) return ''; // heartbeat stale = offline
+  // User is online — pick colour from status
   const s=u.status||'online';
-  return s==='online'?'online':s==='idle'?'online idle':s==='dnd'?'online dnd':'online';
+  if(s==='idle') return 'online idle';
+  if(s==='dnd')  return 'online dnd';
+  return 'online';  // default green
 }
 
 function toast(msg,type=''){
@@ -1403,7 +1410,7 @@ function renderSidebar(){
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
-    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${ou?`<div class="online-dot ${getStatusDotClass(ou)}"></div>`:''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
+    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${isOnline(ou)?`<div class="online-dot ${getStatusDotClass(ou)}"></div>`:''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
     feed.appendChild(el);
   });
 }
@@ -1835,7 +1842,7 @@ function buildUsersList(){
   entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;">${avatarHtml(uid,'42px')}${u.online?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;">${avatarHtml(uid,'42px')}${isOnline(u)?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
     list.appendChild(el);
   });
 }
@@ -4648,6 +4655,7 @@ window._N = {
   toggleMoreMenu, closeMoreMenu, filterUsers,
   ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
   adminClearTickets, adminResetMsgs, openOwnerModal,
+  setStatus, toggleStatusPicker, updateMyStatusDot,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
