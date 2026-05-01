@@ -912,7 +912,8 @@ import {
 import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
   addDoc, updateDoc, deleteDoc, onSnapshot, query, where,
-  orderBy, serverTimestamp, arrayUnion, arrayRemove
+  orderBy, limitToLast, startAfter, endBefore, limit,
+  serverTimestamp, arrayUnion, arrayRemove
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STARFIELD ──────────────────────────────────
@@ -950,6 +951,9 @@ let ctimer=null,csecs=0,cstreams={},sstream=null,micOn=true,camOn=true;
 let ginvitees=[],clsnrs={},acunsub=null,uCache={},aChats={},mCache={},ffilter='';
 
 const EMOJIS=['👍','❤️','😂','😮','😢','😡','🔥','⭐','✅','💯','🎉','👏','😍','🤔','💀','🙏'];
+const MSG_PAGE_SIZE = 60; // messages loaded per page
+let msgPageMap = {}; // { chatId: { oldest: doc|null, hasMore: bool } }
+
 const THEMES=[
   {id:'default',name:'NEXUS',   c:['#4466ff','#00d4ff']},
   {id:'nebula', name:'NEBULA',  c:['#9933ff','#ff66dd']},
@@ -1405,39 +1409,94 @@ function openChat(cid){
 }
 
 // ── MESSAGES ───────────────────────────────────
+function getClearedSec(cid){
+  try{
+    const chat=aChats[cid];
+    const clearedTs=chat?.clearedAt?.[cu?.uid];
+    if(!clearedTs) return 0;
+    if(typeof clearedTs.seconds==='number') return clearedTs.seconds;
+    if(typeof clearedTs.toMillis==='function') return clearedTs.toMillis()/1000;
+  }catch{}
+  return 0;
+}
+
+function filterCleared(msgs, clearedSec){
+  if(!clearedSec) return msgs;
+  return msgs.filter(m=>{
+    if(!m.ts||!m.ts.seconds) return true; // pending send = always show
+    return m.ts.seconds > clearedSec;
+  });
+}
+
 function subMsgs(cid){
   if(clsnrs[cid]){renderMsgs(cid);setTimeout(()=>applyChatBgPreset(cid),30);return;}
-  const q=query(collection(db,'chats',cid,'messages'),orderBy('ts','asc'));
+  // Only subscribe to the latest MSG_PAGE_SIZE messages
+  const q=query(collection(db,'chats',cid,'messages'),orderBy('ts','asc'),limitToLast(MSG_PAGE_SIZE));
   clsnrs[cid]=onSnapshot(q,snap=>{
     const allMsgs=snap.docs.map(d=>({id:d.id,...d.data()}));
-    // Only filter if user explicitly cleared this chat
-    try{
-      const chat=aChats[cid];
-      const clearedTs=chat?.clearedAt?.[cu?.uid];
-      let clearedSec=0; // work in seconds throughout
-      if(clearedTs&&typeof clearedTs.seconds==='number') clearedSec=clearedTs.seconds;
-      else if(clearedTs&&typeof clearedTs.toMillis==='function') clearedSec=clearedTs.toMillis()/1000;
-      if(clearedSec>0){
-        mCache[cid]=allMsgs.filter(m=>{
-          // Messages with no ts yet (just sent, pending server) are ALWAYS shown
-          if(!m.ts||!m.ts.seconds) return true;
-          return m.ts.seconds > clearedSec;
-        });
-      } else {
-        mCache[cid]=allMsgs;
-      }
-    }catch{
-      mCache[cid]=allMsgs;
-    }
-    if(acid===cid)renderMsgs(cid);
+    const clearedSec=getClearedSec(cid);
+    mCache[cid]=filterCleared(allMsgs,clearedSec);
+    // Track whether there might be older messages
+    if(!msgPageMap[cid]) msgPageMap[cid]={};
+    msgPageMap[cid].oldestDoc=snap.docs[0]||null;
+    msgPageMap[cid].hasMore=snap.docs.length>=MSG_PAGE_SIZE;
+    if(acid===cid) renderMsgs(cid);
   });
+}
+
+async function loadOlderMsgs(cid){
+  const pageInfo=msgPageMap[cid];
+  if(!pageInfo?.oldestDoc||!pageInfo.hasMore) return;
+  const btn=document.getElementById('load-older-btn');
+  if(btn){btn.textContent='Loading…';btn.disabled=true;}
+  try{
+    const q=query(
+      collection(db,'chats',cid,'messages'),
+      orderBy('ts','asc'),
+      endBefore(pageInfo.oldestDoc),
+      limitToLast(MSG_PAGE_SIZE)
+    );
+    const snap=await getDocs(q);
+    const older=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const clearedSec=getClearedSec(cid);
+    const filtered=filterCleared(older,clearedSec);
+    // Prepend to cache
+    mCache[cid]=[...filtered,...(mCache[cid]||[])];
+    pageInfo.oldestDoc=snap.docs[0]||null;
+    pageInfo.hasMore=snap.docs.length>=MSG_PAGE_SIZE;
+    // Re-render and restore scroll position
+    const area=$('messages-area');
+    const prevHeight=area?.scrollHeight||0;
+    renderMsgs(cid);
+    if(area) area.scrollTop=area.scrollHeight-prevHeight;
+  }catch(e){
+    toast('Could not load older messages: '+e.message,'danger');
+  }
 }
 
 function renderMsgs(cid){
   const msgs=mCache[cid]||[],area=$('messages-area'),wipe=$('wipe-confirm-slot');
   if(!area||!wipe) return;
+  // Remember scroll position — if user was at bottom, keep them there
+  const wasAtBottom=area.scrollHeight-area.scrollTop-area.clientHeight<60;
   Array.from(area.children).forEach(c=>{if(c!==wipe)c.remove();});
-  if(!msgs.length){const e=document.createElement('div');e.style.cssText='text-align:center;color:var(--text-dim);font-size:13px;font-family:var(--font-mono);padding:60px 40px;flex:1;';e.textContent='No messages yet. Say hello!';area.insertBefore(e,wipe);return;}
+  if(!msgs.length){
+    const e=document.createElement('div');
+    e.style.cssText='text-align:center;color:var(--text-dim);font-size:13px;font-family:var(--font-mono);padding:60px 40px;flex:1;';
+    e.textContent='No messages yet. Say hello!';
+    area.insertBefore(e,wipe);return;
+  }
+  // "Load older" button at top if there are more messages
+  const pageInfo=msgPageMap[cid];
+  if(pageInfo?.hasMore){
+    const lb=document.createElement('button');
+    lb.id='load-older-btn';
+    lb.className='btn-small';
+    lb.style.cssText='display:block;margin:12px auto 8px;';
+    lb.textContent='⬆ Load older messages';
+    lb.onclick=()=>loadOlderMsgs(cid);
+    area.insertBefore(lb,wipe);
+  }
   let ld=null,ls=null,gEl=null;
   msgs.forEach(msg=>{
     const ts=msg.ts?.seconds?new Date(msg.ts.seconds*1000):new Date(),own=msg.senderUid===cu.uid;
@@ -1521,7 +1580,8 @@ function renderMsgs(cid){
     }
     if(gEl) gEl.appendChild(wr);
   });
-  area.scrollTop=area.scrollHeight;
+  // Only auto-scroll if user was already near the bottom
+  if(wasAtBottom) area.scrollTop=area.scrollHeight;
 }
 
 const fmtMsg=t=>t?esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>'):'';
