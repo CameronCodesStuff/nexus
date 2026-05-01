@@ -73,6 +73,11 @@
   .my-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .my-status{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);}
   /* === RANK COLOURS (0→1500 grey, 1500→10000 colour, 10000+ rainbow) === */
+  /* Early subtle tints — not bright, just a gentle hint of colour */
+  .rank-e1{color:#607060;} /* 50+  — very faint sage */
+  .rank-e2{color:#607878;} /* 100+ — very faint teal */
+  .rank-e3{color:#6a6a8a;} /* 500+ — very faint lavender */
+  .rank-e4{color:#7a6888;} /* 1000+ — very faint mauve */
   .rank-0{color:#555;}
   .rank-1{color:#667788;}
   .rank-2{color:#5588aa;}
@@ -1020,11 +1025,9 @@ function toast(msg,type=''){
 // Progressive rank: 0-1500 grey shades, 1500-10000 colour tiers, 10000+ rainbow
 // Font unlocks: 10000-20000 progressively cooler fonts
 function getRank(n){
-  // 10k+ = rainbow with font prestige
+  // 10k+ = rainbow (no font prestige)
   if(n>=10000){
-    const tier=Math.min(5,Math.floor((n-10000)/2000)+1); // font tier 1-5 every 2k msgs
-    const fontCls=n>=20000?'font-5':`font-${tier}`;
-    return{l:'✦ LEGENDARY',c:'rank-rainbow',fc:fontCls,nx:n>=20000?null:10000+tier*2000,p:n>=20000?100:((n-(10000+(tier-1)*2000))/2000)*100};
+    return{l:'✦ LEGENDARY',c:'rank-rainbow',fc:'',nx:null,p:100};
   }
   // 1500-10000 = 12 colour tiers
   if(n>=1500){
@@ -1047,10 +1050,12 @@ function getRank(n){
     }
     return{l:'★ MYTHIC',c:'rank-12',fc:'',nx:10000,p:((n-9800)/200)*100};
   }
-  // 0-1500 = grey shades (3 sub-tiers)
-  if(n>=800) return{l:'○ REGULAR',  c:'rank-0',fc:'',nx:1500,p:((n-800)/700)*100};
-  if(n>=200) return{l:'○ MEMBER',   c:'rank-0',fc:'',nx:800, p:((n-200)/600)*100};
-  return             {l:'○ NEWCOMER', c:'rank-0',fc:'',nx:200, p:(n/200)*100};
+  // 50-1500 = subtle early tints then grey
+  if(n>=1000) return{l:'○ REGULAR',  c:'rank-e4',fc:'',nx:1500,p:((n-1000)/500)*100};
+  if(n>=500)  return{l:'○ MEMBER',   c:'rank-e3',fc:'',nx:1000,p:((n-500)/500)*100};
+  if(n>=100)  return{l:'○ ACTIVE',   c:'rank-e2',fc:'',nx:500, p:((n-100)/400)*100};
+  if(n>=50)   return{l:'○ MEMBER',   c:'rank-e1',fc:'',nx:100, p:((n-50)/50)*100};
+  return             {l:'○ NEWCOMER', c:'rank-0', fc:'',nx:50,  p:(n/50)*100};
 }
 
 // ── THEME ──────────────────────────────────────
@@ -1947,7 +1952,7 @@ function renderSettings(){
       <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:2.4;">
         <div><span class="rank-0">● GREY</span> 0 msgs → <span class="rank-1">COLOUR</span> unlocks at 1,500</div>
         <div style="margin-top:2px;"><span class="rank-rainbow">● RAINBOW</span> unlocks at 10,000 msgs</div>
-        <div style="margin-top:2px;"><span class="font-1" style="font-size:10px;color:var(--accent2);">PRESTIGE FONTS</span> unlock 10k–20k msgs</div>
+        <div style="margin-top:2px;"><span class="rank-e1">● SUBTLE COLOUR</span> starts from 50 msgs</div>
       </div>`;
     rankEl.innerHTML=previewHtml;
   }
