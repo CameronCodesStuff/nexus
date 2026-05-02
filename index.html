@@ -5343,10 +5343,10 @@ function eggOpen(){
   const cooldown=parseInt(localStorage.getItem(EGG_COOLDOWN_KEY)||'0');
   // Clamp: if remaining wait is > 60s, treat as expired (handles leftover test/old values)
   const remaining=cooldown-Date.now();
-  if(remaining>0&&remaining<=60000){
-    const secs=Math.ceil(remaining/1000);
-    toast(`⏳ Try again in ${secs} second${secs!==1?'s':''}.`,'danger');return;
-  } else if(remaining>60000){
+  if(remaining>0&&remaining<=3660000){
+    const mins=Math.ceil(remaining/60000);
+    toast(`⏳ Try again in ${mins} minute${mins!==1?'s':''}.`,'danger');return;
+  } else if(remaining>3660000){
     // Stale long cooldown — clear it
     localStorage.removeItem(EGG_COOLDOWN_KEY);
     localStorage.removeItem('nexus_egg_tries');
@@ -5431,7 +5431,7 @@ function eggLoop(){
       if(s.tries<=0){
         s.phase='done'; s.lost=true; s.flash=60; s.flashColor='#ff3355';
         document.getElementById('egg-msg').textContent='💀 Out of tries! Come back in 1 hour.';
-        localStorage.setItem(EGG_COOLDOWN_KEY, String(Date.now()+5000));
+        localStorage.setItem(EGG_COOLDOWN_KEY, String(Date.now()+3600000));
         localStorage.removeItem('nexus_egg_tries');
         setTimeout(eggClose, 2800);
       } else {
