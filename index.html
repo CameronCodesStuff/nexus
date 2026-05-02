@@ -5563,6 +5563,14 @@ async function eggWin(){
   }catch(e){toast('Egg won but role save failed: '+e.message,'danger');setTimeout(eggClose,2500);}
 }
 
+function eggClose(){
+  document.getElementById('egg-modal')?.classList.remove('open');
+  if(eggRaf){cancelAnimationFrame(eggRaf);eggRaf=null;}
+  eggState=null;
+  const cv=document.getElementById('egg-canvas');
+  if(cv){const cx=cv.getContext('2d');cx.clearRect(0,0,cv.width,cv.height);}
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -5635,7 +5643,7 @@ Object.assign(window.N, window._N);
     <div id="egg-timer" style="display:none;font-size:10px;"></div>
   </div>
   <div id="egg-msg">Click anywhere on the canvas to launch the ball!</div>
-  <button class="egg-close" onclick="eggClose()">CLOSE</button>
+  <button class="egg-close" onclick="N.eggClose()">CLOSE</button>
 </div>
 
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
