@@ -5335,7 +5335,7 @@ function eggOpen(){
   if(localStorage.getItem(EGG_WON_KEY)){toast('🐣 You already found the Easter Egg!','success');return;}
   const cooldown=parseInt(localStorage.getItem(EGG_COOLDOWN_KEY)||'0');
   if(cooldown>Date.now()){
-    const mins=Math.ceil((cooldown-Date.now())/60000);
+    const mins=Math.ceil((cooldown-Date.now())/6);
     toast(`⏳ Try again in ${mins} minute${mins!==1?'s':''}.`,'danger');return;
   }
   const tries=parseInt(localStorage.getItem('nexus_egg_tries')||'3');
