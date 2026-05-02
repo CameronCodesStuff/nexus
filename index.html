@@ -540,6 +540,33 @@
   .effect-card.selected .effect-card-label{color:var(--accent);}
 
 
+  /* ── EASTER EGG ROLE ── */
+  @keyframes egg-bounce{0%,100%{transform:translateY(0) rotate(-3deg);}50%{transform:translateY(-4px) rotate(3deg);}}
+  @keyframes egg-hue{to{filter:hue-rotate(360deg) brightness(1.2);}}
+  .role-easter{
+    display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:1px;
+    padding:2px 8px;border-radius:10px;
+    background:linear-gradient(90deg,#ff6b9d,#ffc23d,#4ecdc4,#a855f7,#ff6b9d);
+    background-size:300%;
+    color:#fff;border:none;
+    animation:role-rainbow 3s linear infinite,egg-bounce 1.2s ease infinite,egg-hue 4s linear infinite;
+    font-weight:900;vertical-align:middle;margin-left:8px;
+    text-shadow:0 1px 3px rgba(0,0,0,0.6);
+    -webkit-text-fill-color:#fff !important;
+  }
+  /* Shooting game modal */
+  #egg-modal{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  #egg-modal.open{display:flex;}
+  #egg-canvas{border:2px solid rgba(68,102,255,0.4);border-radius:12px;background:#050508;display:block;}
+  .egg-ui{display:flex;align-items:center;gap:20px;font-family:'Orbitron',monospace;font-size:12px;letter-spacing:2px;color:var(--text-dim);}
+  .egg-tries{display:flex;gap:6px;}
+  .egg-try{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);}
+  .egg-try.used{background:#333;box-shadow:none;}
+  #egg-msg{font-family:'Orbitron',monospace;font-size:13px;letter-spacing:2px;text-align:center;min-height:20px;color:#fff;}
+  .egg-close{background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.5);padding:6px 16px;border-radius:6px;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:2px;cursor:pointer;}
+  .egg-close:hover{border-color:var(--danger);color:var(--danger);}
+
+
 </style>
 </head>
 <body>
@@ -4039,7 +4066,7 @@ async function openCreditsModal(){
         <div class="credits-role">${roleLine}</div>
         <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">@${esc(username.toLowerCase())} · ${u?.msgCount||0} msgs · ${rank.l}</div>
       </div>
-      <span class="credits-badge ${badgeClass}">${badgeLabel}</span>
+      <span class="credits-badge ${badgeClass}" ${badgeClass==='badge-tester'?'id="secret-egg-trigger" title="🐣" style="cursor:pointer;"':''}>${badgeLabel}</span>
     </div>`;
   };
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
@@ -4310,8 +4337,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','tester','bugfinder','feedback','og'];
-const ROLE_LABELS={owner:'Owner',tester:'Tester',bugfinder:'Bug Finder',feedback:'Feedback',og:'OG'};
+const ROLE_OPTS=['owner','tester','bugfinder','feedback','og','easter'];
+const ROLE_LABELS={owner:'Owner',tester:'Tester',bugfinder:'Bug Finder',feedback:'Feedback',og:'OG',easter:'Easter Egg 🐣'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -4970,6 +4997,7 @@ function getRoleBadge(uid){
     bugfinder:'<span class="role-bugfinder">BUG FINDER</span>',
     feedback: '<span class="role-feedback">FEEDBACK</span>',
     og:       '<span class="role-og">OG</span>',
+    easter:   '<span class="role-easter">🐣 EASTER EGG</span>',
   };
   return roles.map(r=>map[r]||'').join('');
 }
@@ -5298,6 +5326,246 @@ function setBgEffect(id){
   toast('Effect set to '+id,'success');
 }
 
+// ── EASTER EGG MINI GAME ─────────────────────────
+const EGG_COOLDOWN_KEY='nexus_egg_cooldown';
+const EGG_WON_KEY='nexus_egg_won';
+let eggRaf=null, eggState=null;
+
+function eggOpen(){
+  // Check if already won
+  if(localStorage.getItem(EGG_WON_KEY)){
+    toast('🐣 You already found the Easter Egg!','success');
+    return;
+  }
+  // Check cooldown
+  const cooldown=parseInt(localStorage.getItem(EGG_COOLDOWN_KEY)||'0');
+  const now=Date.now();
+  if(cooldown>now){
+    const mins=Math.ceil((cooldown-now)/60000);
+    toast(`⏳ You failed! Try again in ${mins} minute${mins!==1?'s':''}.`,'danger');
+    return;
+  }
+  // Init game state
+  const tries=parseInt(localStorage.getItem('nexus_egg_tries')||'3');
+  eggState={
+    tries, phase:'aim', // aim | flying | result
+    ball:{x:60,y:260,vx:0,vy:0,launched:false},
+    target:{x:380,y:160,vx:2.2,vy:0,dir:1,minY:60,maxY:240,bounces:0},
+    aimAngle:Math.PI/4, power:0.7,
+    flash:0, flashColor:'',
+    won:false, lost:false,
+    trail:[],
+  };
+  updateEggTries(tries);
+  const modal=document.getElementById('egg-modal');
+  modal.classList.add('open');
+  document.getElementById('egg-msg').textContent='Move mouse to aim · Click to launch!';
+  // Wire canvas events fresh each time
+  const cv=document.getElementById('egg-canvas');
+  // Remove old listeners by cloning
+  const newCv=cv.cloneNode(true);
+  cv.parentNode.replaceChild(newCv,cv);
+  newCv.addEventListener('mousemove',e=>{
+    if(!eggState||eggState.phase!=='aim') return;
+    const rect=newCv.getBoundingClientRect();
+    eggState.aimAngle=Math.atan2(-(e.clientY-rect.top-260),e.clientX-rect.left-60);
+  });
+  newCv.addEventListener('click',()=>{
+    if(!eggState||eggState.phase!=='aim') return;
+    const spd=5.5;
+    eggState.ball.vx=spd*Math.cos(eggState.aimAngle);
+    eggState.ball.vy=-spd*Math.sin(eggState.aimAngle);
+    eggState.phase='flying';
+    document.getElementById('egg-msg').textContent='🎯 Tracking…';
+  });
+  eggLoop();
+}
+
+function eggClose(){
+  document.getElementById('egg-modal').classList.remove('open');
+  if(eggRaf){cancelAnimationFrame(eggRaf);eggRaf=null;}
+  const cv=document.getElementById('egg-canvas');
+  if(cv){const cx=cv.getContext('2d');cx.clearRect(0,0,cv.width,cv.height);}
+}
+
+function updateEggTries(n){
+  for(let i=1;i<=3;i++){
+    const el=document.getElementById('egg-t'+i);
+    if(el) el.className='egg-try'+(i>n?' used':'');
+  }
+}
+
+function eggLoop(){
+  if(!eggState) return;
+  const cv=document.getElementById('egg-canvas');
+  if(!cv||!eggState){return;}
+  const cx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const s=eggState;
+
+  // ── UPDATE ──
+  if(s.phase==='flying'){
+    // Physics
+    s.ball.vy+=0.18; // gravity
+    s.ball.x+=s.ball.vx;
+    s.ball.y+=s.ball.vy;
+    s.trail.push({x:s.ball.x,y:s.ball.y,a:1});
+    if(s.trail.length>30) s.trail.shift();
+    s.trail.forEach(t=>t.a-=0.03);
+
+    // Target moves
+    s.target.y+=s.target.vy;
+    s.target.vy+=s.target.dir*0.08;
+    if(s.target.y<s.target.minY||s.target.y>s.target.maxY){s.target.dir*=-1;}
+    s.target.x-=0.4; // slowly drifts left
+    if(s.target.x<80) s.target.x=420;
+
+    // Hit check
+    const dx=s.ball.x-s.target.x,dy=s.ball.y-s.target.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<24){
+      s.phase='result';s.won=true;s.flash=30;s.flashColor='#ffee44';
+      eggWin();
+    }
+    // Miss — ball off screen
+    if(s.ball.x>W+20||s.ball.y>H+20||s.ball.x<-20){
+      s.tries--;
+      updateEggTries(s.tries);
+      localStorage.setItem('nexus_egg_tries',s.tries);
+      if(s.tries<=0){
+        s.phase='result';s.lost=true;s.flash=40;s.flashColor='#ff3355';
+        document.getElementById('egg-msg').textContent='💀 Out of tries! Wait 1 hour.';
+        localStorage.setItem(EGG_COOLDOWN_KEY,String(Date.now()+3600000));
+        localStorage.removeItem('nexus_egg_tries');
+        setTimeout(eggClose,2500);
+      } else {
+        // Reset ball
+        s.ball={x:60,y:260,vx:0,vy:0,launched:false};
+        s.trail=[];s.phase='aim';
+        document.getElementById('egg-msg').textContent=`Miss! ${s.tries} tr${s.tries===1?'y':'ies'} left. Aim again!`;
+      }
+    }
+  }
+  if(s.flash>0) s.flash--;
+
+  // ── DRAW ──
+  // Background
+  cx.fillStyle='#050508';
+  cx.fillRect(0,0,W,H);
+  // Grid lines subtle
+  cx.strokeStyle='rgba(68,102,255,0.06)';cx.lineWidth=1;
+  for(let gx=0;gx<W;gx+=40){cx.beginPath();cx.moveTo(gx,0);cx.lineTo(gx,H);cx.stroke();}
+  for(let gy=0;gy<H;gy+=40){cx.beginPath();cx.moveTo(0,gy);cx.lineTo(W,gy);cx.stroke();}
+
+  // Flash effect
+  if(s.flash>0){
+    cx.fillStyle=s.flashColor+(Math.floor(s.flash/40*99).toString(16).padStart(2,'0'));
+    cx.fillRect(0,0,W,H);
+  }
+
+  // Ball trail
+  s.trail.forEach((t,i)=>{
+    cx.globalAlpha=Math.max(0,t.a);
+    cx.fillStyle='#4466ff';
+    cx.beginPath();cx.arc(t.x,t.y,4*(i/s.trail.length),0,Math.PI*2);cx.fill();
+  });
+  cx.globalAlpha=1;
+
+  // Launch platform
+  cx.fillStyle='#1a1a3a';
+  cx.strokeStyle='rgba(68,102,255,0.4)';cx.lineWidth=2;
+  cx.beginPath();cx.roundRect(20,240,80,30,6);cx.fill();cx.stroke();
+  cx.fillStyle='rgba(68,102,255,0.6)';cx.font='10px Orbitron';cx.textAlign='center';
+  cx.fillText('LAUNCH',60,259);
+
+  // Aim line (only in aim phase)
+  if(s.phase==='aim'){
+    cx.save();cx.translate(60,260);
+    // Draw trajectory preview dots
+    let px=0,py=0,pvx=4*Math.cos(s.aimAngle),pvy=4*Math.sin(s.aimAngle)*-1;
+    cx.fillStyle='rgba(100,150,255,0.3)';
+    for(let step=0;step<40;step++){
+      pvy+=0.18;px+=pvx;py+=pvy;
+      if(step%3===0){cx.beginPath();cx.arc(px,py,2,0,Math.PI*2);cx.fill();}
+      if(px>W||py>H) break;
+    }
+    cx.restore();
+  }
+
+  // Ball
+  if(!s.lost){
+    const bg=cx.createRadialGradient(s.ball.x-3,s.ball.y-3,1,s.ball.x,s.ball.y,10);
+    bg.addColorStop(0,'#88aaff');bg.addColorStop(1,'#2244cc');
+    cx.fillStyle=bg;
+    cx.beginPath();cx.arc(s.ball.x,s.ball.y,10,0,Math.PI*2);cx.fill();
+    cx.strokeStyle='rgba(180,200,255,0.5)';cx.lineWidth=1;cx.stroke();
+  }
+
+  // Target — bouncing egg
+  if(!s.won){
+    const tx=s.target.x,ty=s.target.y;
+    // Egg shape
+    cx.save();cx.translate(tx,ty);
+    const eg=cx.createRadialGradient(-5,-8,2,0,0,22);
+    eg.addColorStop(0,'#fff8aa');eg.addColorStop(0.4,'#ffcc44');
+    eg.addColorStop(0.7,'#ff6baa');eg.addColorStop(1,'#9933ff');
+    cx.fillStyle=eg;
+    cx.beginPath();
+    cx.ellipse(0,0,16,22,0,0,Math.PI*2);cx.fill();
+    // Zigzag pattern on egg
+    cx.strokeStyle='rgba(255,255,255,0.4)';cx.lineWidth=1.5;
+    cx.beginPath();
+    for(let zig=-16;zig<16;zig+=8){cx.lineTo(zig,Math.sin(zig*0.4)*8);}cx.stroke();
+    // Glow
+    cx.shadowBlur=15;cx.shadowColor='#ffcc44';
+    cx.strokeStyle='rgba(255,200,80,0.4)';cx.lineWidth=2;
+    cx.beginPath();cx.ellipse(0,0,18,24,0,0,Math.PI*2);cx.stroke();
+    cx.shadowBlur=0;
+    cx.restore();
+    // Target reticle
+    cx.strokeStyle='rgba(255,100,100,0.3)';cx.lineWidth=1;cx.setLineDash([4,4]);
+    cx.beginPath();cx.arc(tx,ty,30,0,Math.PI*2);cx.stroke();cx.setLineDash([]);
+  }
+
+  // Win/lose overlay
+  if(s.won){
+    cx.fillStyle='rgba(5,5,8,0.7)';cx.fillRect(0,0,W,H);
+    cx.font='bold 28px Orbitron';cx.textAlign='center';cx.fillStyle='#ffee44';
+    cx.fillText('🐣 HIT!',W/2,H/2-20);
+    cx.font='12px Orbitron';cx.fillStyle='rgba(255,255,255,0.7)';
+    cx.fillText('EASTER EGG UNLOCKED',W/2,H/2+14);
+  }
+
+  cx.textAlign='left'; // reset
+  eggRaf=requestAnimationFrame(eggLoop);
+}
+
+// Canvas events wired in eggOpen after modal is shown
+
+async function eggWin(){
+  document.getElementById('egg-msg').textContent='🐣 You found the Easter Egg! Unlocking reward…';
+  localStorage.setItem(EGG_WON_KEY,'1');
+  localStorage.removeItem('nexus_egg_tries');
+  // Add easter role to current user
+  try{
+    const curRoles=Array.isArray(cud?.roles)?cud.roles:(cud?.role?[cud.role]:[]);
+    if(!curRoles.includes('easter')){
+      const newRoles=[...curRoles,'easter'];
+      await updateDoc(doc(db,'users',cu.uid),{roles:newRoles,role:newRoles[0]});
+      cud={...cud,roles:newRoles,role:newRoles[0]};
+      uCache[cu.uid]={...uCache[cu.uid],roles:newRoles,role:newRoles[0]};
+    }
+    setTimeout(()=>{
+      eggClose();
+      toast('🐣 Easter Egg role unlocked! Check your profile!','success');
+      renderProfile();
+    },2200);
+  }catch(e){
+    toast('Egg won but role failed: '+e.message,'danger');
+    setTimeout(eggClose,2500);
+  }
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -5341,7 +5609,7 @@ window._N = {
   ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
-  setBgEffect,
+  setBgEffect, eggOpen, eggClose,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
@@ -5354,6 +5622,23 @@ Object.assign(window.N, window._N);
     <button class="modal-close" onclick="N.closeModal('ttt-modal');N.tttCleanup()">✕</button>
     <div id="ttt-content"></div>
   </div>
+</div>
+
+<!-- EASTER EGG MINI GAME -->
+<div id="egg-modal">
+  <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.3);margin-bottom:-6px;">🐣 SECRET DISCOVERED</div>
+  <canvas id="egg-canvas" width="500" height="320"></canvas>
+  <div class="egg-ui">
+    <div>TRIES</div>
+    <div class="egg-tries">
+      <div class="egg-try" id="egg-t1"></div>
+      <div class="egg-try" id="egg-t2"></div>
+      <div class="egg-try" id="egg-t3"></div>
+    </div>
+    <div id="egg-timer" style="display:none;font-size:10px;"></div>
+  </div>
+  <div id="egg-msg">Click anywhere on the canvas to launch the ball!</div>
+  <button class="egg-close" onclick="eggClose()">CLOSE</button>
 </div>
 
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
