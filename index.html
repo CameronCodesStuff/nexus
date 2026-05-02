@@ -567,6 +567,22 @@
   .egg-close:hover{border-color:var(--danger);color:var(--danger);}
 
 
+  /* ── ACHIEVEMENTS ── */
+  .ach-grid{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+  .ach-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;transition:all 0.2s;}
+  .ach-item.unlocked{border-color:rgba(68,102,255,0.35);background:rgba(68,102,255,0.06);}
+  .ach-item.locked{opacity:0.45;filter:grayscale(0.7);}
+  .ach-icon{font-size:28px;flex-shrink:0;width:40px;text-align:center;}
+  .ach-info{flex:1;min-width:0;}
+  .ach-name{font-size:13px;font-weight:700;margin-bottom:2px;}
+  .ach-desc{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);}
+  .ach-reward{font-size:10px;color:var(--accent);font-family:var(--font-display);letter-spacing:1px;margin-top:3px;}
+  .ach-badge{font-size:9px;font-family:var(--font-display);letter-spacing:2px;padding:2px 8px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;flex-shrink:0;}
+  /* Profile achievements strip */
+  .profile-ach-strip{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+  .profile-ach-icon{font-size:18px;title:attr(title);}
+
+
 </style>
 </head>
 <body>
@@ -655,6 +671,7 @@
         <div style="position:relative;">
           <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
           <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:160px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+            <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
             <button onclick="N.openModal('credits-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">✦ Credits</button>
             <button onclick="N.openModal('help-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">❓ Help</button>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -862,6 +879,15 @@
     <div id="op-panel-roles" style="display:none;"></div>
     <div id="op-panel-admin" style="display:none;"></div>
     <div id="op-panel-announce" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ACHIEVEMENTS MODAL -->
+<div class="modal-overlay" id="achievements-modal">
+  <div class="modal" style="width:500px;">
+    <div class="modal-title">🏆 ACHIEVEMENTS</div>
+    <button class="modal-close" onclick="N.closeModal('achievements-modal')">✕</button>
+    <div id="achievements-content"></div>
   </div>
 </div>
 
@@ -1692,6 +1718,7 @@ function getRank(n){
 let curTheme = localStorage.getItem('nexus_theme')||'default';
 
 function applyTheme(id){
+  if(id!==curTheme) unlockAch('change_theme');
   curTheme=id;
   localStorage.setItem('nexus_theme',id);
   document.documentElement.setAttribute('data-theme',id==='default'?'':id);
@@ -2227,6 +2254,7 @@ const fmtMsg=t=>t?esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_b
 let replyingTo = null; // { id, senderName, text }
 
 function setReply(msg, cid){
+  unlockAch('reply_msg');
   replyingTo = {
     id: msg.id,
     senderName: uCache[msg.senderUid]?.displayName || msg.senderName || 'User',
@@ -2265,6 +2293,15 @@ async function sendMessage(){
     const nc=(cud?.msgCount||0)+1;
     await updateDoc(doc(db,'users',cu.uid),{msgCount:nc});
     cud={...cud,msgCount:nc};uCache[cu.uid]={...uCache[cu.uid],msgCount:nc};renderProfile();
+    // Achievement checks
+    const achToCheck=['first_message'];
+    if(nc>=100) achToCheck.push('chat_100');
+    if(nc>=500) achToCheck.push('chat_500');
+    if(nc>=1000) achToCheck.push('chat_1000');
+    // Night owl check
+    const hr=new Date().getHours();
+    if(hr>=0&&hr<4) achToCheck.push('night_owl');
+    unlockAch(...achToCheck);
   }catch(e){toast('Send failed: '+e.message,'danger');}
 }
 
@@ -2327,6 +2364,7 @@ function dlLightbox(){dlFile(_lbData,_lbName);}
 
 // ── DELETE MESSAGE ───────────────────────────────
 async function deleteMessage(msgId, chatId){
+  unlockAch('delete_msg');
   try{
     await deleteDoc(doc(db,'chats',chatId,'messages',msgId));
     // If it was the last message, update the preview
@@ -2350,6 +2388,7 @@ function showRP(e,mid,cid){
 }
 
 async function addRxn(cid,mid,emoji){
+  unlockAch('first_reaction');
   const ref=doc(db,'chats',cid,'messages',mid),snap=await getDoc(ref);if(!snap.exists())return;
   const rxns=snap.data().reactions||{},users=rxns[emoji]||[],pos=users.indexOf(cu.uid);
   if(pos>-1)users.splice(pos,1);else users.push(cu.uid);
@@ -2394,6 +2433,7 @@ function openModal(id){
   if(id==='gc-members-modal'){}  // rendered by openGcMembers()
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
+  if(id==='achievements-modal')openAchievementsModal();
 }
 const closeModal=id=>{$(id).classList.remove('open');};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
@@ -2476,6 +2516,7 @@ async function acceptInvite(iid,cid,type){
       if(ex){await deleteDoc(doc(db,'invites',iid));closeModal('inbox-modal');openChat(ex.id);return;}
       const chatRef=await addDoc(collection(db,'chats'),{type:'dm',members:[cu.uid,inv.fromUid],createdAt:serverTimestamp(),lastMessage:'',lastTs:serverTimestamp()});
       await deleteDoc(doc(db,'invites',iid));
+      unlockAch('first_dm');
       closeModal('inbox-modal');openChat(chatRef.id);toast('DM accepted!','success');
     } else {
       await updateDoc(doc(db,'chats',cid),{members:arrayUnion(cu.uid)});
@@ -2515,6 +2556,7 @@ async function createGroup(){
   if(!ginvitees.length){toast('Add at least one member.','danger');return;}
   const ref=await addDoc(collection(db,'chats'),{type:'group',name:nm,members:[cu.uid],createdAt:serverTimestamp(),lastMessage:'',lastTs:serverTimestamp()});
   for(const uid of ginvitees)await addDoc(collection(db,'invites'),{toUid:uid,fromUid:cu.uid,fromName:cud?.displayName||'User',groupName:nm,chatId:ref.id,ts:serverTimestamp()});
+  unlockAch('first_group');
   $('group-name-input').value='';closeModal('group-modal');openChat(ref.id);toast(`Group "${nm}" created!`,'success');
 }
 
@@ -2827,7 +2869,8 @@ function renderSettings(){
 
 async function saveEmoji(emoji){
   try{
-    await updateDoc(doc(db,'users',cu.uid),{emoji});
+    unlockAch('set_avatar');
+  await updateDoc(doc(db,'users',cu.uid),{emoji});
     cud={...cud,emoji};
     uCache[cu.uid]={...uCache[cu.uid],emoji};
     toast('Avatar updated!','success');
@@ -2837,7 +2880,8 @@ async function saveEmoji(emoji){
 async function saveBio(){
   const bio=($('bio-input')?.value||'').trim().substring(0,200);
   try{
-    await updateDoc(doc(db,'users',cu.uid),{bio});
+    unlockAch('set_bio');
+  await updateDoc(doc(db,'users',cu.uid),{bio});
     cud={...cud,bio};
     uCache[cu.uid]={...uCache[cu.uid],bio};
     toast('Bio saved!','success');
@@ -3092,6 +3136,7 @@ function cleanupRecording(){
 }
 
 async function finaliseRecording(){
+  unlockAch('first_voice');
   const dur=Math.round((Date.now()-recordingStart)/1000);
   if(dur<1){toast('Recording too short.','');return;}
   const mimeType=mediaRecorder?.mimeType||'audio/webm';
@@ -3366,6 +3411,7 @@ async function startCall(mode){
   const otherMembers = (chat.members||[]).filter(m=>m!==cu.uid);
   if(!otherMembers.length){ toast('No one else in this chat.','danger'); return; }
 
+  unlockAch('first_call');
   // Get local media first
   try{
     if(mode==='audio'){
@@ -3880,6 +3926,12 @@ function openProfileModal(uid){
           <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">${u.online?(u.status==='idle'?'IDLE':u.status==='dnd'?'DO NOT DISTURB':'ONLINE'):'OFFLINE'}</div>
         </div>
       </div>
+      ${(()=>{
+        const uAchs=Array.isArray(u.achievements)?u.achievements:[];
+        if(!uAchs.length) return '';
+        const icons=uAchs.slice(0,12).map(id=>{const a=ACHIEVEMENTS.find(x=>x.id===id);return a?`<span title="${esc(a.name)}" style="font-size:20px;">${a.icon}</span>`:''}).join('');
+        return `<div style="margin-top:12px;"><div style="font-size:10px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:6px;">ACHIEVEMENTS (${uAchs.length})</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${icons}</div></div>`;
+      })()}
       ${!isMe?`<div style="margin-top:12px;display:flex;gap:8px;">
         <button class="btn-small" style="${isBlocked?'border-color:var(--success);color:var(--success)':'border-color:var(--danger);color:var(--danger)'}" onclick="N.toggleBlock('${uid}')">
           ${isBlocked?'✓ UNBLOCK':'🚫 BLOCK'}
@@ -4964,7 +5016,8 @@ const USER_FONTS=[
 
 async function saveUserFont(fontId){
   try{
-    await updateDoc(doc(db,'users',cu.uid),{fontId});
+    unlockAch('set_font');
+  await updateDoc(doc(db,'users',cu.uid),{fontId});
     cud={...cud,fontId};uCache[cu.uid]={...uCache[cu.uid],fontId};
     toast('Font updated!','success');
     renderProfile();renderSettings();
@@ -5216,12 +5269,14 @@ async function tttMove(cellIdx){
   const winner=tttCalcWinner(board);
   const isDraw=!winner&&board.every(v=>v!==null);
   try{
+    const wasWinner=tttCalcWinner(board);
     await updateDoc(doc(db,'chats',tttChatId,'ttt',tttGameId),{
       board,
       turn:winner||isDraw?null:oppUid,
       status:winner||isDraw?'done':'active',
       winner:winner?winner.sym:null
     });
+    if(wasWinner&&wasWinner.sym===(data.xUid===cu.uid?'X':'O')) unlockAch('ttt_win');
   }catch(e){toast('Move failed: '+e.message,'danger');}
 }
 
@@ -5294,6 +5349,7 @@ function toggleStatusPicker(){
 async function setStatus(status){
   currentStatus=status;
   localStorage.setItem('nexus_status',status);
+  if(status!=='online') unlockAch('set_status');
   document.getElementById('status-popup')?.classList.remove('open');
   // Update Firestore
   try{
@@ -5318,6 +5374,7 @@ function updateMyStatusDot(){
 
 // ── BG EFFECT ────────────────────────────────────
 function setBgEffect(id){
+  unlockAch('bg_effect');
   BgEffects.start(id);
   // Update selected card in settings
   document.querySelectorAll('.effect-card').forEach(c=>{
@@ -5563,6 +5620,7 @@ function eggLoop(){
 async function eggWin(){
   document.getElementById('egg-msg').textContent='🐣 Easter Egg found! Unlocking…';
   localStorage.setItem(EGG_WON_KEY,'1');
+  unlockAch('egg_hunter');
   localStorage.removeItem('nexus_egg_tries');
   try{
     const curRoles=Array.isArray(cud?.roles)?cud.roles:(cud?.role?[cud.role]:[]);
@@ -5582,6 +5640,105 @@ function eggClose(){
   eggState=null;
   const cv=document.getElementById('egg-canvas');
   if(cv){const cx=cv.getContext('2d');cx.clearRect(0,0,cv.width,cv.height);}
+}
+
+// ── ACHIEVEMENTS ─────────────────────────────────
+const ACHIEVEMENTS=[
+  {id:'first_message',   icon:'💬', name:'First Words',        desc:'Send your first message',                  reward:10,  secret:false},
+  {id:'chat_100',        icon:'📨', name:'Chatterbox',         desc:'Send 100 messages',                        reward:50,  secret:false},
+  {id:'chat_500',        icon:'📢', name:'Broadcaster',        desc:'Send 500 messages',                        reward:100, secret:false},
+  {id:'chat_1000',       icon:'🔥', name:'On Fire',            desc:'Send 1,000 messages',                      reward:200, secret:false},
+  {id:'first_dm',        icon:'📩', name:'Ice Breaker',        desc:'Start your first DM',                      reward:20,  secret:false},
+  {id:'first_group',     icon:'👥', name:'Social Butterfly',   desc:'Join or create a group chat',              reward:30,  secret:false},
+  {id:'first_call',      icon:'📞', name:'Hello?',             desc:'Make your first audio or video call',      reward:50,  secret:false},
+  {id:'first_reaction',  icon:'😊', name:'Expressive',         desc:'React to a message',                       reward:10,  secret:false},
+  {id:'first_voice',     icon:'🎙️', name:'Podcast Mode',       desc:'Send your first voice note',               reward:25,  secret:false},
+  {id:'first_file',      icon:'📎', name:'File Sharer',        desc:'Send your first file',                     reward:20,  secret:false},
+  {id:'first_image',     icon:'🖼️', name:'Show and Tell',      desc:'Send your first image',                    reward:20,  secret:false},
+  {id:'ttt_win',         icon:'🎮', name:'Tic-Tac-Toe Master', desc:'Win a game of Tic-Tac-Toe',                reward:100, secret:false},
+  {id:'change_theme',    icon:'🎨', name:'Decorator',          desc:'Change your app theme',                    reward:10,  secret:false},
+  {id:'set_bio',         icon:'📝', name:'Autobiographer',     desc:'Write your profile bio',                   reward:15,  secret:false},
+  {id:'set_avatar',      icon:'🦊', name:'Identity',           desc:'Choose a custom emoji avatar',             reward:10,  secret:false},
+  {id:'set_font',        icon:'✍️', name:'Typographer',        desc:'Change your name font',                    reward:15,  secret:false},
+  {id:'night_owl',       icon:'🦉', name:'Night Owl',          desc:'Send a message between midnight and 4am',  reward:30,  secret:false},
+  {id:'set_status',      icon:'🟡', name:'Status Update',      desc:'Change your status to Idle or DND',        reward:10,  secret:false},
+  {id:'egg_hunter',      icon:'🐣', name:'Egg Hunter',         desc:'Find the hidden Easter Egg',               reward:500, secret:true},
+  {id:'reply_msg',       icon:'↩️', name:'Reply Guy',          desc:'Reply to a message',                       reward:10,  secret:false},
+  {id:'delete_msg',      icon:'🗑️', name:'Revisionist',        desc:'Delete one of your messages',              reward:5,   secret:false},
+  {id:'bg_effect',       icon:'✨', name:'Atmosphere',         desc:'Change your background effect',            reward:10,  secret:false},
+];
+
+const ACH_KEY='nexus_achievements';
+
+function getUnlockedAchs(){
+  try{return new Set(JSON.parse(localStorage.getItem(ACH_KEY)||'[]'));}catch{return new Set();}
+}
+
+function saveAch(ids){
+  const unlocked=getUnlockedAchs();
+  const newOnes=[];
+  ids.forEach(id=>{if(!unlocked.has(id)){unlocked.add(id);newOnes.push(id);}});
+  if(!newOnes.length) return;
+  localStorage.setItem(ACH_KEY,JSON.stringify([...unlocked]));
+  // Grant bonus messages for each new achievement
+  newOnes.forEach(async id=>{
+    const ach=ACHIEVEMENTS.find(a=>a.id===id);
+    if(!ach) return;
+    toast('🏆 Achievement: '+ach.name+' (+'+ach.reward+' msgs)','success');
+    // Add reward msgs to user count
+    try{
+      const newCount=(cud?.msgCount||0)+ach.reward;
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+      cud={...cud,msgCount:newCount};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+      renderProfile();
+      // Save achieved list to Firestore too so it shows on profile
+      const existing=Array.isArray(cud?.achievements)?cud.achievements:[];
+      const merged=[...new Set([...existing,...newOnes])];
+      await updateDoc(doc(db,'users',cu.uid),{achievements:merged});
+      cud={...cud,achievements:merged};
+      uCache[cu.uid]={...uCache[cu.uid],achievements:merged};
+    }catch{}
+  });
+}
+
+function unlockAch(...ids){ saveAch(ids); }
+
+function openAchievementsModal(){
+  const el=document.getElementById('achievements-content');
+  if(!el) return;
+  const unlocked=getUnlockedAchs();
+  // Merge with Firestore achievements for display
+  const firestoreAchs=Array.isArray(cud?.achievements)?cud.achievements:[];
+  firestoreAchs.forEach(id=>unlocked.add(id));
+  const total=ACHIEVEMENTS.length;
+  const count=[...unlocked].filter(id=>ACHIEVEMENTS.find(a=>a.id===id)).length;
+  let html=`<div style="font-size:11px;font-family:var(--font-mono);color:var(--text-dim);margin-bottom:14px;display:flex;justify-content:space-between;">
+    <span>Unlocked: <strong style="color:var(--accent)">${count}</strong> / ${total}</span>
+    <span>Bonus messages earned: <strong style="color:var(--accent)">${[...unlocked].reduce((s,id)=>{const a=ACHIEVEMENTS.find(x=>x.id===id);return s+(a?.reward||0);},0)}</strong></span>
+  </div><div class="ach-grid">`;
+  // Unlocked first, then locked
+  const sorted=[...ACHIEVEMENTS].sort((a,b)=>{
+    const au=unlocked.has(a.id),bu=unlocked.has(b.id);
+    return bu-au;
+  });
+  sorted.forEach(ach=>{
+    const isUnlocked=unlocked.has(ach.id);
+    const nameDisplay=ach.secret&&!isUnlocked?'???':ach.name;
+    const descDisplay=ach.secret&&!isUnlocked?'Keep exploring…':ach.desc;
+    html+=`<div class="ach-item ${isUnlocked?'unlocked':'locked'}">
+      <div class="ach-icon">${ach.secret&&!isUnlocked?'🔒':ach.icon}</div>
+      <div class="ach-info">
+        <div class="ach-name">${esc(nameDisplay)}</div>
+        <div class="ach-desc">${esc(descDisplay)}</div>
+        <div class="ach-reward">+${ach.reward} messages on unlock</div>
+      </div>
+      ${isUnlocked?'<div class="ach-badge">DONE</div>':''}
+    </div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
+  openModal('achievements-modal');
 }
 
 // ── GLOBAL EVENTS ──────────────────────────────
@@ -5628,6 +5785,7 @@ window._N = {
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
   setBgEffect, eggOpen, eggClose,
+  openAchievementsModal, unlockAch,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
