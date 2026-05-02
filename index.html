@@ -4066,7 +4066,7 @@ async function openCreditsModal(){
         <div class="credits-role">${roleLine}</div>
         <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">@${esc(username.toLowerCase())} · ${u?.msgCount||0} msgs · ${rank.l}</div>
       </div>
-      <span class="credits-badge ${badgeClass}" ${badgeClass==='badge-tester'?'id="secret-egg-trigger" title="🐣" style="cursor:pointer;"':''}>${badgeLabel}</span>
+      <span class="credits-badge ${badgeClass}" ${badgeClass==='badge-tester'?'style="cursor:pointer;outline:none;" onclick="N.eggOpen()" title="🥚 Click me..."':''}>${badgeLabel}</span>
     </div>`;
   };
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
