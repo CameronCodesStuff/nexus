@@ -5331,6 +5331,13 @@ const EGG_COOLDOWN_KEY='nexus_egg_cooldown';
 const EGG_WON_KEY='nexus_egg_won';
 let eggRaf=null, eggState=null;
 
+function updateEggTries(n){
+  for(let i=1;i<=3;i++){
+    const el=document.getElementById('egg-t'+i);
+    if(el) el.className='egg-try'+(i>n?' used':'');
+  }
+}
+
 function eggOpen(){
   if(localStorage.getItem(EGG_WON_KEY)){toast('🐣 You already found the Easter Egg!','success');return;}
   const cooldown=parseInt(localStorage.getItem(EGG_COOLDOWN_KEY)||'0');
