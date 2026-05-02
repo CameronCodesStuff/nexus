@@ -5332,116 +5332,101 @@ const EGG_WON_KEY='nexus_egg_won';
 let eggRaf=null, eggState=null;
 
 function eggOpen(){
-  // Check if already won
-  if(localStorage.getItem(EGG_WON_KEY)){
-    toast('🐣 You already found the Easter Egg!','success');
-    return;
-  }
-  // Check cooldown
+  if(localStorage.getItem(EGG_WON_KEY)){toast('🐣 You already found the Easter Egg!','success');return;}
   const cooldown=parseInt(localStorage.getItem(EGG_COOLDOWN_KEY)||'0');
-  const now=Date.now();
-  if(cooldown>now){
-    const mins=Math.ceil((cooldown-now)/60000);
-    toast(`⏳ You failed! Try again in ${mins} minute${mins!==1?'s':''}.`,'danger');
-    return;
+  if(cooldown>Date.now()){
+    const mins=Math.ceil((cooldown-Date.now())/60000);
+    toast(`⏳ Try again in ${mins} minute${mins!==1?'s':''}.`,'danger');return;
   }
-  // Init game state
   const tries=parseInt(localStorage.getItem('nexus_egg_tries')||'3');
+  eggReset(tries);
+  document.getElementById('egg-modal').classList.add('open');
+  // Wire fresh canvas events
+  const old=document.getElementById('egg-canvas');
+  const cv=old.cloneNode(true);
+  old.parentNode.replaceChild(cv,old);
+  cv.addEventListener('mousemove',e=>{
+    if(!eggState||eggState.phase!=='aim') return;
+    const r=cv.getBoundingClientRect();
+    // Aim from ball position (bottom-left of canvas)
+    const bx=eggState.ball.ox,by=eggState.ball.oy;
+    const mx=(e.clientX-r.left)/r.width*cv.width;
+    const my=(e.clientY-r.top)/r.height*cv.height;
+    eggState.aimAngle=Math.atan2(by-my, mx-bx);
+  });
+  cv.addEventListener('click',()=>{
+    if(!eggState||eggState.phase!=='aim') return;
+    const spd=7;
+    eggState.ball.vx=spd*Math.cos(eggState.aimAngle);
+    eggState.ball.vy=-spd*Math.sin(eggState.aimAngle);
+    eggState.phase='flying';
+    document.getElementById('egg-msg').textContent='🎯 Flying…';
+  });
+  if(eggRaf){cancelAnimationFrame(eggRaf);eggRaf=null;}
+  eggLoop();
+}
+
+function eggReset(tries){
   eggState={
-    tries, phase:'aim', // aim | flying | result
-    ball:{x:60,y:260,vx:0,vy:0,launched:false},
-    target:{x:380,y:160,vx:2.2,vy:0,dir:1,minY:60,maxY:240,bounces:0},
-    aimAngle:Math.PI/4, power:0.7,
+    tries,
+    phase:'aim',
+    ball:{x:50, y:280, ox:50, oy:280, vx:0, vy:0},
+    target:{x:380, y:160, vy:1.5, dir:1, startX:380},
+    aimAngle:Math.PI/4,
     flash:0, flashColor:'',
     won:false, lost:false,
     trail:[],
   };
   updateEggTries(tries);
-  const modal=document.getElementById('egg-modal');
-  modal.classList.add('open');
-  document.getElementById('egg-msg').textContent='Move mouse to aim · Click to launch!';
-  // Wire canvas events fresh each time
-  const cv=document.getElementById('egg-canvas');
-  // Remove old listeners by cloning
-  const newCv=cv.cloneNode(true);
-  cv.parentNode.replaceChild(newCv,cv);
-  newCv.addEventListener('mousemove',e=>{
-    if(!eggState||eggState.phase!=='aim') return;
-    const rect=newCv.getBoundingClientRect();
-    eggState.aimAngle=Math.atan2(-(e.clientY-rect.top-260),e.clientX-rect.left-60);
-  });
-  newCv.addEventListener('click',()=>{
-    if(!eggState||eggState.phase!=='aim') return;
-    const spd=5.5;
-    eggState.ball.vx=spd*Math.cos(eggState.aimAngle);
-    eggState.ball.vy=-spd*Math.sin(eggState.aimAngle);
-    eggState.phase='flying';
-    document.getElementById('egg-msg').textContent='🎯 Tracking…';
-  });
-  eggLoop();
-}
-
-function eggClose(){
-  document.getElementById('egg-modal').classList.remove('open');
-  if(eggRaf){cancelAnimationFrame(eggRaf);eggRaf=null;}
-  const cv=document.getElementById('egg-canvas');
-  if(cv){const cx=cv.getContext('2d');cx.clearRect(0,0,cv.width,cv.height);}
-}
-
-function updateEggTries(n){
-  for(let i=1;i<=3;i++){
-    const el=document.getElementById('egg-t'+i);
-    if(el) el.className='egg-try'+(i>n?' used':'');
-  }
+  document.getElementById('egg-msg').textContent='Move mouse over canvas to aim · Click to fire!';
 }
 
 function eggLoop(){
   if(!eggState) return;
   const cv=document.getElementById('egg-canvas');
-  if(!cv||!eggState){return;}
+  if(!cv) return;
   const cx=cv.getContext('2d');
-  const W=cv.width,H=cv.height;
+  const W=cv.width, H=cv.height;
   const s=eggState;
 
   // ── UPDATE ──
   if(s.phase==='flying'){
-    // Physics
-    s.ball.vy+=0.18; // gravity
+    s.ball.vy+=0.25; // gravity
     s.ball.x+=s.ball.vx;
     s.ball.y+=s.ball.vy;
-    s.trail.push({x:s.ball.x,y:s.ball.y,a:1});
-    if(s.trail.length>30) s.trail.shift();
-    s.trail.forEach(t=>t.a-=0.03);
+    s.trail.push({x:s.ball.x, y:s.ball.y});
+    if(s.trail.length>25) s.trail.shift();
 
-    // Target moves
+    // Target bounces vertically, moves horizontally
     s.target.y+=s.target.vy;
-    s.target.vy+=s.target.dir*0.08;
-    if(s.target.y<s.target.minY||s.target.y>s.target.maxY){s.target.dir*=-1;}
-    s.target.x-=0.4; // slowly drifts left
-    if(s.target.x<80) s.target.x=420;
+    if(s.target.y<40||s.target.y>H-40) s.target.vy*=-1;
+    s.target.x-=0.5;
+    if(s.target.x<60) s.target.x=W-60;
 
-    // Hit check
-    const dx=s.ball.x-s.target.x,dy=s.ball.y-s.target.y;
-    const dist=Math.sqrt(dx*dx+dy*dy);
-    if(dist<24){
-      s.phase='result';s.won=true;s.flash=30;s.flashColor='#ffee44';
-      eggWin();
+    // Hit check (generous 28px radius)
+    const dx=s.ball.x-s.target.x, dy=s.ball.y-s.target.y;
+    if(Math.sqrt(dx*dx+dy*dy)<28){
+      s.phase='done'; s.won=true; s.flash=60; s.flashColor='#ffee44';
+      eggWin(); return;
     }
-    // Miss — ball off screen
-    if(s.ball.x>W+20||s.ball.y>H+20||s.ball.x<-20){
+
+    // Miss — ball leaves canvas
+    if(s.ball.x>W+30||s.ball.y>H+30||s.ball.x<-30||s.ball.y<-100){
       s.tries--;
+      localStorage.setItem('nexus_egg_tries', String(s.tries));
       updateEggTries(s.tries);
-      localStorage.setItem('nexus_egg_tries',s.tries);
       if(s.tries<=0){
-        s.phase='result';s.lost=true;s.flash=40;s.flashColor='#ff3355';
-        document.getElementById('egg-msg').textContent='💀 Out of tries! Wait 1 hour.';
-        localStorage.setItem(EGG_COOLDOWN_KEY,String(Date.now()+3600000));
+        s.phase='done'; s.lost=true; s.flash=60; s.flashColor='#ff3355';
+        document.getElementById('egg-msg').textContent='💀 Out of tries! Come back in 1 hour.';
+        localStorage.setItem(EGG_COOLDOWN_KEY, String(Date.now()+3600000));
         localStorage.removeItem('nexus_egg_tries');
-        setTimeout(eggClose,2500);
+        setTimeout(eggClose, 2800);
       } else {
-        // Reset ball
-        s.ball={x:60,y:260,vx:0,vy:0,launched:false};
-        s.trail=[];s.phase='aim';
+        // Reset ball AND target to starting position
+        s.ball={x:50, y:280, ox:50, oy:280, vx:0, vy:0};
+        s.target.x=s.target.startX; s.target.y=160; s.target.vy=1.5;
+        s.trail=[];
+        s.phase='aim';
         document.getElementById('egg-msg').textContent=`Miss! ${s.tries} tr${s.tries===1?'y':'ies'} left. Aim again!`;
       }
     }
@@ -5449,104 +5434,123 @@ function eggLoop(){
   if(s.flash>0) s.flash--;
 
   // ── DRAW ──
-  // Background
-  cx.fillStyle='#050508';
+  cx.fillStyle='#05050d';
   cx.fillRect(0,0,W,H);
-  // Grid lines subtle
-  cx.strokeStyle='rgba(68,102,255,0.06)';cx.lineWidth=1;
+
+  // Subtle grid
+  cx.strokeStyle='rgba(68,102,255,0.05)'; cx.lineWidth=1;
   for(let gx=0;gx<W;gx+=40){cx.beginPath();cx.moveTo(gx,0);cx.lineTo(gx,H);cx.stroke();}
   for(let gy=0;gy<H;gy+=40){cx.beginPath();cx.moveTo(0,gy);cx.lineTo(W,gy);cx.stroke();}
 
-  // Flash effect
+  // Flash
   if(s.flash>0){
-    cx.fillStyle=s.flashColor+(Math.floor(s.flash/40*99).toString(16).padStart(2,'0'));
+    cx.globalAlpha=s.flash/60*0.35;
+    cx.fillStyle=s.flashColor;
     cx.fillRect(0,0,W,H);
+    cx.globalAlpha=1;
+  }
+
+  // AIM phase: show trajectory preview
+  if(s.phase==='aim'){
+    let px=s.ball.ox, py=s.ball.oy;
+    let pvx=7*Math.cos(s.aimAngle), pvy=-7*Math.sin(s.aimAngle);
+    cx.fillStyle='rgba(100,180,255,0.5)';
+    for(let step=0;step<55;step++){
+      pvy+=0.25; px+=pvx; py+=pvy;
+      if(step%4===0){
+        cx.globalAlpha=0.5*(1-step/55);
+        cx.beginPath(); cx.arc(px,py,2.5,0,Math.PI*2); cx.fill();
+      }
+      if(px>W||py>H||px<0) break;
+    }
+    cx.globalAlpha=1;
+    // Aim arrow from ball
+    const ax=s.ball.ox+Math.cos(s.aimAngle)*40;
+    const ay=s.ball.oy-Math.sin(s.aimAngle)*40;
+    cx.strokeStyle='rgba(100,200,255,0.6)'; cx.lineWidth=2; cx.setLineDash([6,4]);
+    cx.beginPath(); cx.moveTo(s.ball.ox,s.ball.oy); cx.lineTo(ax,ay); cx.stroke();
+    cx.setLineDash([]);
   }
 
   // Ball trail
   s.trail.forEach((t,i)=>{
-    cx.globalAlpha=Math.max(0,t.a);
-    cx.fillStyle='#4466ff';
-    cx.beginPath();cx.arc(t.x,t.y,4*(i/s.trail.length),0,Math.PI*2);cx.fill();
+    cx.globalAlpha=i/s.trail.length*0.4;
+    cx.fillStyle='#66aaff';
+    cx.beginPath(); cx.arc(t.x,t.y,5*(i/s.trail.length),0,Math.PI*2); cx.fill();
   });
   cx.globalAlpha=1;
 
-  // Launch platform
-  cx.fillStyle='#1a1a3a';
-  cx.strokeStyle='rgba(68,102,255,0.4)';cx.lineWidth=2;
-  cx.beginPath();cx.roundRect(20,240,80,30,6);cx.fill();cx.stroke();
-  cx.fillStyle='rgba(68,102,255,0.6)';cx.font='10px Orbitron';cx.textAlign='center';
-  cx.fillText('LAUNCH',60,259);
+  // Ball (cannon / launcher — just a circle on the left)
+  // Draw cannon base
+  cx.fillStyle='#1a1a40';
+  cx.strokeStyle='rgba(68,102,255,0.5)'; cx.lineWidth=2;
+  cx.beginPath(); cx.arc(s.ball.ox, s.ball.oy, 18, 0, Math.PI*2); cx.fill(); cx.stroke();
+  // Cannon barrel pointing toward aim angle
+  cx.save();
+  cx.translate(s.ball.ox, s.ball.oy);
+  cx.rotate(-s.aimAngle);
+  cx.fillStyle='#2244aa';
+  cx.beginPath(); cx.roundRect(0,-5,30,10,3); cx.fill();
+  cx.strokeStyle='rgba(100,150,255,0.6)'; cx.lineWidth=1.5; cx.stroke();
+  cx.restore();
 
-  // Aim line (only in aim phase)
-  if(s.phase==='aim'){
-    cx.save();cx.translate(60,260);
-    // Draw trajectory preview dots
-    let px=0,py=0,pvx=4*Math.cos(s.aimAngle),pvy=4*Math.sin(s.aimAngle)*-1;
-    cx.fillStyle='rgba(100,150,255,0.3)';
-    for(let step=0;step<40;step++){
-      pvy+=0.18;px+=pvx;py+=pvy;
-      if(step%3===0){cx.beginPath();cx.arc(px,py,2,0,Math.PI*2);cx.fill();}
-      if(px>W||py>H) break;
-    }
-    cx.restore();
-  }
-
-  // Ball
-  if(!s.lost){
-    const bg=cx.createRadialGradient(s.ball.x-3,s.ball.y-3,1,s.ball.x,s.ball.y,10);
-    bg.addColorStop(0,'#88aaff');bg.addColorStop(1,'#2244cc');
+  // Flying ball
+  if(s.phase==='flying'&&!s.lost){
+    const bg=cx.createRadialGradient(s.ball.x-3,s.ball.y-3,0,s.ball.x,s.ball.y,11);
+    bg.addColorStop(0,'#aaccff'); bg.addColorStop(1,'#2244cc');
     cx.fillStyle=bg;
-    cx.beginPath();cx.arc(s.ball.x,s.ball.y,10,0,Math.PI*2);cx.fill();
-    cx.strokeStyle='rgba(180,200,255,0.5)';cx.lineWidth=1;cx.stroke();
+    cx.beginPath(); cx.arc(s.ball.x,s.ball.y,11,0,Math.PI*2); cx.fill();
+    cx.strokeStyle='rgba(180,220,255,0.6)'; cx.lineWidth=1.5; cx.stroke();
   }
 
-  // Target — bouncing egg
+  // TARGET — classic bullseye rings
   if(!s.won){
-    const tx=s.target.x,ty=s.target.y;
-    // Egg shape
-    cx.save();cx.translate(tx,ty);
-    const eg=cx.createRadialGradient(-5,-8,2,0,0,22);
-    eg.addColorStop(0,'#fff8aa');eg.addColorStop(0.4,'#ffcc44');
-    eg.addColorStop(0.7,'#ff6baa');eg.addColorStop(1,'#9933ff');
-    cx.fillStyle=eg;
-    cx.beginPath();
-    cx.ellipse(0,0,16,22,0,0,Math.PI*2);cx.fill();
-    // Zigzag pattern on egg
-    cx.strokeStyle='rgba(255,255,255,0.4)';cx.lineWidth=1.5;
-    cx.beginPath();
-    for(let zig=-16;zig<16;zig+=8){cx.lineTo(zig,Math.sin(zig*0.4)*8);}cx.stroke();
+    const tx=s.target.x, ty=s.target.y;
+    cx.save(); cx.translate(tx,ty);
+    // Outer ring (red)
+    cx.fillStyle='#cc2222'; cx.beginPath(); cx.arc(0,0,28,0,Math.PI*2); cx.fill();
+    // White ring
+    cx.fillStyle='#ffffff'; cx.beginPath(); cx.arc(0,0,21,0,Math.PI*2); cx.fill();
+    // Red ring
+    cx.fillStyle='#cc2222'; cx.beginPath(); cx.arc(0,0,14,0,Math.PI*2); cx.fill();
+    // White ring
+    cx.fillStyle='#ffffff'; cx.beginPath(); cx.arc(0,0,8,0,Math.PI*2); cx.fill();
+    // Bullseye (yellow)
+    cx.fillStyle='#ffdd00'; cx.beginPath(); cx.arc(0,0,4,0,Math.PI*2); cx.fill();
     // Glow
-    cx.shadowBlur=15;cx.shadowColor='#ffcc44';
-    cx.strokeStyle='rgba(255,200,80,0.4)';cx.lineWidth=2;
-    cx.beginPath();cx.ellipse(0,0,18,24,0,0,Math.PI*2);cx.stroke();
+    cx.shadowBlur=12; cx.shadowColor='rgba(255,100,100,0.6)';
+    cx.strokeStyle='rgba(255,100,100,0.4)'; cx.lineWidth=2;
+    cx.beginPath(); cx.arc(0,0,30,0,Math.PI*2); cx.stroke();
     cx.shadowBlur=0;
     cx.restore();
-    // Target reticle
-    cx.strokeStyle='rgba(255,100,100,0.3)';cx.lineWidth=1;cx.setLineDash([4,4]);
-    cx.beginPath();cx.arc(tx,ty,30,0,Math.PI*2);cx.stroke();cx.setLineDash([]);
   }
 
-  // Win/lose overlay
+  // Win overlay
   if(s.won){
-    cx.fillStyle='rgba(5,5,8,0.7)';cx.fillRect(0,0,W,H);
-    cx.font='bold 28px Orbitron';cx.textAlign='center';cx.fillStyle='#ffee44';
-    cx.fillText('🐣 HIT!',W/2,H/2-20);
-    cx.font='12px Orbitron';cx.fillStyle='rgba(255,255,255,0.7)';
-    cx.fillText('EASTER EGG UNLOCKED',W/2,H/2+14);
+    cx.fillStyle='rgba(5,5,13,0.75)'; cx.fillRect(0,0,W,H);
+    cx.textAlign='center';
+    cx.font='bold 32px Orbitron'; cx.fillStyle='#ffee44';
+    cx.fillText('🐣 HIT!',W/2,H/2-16);
+    cx.font='12px Orbitron'; cx.fillStyle='rgba(255,255,200,0.8)';
+    cx.fillText('EASTER EGG UNLOCKED',W/2,H/2+16);
+    cx.textAlign='left';
   }
 
-  cx.textAlign='left'; // reset
+  // Instructions overlay (aim phase only)
+  if(s.phase==='aim'){
+    cx.fillStyle='rgba(100,150,255,0.4)';
+    cx.font='10px Orbitron'; cx.textAlign='right';
+    cx.fillText('MOVE MOUSE TO AIM · CLICK TO FIRE',W-10,H-10);
+    cx.textAlign='left';
+  }
+
   eggRaf=requestAnimationFrame(eggLoop);
 }
 
-// Canvas events wired in eggOpen after modal is shown
-
 async function eggWin(){
-  document.getElementById('egg-msg').textContent='🐣 You found the Easter Egg! Unlocking reward…';
+  document.getElementById('egg-msg').textContent='🐣 Easter Egg found! Unlocking…';
   localStorage.setItem(EGG_WON_KEY,'1');
   localStorage.removeItem('nexus_egg_tries');
-  // Add easter role to current user
   try{
     const curRoles=Array.isArray(cud?.roles)?cud.roles:(cud?.role?[cud.role]:[]);
     if(!curRoles.includes('easter')){
@@ -5555,15 +5559,8 @@ async function eggWin(){
       cud={...cud,roles:newRoles,role:newRoles[0]};
       uCache[cu.uid]={...uCache[cu.uid],roles:newRoles,role:newRoles[0]};
     }
-    setTimeout(()=>{
-      eggClose();
-      toast('🐣 Easter Egg role unlocked! Check your profile!','success');
-      renderProfile();
-    },2200);
-  }catch(e){
-    toast('Egg won but role failed: '+e.message,'danger');
-    setTimeout(eggClose,2500);
-  }
+    setTimeout(()=>{eggClose();toast('🐣 Easter Egg role unlocked!','success');renderProfile();},2400);
+  }catch(e){toast('Egg won but role save failed: '+e.message,'danger');setTimeout(eggClose,2500);}
 }
 
 // ── GLOBAL EVENTS ──────────────────────────────
