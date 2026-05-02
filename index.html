@@ -5369,7 +5369,7 @@ function eggOpen(){
   });
   cv.addEventListener('click',()=>{
     if(!eggState||eggState.phase!=='aim') return;
-    const spd=7;
+    const spd=9;
     eggState.ball.vx=spd*Math.cos(eggState.aimAngle);
     eggState.ball.vy=-spd*Math.sin(eggState.aimAngle);
     eggState.phase='flying';
@@ -5404,7 +5404,7 @@ function eggLoop(){
 
   // ── UPDATE ──
   if(s.phase==='flying'){
-    s.ball.vy+=0.25; // gravity
+    s.ball.vy+=0.06; // gravity — tuned so ball can reach target
     s.ball.x+=s.ball.vx;
     s.ball.y+=s.ball.vy;
     s.trail.push({x:s.ball.x, y:s.ball.y});
@@ -5418,7 +5418,7 @@ function eggLoop(){
 
     // Hit check (generous 28px radius)
     const dx=s.ball.x-s.target.x, dy=s.ball.y-s.target.y;
-    if(Math.sqrt(dx*dx+dy*dy)<28){
+    if(Math.sqrt(dx*dx+dy*dy)<32){
       s.phase='done'; s.won=true; s.flash=60; s.flashColor='#ffee44';
       eggWin(); return;
     }
@@ -5466,10 +5466,10 @@ function eggLoop(){
   // AIM phase: show trajectory preview
   if(s.phase==='aim'){
     let px=s.ball.ox, py=s.ball.oy;
-    let pvx=7*Math.cos(s.aimAngle), pvy=-7*Math.sin(s.aimAngle);
+    let pvx=9*Math.cos(s.aimAngle), pvy=-9*Math.sin(s.aimAngle);
     cx.fillStyle='rgba(100,180,255,0.5)';
-    for(let step=0;step<55;step++){
-      pvy+=0.25; px+=pvx; py+=pvy;
+    for(let step=0;step<70;step++){
+      pvy+=0.06; px+=pvx; py+=pvy;
       if(step%4===0){
         cx.globalAlpha=0.5*(1-step/55);
         cx.beginPath(); cx.arc(px,py,2.5,0,Math.PI*2); cx.fill();
