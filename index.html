@@ -5335,8 +5335,8 @@ function eggOpen(){
   if(localStorage.getItem(EGG_WON_KEY)){toast('🐣 You already found the Easter Egg!','success');return;}
   const cooldown=parseInt(localStorage.getItem(EGG_COOLDOWN_KEY)||'0');
   if(cooldown>Date.now()){
-    const mins=Math.ceil((cooldown-Date.now())/6);
-    toast(`⏳ Try again in ${mins} minute${mins!==1?'s':''}.`,'danger');return;
+    const secs=Math.ceil((cooldown-Date.now())/1000);
+    toast(`⏳ Try again in ${secs} second${secs!==1?'s':''}.`,'danger');return;
   }
   const tries=parseInt(localStorage.getItem('nexus_egg_tries')||'3');
   eggReset(tries);
@@ -5418,7 +5418,7 @@ function eggLoop(){
       if(s.tries<=0){
         s.phase='done'; s.lost=true; s.flash=60; s.flashColor='#ff3355';
         document.getElementById('egg-msg').textContent='💀 Out of tries! Come back in 1 hour.';
-        localStorage.setItem(EGG_COOLDOWN_KEY, String(Date.now()+3600000));
+        localStorage.setItem(EGG_COOLDOWN_KEY, String(Date.now()+5000));
         localStorage.removeItem('nexus_egg_tries');
         setTimeout(eggClose, 2800);
       } else {
