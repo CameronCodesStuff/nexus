@@ -1848,6 +1848,7 @@ async function doLogout(){
   if(presenceInterval){clearInterval(presenceInterval);presenceInterval=null;}
   clsnrs={};acunsub=null;acid=null;aChats={};mCache={};inboxCount=0;
   if(activeCallId)endCall();
+  _achCache=null; // reset achievement cache on logout
   await signOut(auth);
 }
 
@@ -1858,6 +1859,7 @@ async function enterApp(){
 
   renderProfile();
   updateMyStatusDot();
+  syncAchCache(); // hydrate achievement cache from Firestore
   const snap=await getDocs(collection(db,'users'));
   snap.forEach(d=>{uCache[d.id]=d.data();});
   setupChatsListener();
@@ -5669,32 +5671,48 @@ const ACHIEVEMENTS=[
 ];
 
 const ACH_KEY='nexus_achievements';
+// Single in-memory cache — source of truth, merged from localStorage + Firestore on login
+let _achCache=null;
 
 function getUnlockedAchs(){
-  try{return new Set(JSON.parse(localStorage.getItem(ACH_KEY)||'[]'));}catch{return new Set();}
+  // Return cached set if available
+  if(_achCache) return _achCache;
+  // Build from localStorage + cud.achievements (Firestore)
+  const local=JSON.parse(localStorage.getItem(ACH_KEY)||'[]');
+  const remote=Array.isArray(cud?.achievements)?cud.achievements:[];
+  _achCache=new Set([...local,...remote]);
+  return _achCache;
+}
+
+function syncAchCache(){
+  // Call after login to hydrate cache from Firestore
+  const local=JSON.parse(localStorage.getItem(ACH_KEY)||'[]');
+  const remote=Array.isArray(cud?.achievements)?cud.achievements:[];
+  _achCache=new Set([...local,...remote]);
+  // Also write merged back to localStorage so it's up to date
+  localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
 }
 
 function saveAch(ids){
-  const unlocked=getUnlockedAchs();
-  const newOnes=[];
-  ids.forEach(id=>{if(!unlocked.has(id)){unlocked.add(id);newOnes.push(id);}});
-  if(!newOnes.length) return;
+  const unlocked=getUnlockedAchs(); // always the cached set
+  const newOnes=ids.filter(id=>!unlocked.has(id));
+  if(!newOnes.length) return; // already have all of these — stop
+  // Add to cache immediately so duplicate calls in same session are no-ops
+  newOnes.forEach(id=>unlocked.add(id));
   localStorage.setItem(ACH_KEY,JSON.stringify([...unlocked]));
-  // Grant bonus messages for each new achievement
+  // Persist to Firestore and grant rewards
   newOnes.forEach(async id=>{
     const ach=ACHIEVEMENTS.find(a=>a.id===id);
     if(!ach) return;
     toast('🏆 Achievement: '+ach.name+' (+'+ach.reward+' msgs)','success');
-    // Add reward msgs to user count
     try{
       const newCount=(cud?.msgCount||0)+ach.reward;
       await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
       cud={...cud,msgCount:newCount};
       uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
       renderProfile();
-      // Save achieved list to Firestore too so it shows on profile
-      const existing=Array.isArray(cud?.achievements)?cud.achievements:[];
-      const merged=[...new Set([...existing,...newOnes])];
+      // Write full merged list to Firestore
+      const merged=[..._achCache];
       await updateDoc(doc(db,'users',cu.uid),{achievements:merged});
       cud={...cud,achievements:merged};
       uCache[cu.uid]={...uCache[cu.uid],achievements:merged};
@@ -5702,7 +5720,11 @@ function saveAch(ids){
   });
 }
 
-function unlockAch(...ids){ saveAch(ids); }
+function unlockAch(...ids){
+  // Fast early-exit: if cache exists and all ids already in it, skip entirely
+  if(_achCache&&ids.every(id=>_achCache.has(id))) return;
+  saveAch(ids);
+}
 
 function openAchievementsModal(){
   const el=document.getElementById('achievements-content');
@@ -5785,7 +5807,7 @@ window._N = {
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
   setBgEffect, eggOpen, eggClose,
-  openAchievementsModal, unlockAch,
+  openAchievementsModal, unlockAch, syncAchCache,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
