@@ -5751,14 +5751,14 @@ async function retroCheckAchs(){
   if(needsScan.length>0){
     try{
       // Query across all user's chats — grab last 200 messages total, sample a few chats
-      const chatIds=userChats.slice(0,8).map(c=>c.id); // check up to 8 chats
+      const chatIds=userChats.slice(0,12).map(c=>c.id); // check up to 12 chats
       for(const chatId of chatIds){
         if(needsScan.length===0) break;
         // Single query, no composite index needed — filter client-side
         const snap=await getDocs(query(
           collection(db,'chats',chatId,'messages'),
           orderBy('ts','desc'),
-          limit(80)
+          limit(1000)
         ));
         snap.docs.forEach(d=>{
           const m=d.data();
