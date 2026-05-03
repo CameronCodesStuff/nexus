@@ -5699,39 +5699,103 @@ function syncAchCache(){
 }
 
 async function retroCheckAchs(){
-  // Don't retro-grant if cache already has lots of achievements (already done)
   const toGrant=[];
   const msgs=cud?.msgCount||0;
-  // Message milestones
+
+  // ── Profile-based checks (instant) ──
   if(msgs>=1)    toGrant.push('first_message');
   if(msgs>=100)  toGrant.push('chat_100');
   if(msgs>=500)  toGrant.push('chat_500');
   if(msgs>=1000) toGrant.push('chat_1000');
-  // Bio set
-  if(cud?.bio&&cud.bio.trim().length>0) toGrant.push('set_bio');
-  // Custom emoji set (not the auto-assigned one)
-  if(cud?.emoji) toGrant.push('set_avatar');
-  // Font set
+  if(cud?.bio?.trim())            toGrant.push('set_bio');
+  if(cud?.emoji)                  toGrant.push('set_avatar');
   if(cud?.fontId&&cud.fontId!==0) toGrant.push('set_font');
-  // Profile pic set
-  if(cud?.profilePic) toGrant.push('first_image');
-  // Easter egg already won
+  if(cud?.profilePic)             toGrant.push('first_image','first_file');
   if(localStorage.getItem(EGG_WON_KEY)) toGrant.push('egg_hunter');
-  // Status ever changed (check localStorage)
   const savedStatus=localStorage.getItem('nexus_status');
   if(savedStatus&&savedStatus!=='online') toGrant.push('set_status');
-  // Bg effect ever changed
   const savedBg=localStorage.getItem('nexus_bg_effect');
-  if(savedBg&&savedBg!=='stars') toGrant.push('bg_effect');
-  // Check existing chats — if user has any DM, grant first_dm
-  // Check if they have any groups
+  if(savedBg&&savedBg!=='stars')  toGrant.push('bg_effect');
+  if(cud?.banner&&cud.banner!=='default') toGrant.push('bg_effect');
+
+  // ── Chat-based checks ──
   const userChats=Object.values(aChats);
-  if(userChats.some(c=>c.type==='dm')) toGrant.push('first_dm');
-  if(userChats.some(c=>c.type==='group')) toGrant.push('first_group');
-  // Filter to only ones not already in cache
-  const genuinelyNew=toGrant.filter(id=>!_achCache.has(id));
+  if(userChats.some(c=>c.type==='dm'))    toGrant.push('first_dm');
+  if(userChats.some(c=>c.type==='group')) toGrant.push('first_group','first_message');
+
+  // ── Message content scan — look through cached messages for evidence ──
+  // Only scan chats we already have loaded (mCache) to avoid extra reads
+  // But also do a targeted scan of a few chats we're in
+  const allCachedMsgs=Object.values(mCache).flat();
+
+  // Check cached messages first (fast)
+  const hasVoice    = allCachedMsgs.some(m=>m.type==='voice'&&m.senderUid===cu.uid);
+  const hasFile     = allCachedMsgs.some(m=>m.type==='file'&&m.senderUid===cu.uid);
+  const hasImage    = allCachedMsgs.some(m=>m.type==='file'&&m.senderUid===cu.uid&&isImgFile(m.fileName));
+  const hasReply    = allCachedMsgs.some(m=>m.replyTo&&m.senderUid===cu.uid);
+  const hasDeleted  = false; // can't detect — forward-only
+  const hasReaction = allCachedMsgs.some(m=>m.reactions&&Object.values(m.reactions).some(users=>Array.isArray(users)&&users.includes(cu.uid)));
+  const hasTttWin   = allCachedMsgs.some(m=>m.type==='ttt'&&m.senderUid===cu.uid); // sent a challenge = played
+
+  if(hasVoice)    toGrant.push('first_voice');
+  if(hasFile)     toGrant.push('first_file');
+  if(hasImage)    toGrant.push('first_image');
+  if(hasReply)    toGrant.push('reply_msg');
+  if(hasReaction) toGrant.push('first_reaction');
+
+  // ── Deeper scan: query a sample of chats for messages we haven't loaded ──
+  // Only do this if we're missing achievements that require message scanning
+  const needsScan = ['first_voice','first_file','first_image','reply_msg','first_reaction','ttt_win','first_call']
+    .filter(id=>!_achCache.has(id)&&!toGrant.includes(id));
+
+  if(needsScan.length>0){
+    try{
+      // Query across all user's chats — grab last 200 messages total, sample a few chats
+      const chatIds=userChats.slice(0,8).map(c=>c.id); // check up to 8 chats
+      for(const chatId of chatIds){
+        if(needsScan.length===0) break;
+        const snap=await getDocs(query(
+          collection(db,'chats',chatId,'messages'),
+          where('senderUid','==',cu.uid),
+          orderBy('ts','desc'),
+          limit(100)
+        ));
+        snap.docs.forEach(d=>{
+          const m=d.data();
+          if(m.type==='voice')                        toGrant.push('first_voice');
+          if(m.type==='file')                         toGrant.push('first_file');
+          if(m.type==='file'&&isImgFile(m.fileName)) toGrant.push('first_image');
+          if(m.replyTo)                               toGrant.push('reply_msg');
+          if(m.type==='ttt')                          toGrant.push('ttt_win');
+        });
+        // Check reactions by others (any message in this chat)
+        const allSnap=await getDocs(query(
+          collection(db,'chats',chatId,'messages'),
+          orderBy('ts','desc'),
+          limit(50)
+        ));
+        allSnap.docs.forEach(d=>{
+          const m=d.data();
+          if(m.reactions&&Object.values(m.reactions).some(u=>Array.isArray(u)&&u.includes(cu.uid)))
+            toGrant.push('first_reaction');
+        });
+      }
+      // Check if user has ever been in a call (look for call docs — they get deleted, so check messages)
+      // If msgCount > 0 and they're in DMs, they've probably called — grant first_call
+      // Actually we can't know for sure, so skip first_call retroactively
+    }catch(e){console.warn('Retro scan error:',e);}
+  }
+
+  // ── Night owl: can't detect retroactively ──
+  // ── Delete message: can't detect retroactively ──
+  // ── Change theme: check localStorage (applyTheme saves it) ──
+  const savedTheme=localStorage.getItem('nexus_theme');
+  if(savedTheme&&savedTheme!=='default') toGrant.push('change_theme');
+
+  // ── Deduplicate and filter already-unlocked ──
+  const genuinelyNew=[...new Set(toGrant)].filter(id=>!_achCache.has(id));
   if(!genuinelyNew.length) return;
-  // Grant silently (no toast for retroactive)
+
   genuinelyNew.forEach(id=>_achCache.add(id));
   localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
   try{
@@ -5739,6 +5803,13 @@ async function retroCheckAchs(){
     await updateDoc(doc(db,'users',cu.uid),{achievements:merged});
     cud={...cud,achievements:merged};
     uCache[cu.uid]={...uCache[cu.uid],achievements:merged};
+    // Single toast summarising what was granted retroactively
+    if(genuinelyNew.length===1){
+      const a=ACHIEVEMENTS.find(x=>x.id===genuinelyNew[0]);
+      if(a) toast('🏆 Achievement unlocked: '+a.name,'success');
+    } else if(genuinelyNew.length>1){
+      toast('🏆 '+genuinelyNew.length+' achievements unlocked from past activity!','success');
+    }
   }catch{}
 }
 
