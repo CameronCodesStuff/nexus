@@ -5788,48 +5788,57 @@ async function retroCheckAchs(){
   const genuinelyNew=[...new Set(toGrant)].filter(id=>!_achCache.has(id));
   if(!genuinelyNew.length) return;
 
-  genuinelyNew.forEach(id=>_achCache.add(id));
-  localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
-  try{
-    const merged=[..._achCache];
-    await updateDoc(doc(db,'users',cu.uid),{achievements:merged});
-    cud={...cud,achievements:merged};
-    uCache[cu.uid]={...uCache[cu.uid],achievements:merged};
-    // Single toast summarising what was granted retroactively
-    if(genuinelyNew.length===1){
-      const a=ACHIEVEMENTS.find(x=>x.id===genuinelyNew[0]);
-      if(a) toast('🏆 Achievement unlocked: '+a.name,'success');
-    } else if(genuinelyNew.length>1){
-      toast('🏆 '+genuinelyNew.length+' achievements unlocked from past activity!','success');
-    }
-  }catch{}
+  // Use saveAch so the message bonus is properly batched and applied
+  if(genuinelyNew.length>0){
+    const bonusTotal=genuinelyNew.reduce((s,id)=>{const a=ACHIEVEMENTS.find(x=>x.id===id);return s+(a?.reward||0);},0);
+    // Show a single summary toast for retro grants instead of one per achievement
+    const _origToast=window._N?.toast||toast;
+    // Temporarily suppress individual toasts by granting silently then showing summary
+    genuinelyNew.forEach(id=>_achCache.add(id));
+    localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
+    try{
+      const newCount=(cud?.msgCount||0)+bonusTotal;
+      const merged=[..._achCache];
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged});
+      cud={...cud,msgCount:newCount,achievements:merged};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
+      renderProfile();
+      if(genuinelyNew.length===1){
+        const a=ACHIEVEMENTS.find(x=>x.id===genuinelyNew[0]);
+        if(a) toast('🏆 '+a.name+' unlocked! (+'+a.reward+' msgs)','success');
+      } else {
+        toast('🏆 '+genuinelyNew.length+' achievements unlocked! (+'+bonusTotal+' msgs bonus)','success');
+      }
+    }catch(e){console.warn('Retro grant write failed:',e);}
+  }
 }
 
-function saveAch(ids){
-  const unlocked=getUnlockedAchs(); // always the cached set
+async function saveAch(ids){
+  const unlocked=getUnlockedAchs();
   const newOnes=ids.filter(id=>!unlocked.has(id));
-  if(!newOnes.length) return; // already have all of these — stop
-  // Add to cache immediately so duplicate calls in same session are no-ops
+  if(!newOnes.length) return;
+  // Add to cache immediately
   newOnes.forEach(id=>unlocked.add(id));
   localStorage.setItem(ACH_KEY,JSON.stringify([...unlocked]));
-  // Persist to Firestore and grant rewards
-  newOnes.forEach(async id=>{
+  // Calculate TOTAL bonus in one go — read msgCount once, add all rewards, write once
+  const totalBonus=newOnes.reduce((sum,id)=>{
     const ach=ACHIEVEMENTS.find(a=>a.id===id);
-    if(!ach) return;
-    toast('🏆 Achievement: '+ach.name+' (+'+ach.reward+' msgs)','success');
-    try{
-      const newCount=(cud?.msgCount||0)+ach.reward;
-      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
-      cud={...cud,msgCount:newCount};
-      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
-      renderProfile();
-      // Write full merged list to Firestore
-      const merged=[..._achCache];
-      await updateDoc(doc(db,'users',cu.uid),{achievements:merged});
-      cud={...cud,achievements:merged};
-      uCache[cu.uid]={...uCache[cu.uid],achievements:merged};
-    }catch{}
+    return sum+(ach?.reward||0);
+  },0);
+  // Toast each new achievement
+  newOnes.forEach(id=>{
+    const ach=ACHIEVEMENTS.find(a=>a.id===id);
+    if(ach) toast('🏆 '+ach.name+' (+'+ach.reward+' msgs)','success');
   });
+  try{
+    // Single batched write for msgCount + achievements
+    const newCount=(cud?.msgCount||0)+totalBonus;
+    const merged=[..._achCache];
+    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged});
+    cud={...cud,msgCount:newCount,achievements:merged};
+    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
+    renderProfile();
+  }catch(e){console.warn('saveAch write failed:',e);}
 }
 
 function unlockAch(...ids){
