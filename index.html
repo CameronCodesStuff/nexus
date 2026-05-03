@@ -1859,7 +1859,7 @@ async function enterApp(){
 
   renderProfile();
   updateMyStatusDot();
-  syncAchCache(); // hydrate achievement cache from Firestore
+  syncAchCache(); // hydrate + retroactively grant based on existing data
   const snap=await getDocs(collection(db,'users'));
   snap.forEach(d=>{uCache[d.id]=d.data();});
   setupChatsListener();
@@ -1956,6 +1956,7 @@ let usersUnsub = null;
 function setupChatsListener(){
   if(acunsub)acunsub();
   const q=query(collection(db,'chats'),where('members','array-contains',cu.uid));
+  let _retroDone=false;
   acunsub=onSnapshot(q,snap=>{
     snap.docChanges().forEach(ch=>{
       if(ch.type==='removed'){delete aChats[ch.doc.id];}
@@ -1971,6 +1972,8 @@ function setupChatsListener(){
       }
     });
     renderSidebar();
+    // After first chats load, run retro check (aChats now populated)
+    if(!_retroDone){_retroDone=true;setTimeout(retroCheckAchs,500);}
   });
   // Live listener for all users so online dots stay current
   if(usersUnsub) usersUnsub();
@@ -5685,12 +5688,58 @@ function getUnlockedAchs(){
 }
 
 function syncAchCache(){
-  // Call after login to hydrate cache from Firestore
+  // Hydrate from localStorage + Firestore
   const local=JSON.parse(localStorage.getItem(ACH_KEY)||'[]');
   const remote=Array.isArray(cud?.achievements)?cud.achievements:[];
   _achCache=new Set([...local,...remote]);
-  // Also write merged back to localStorage so it's up to date
   localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
+  // Retroactively grant achievements based on existing account data
+  // These are silent — no toast, just write to cache+Firestore if not already there
+  retroCheckAchs();
+}
+
+async function retroCheckAchs(){
+  // Don't retro-grant if cache already has lots of achievements (already done)
+  const toGrant=[];
+  const msgs=cud?.msgCount||0;
+  // Message milestones
+  if(msgs>=1)    toGrant.push('first_message');
+  if(msgs>=100)  toGrant.push('chat_100');
+  if(msgs>=500)  toGrant.push('chat_500');
+  if(msgs>=1000) toGrant.push('chat_1000');
+  // Bio set
+  if(cud?.bio&&cud.bio.trim().length>0) toGrant.push('set_bio');
+  // Custom emoji set (not the auto-assigned one)
+  if(cud?.emoji) toGrant.push('set_avatar');
+  // Font set
+  if(cud?.fontId&&cud.fontId!==0) toGrant.push('set_font');
+  // Profile pic set
+  if(cud?.profilePic) toGrant.push('first_image');
+  // Easter egg already won
+  if(localStorage.getItem(EGG_WON_KEY)) toGrant.push('egg_hunter');
+  // Status ever changed (check localStorage)
+  const savedStatus=localStorage.getItem('nexus_status');
+  if(savedStatus&&savedStatus!=='online') toGrant.push('set_status');
+  // Bg effect ever changed
+  const savedBg=localStorage.getItem('nexus_bg_effect');
+  if(savedBg&&savedBg!=='stars') toGrant.push('bg_effect');
+  // Check existing chats — if user has any DM, grant first_dm
+  // Check if they have any groups
+  const userChats=Object.values(aChats);
+  if(userChats.some(c=>c.type==='dm')) toGrant.push('first_dm');
+  if(userChats.some(c=>c.type==='group')) toGrant.push('first_group');
+  // Filter to only ones not already in cache
+  const genuinelyNew=toGrant.filter(id=>!_achCache.has(id));
+  if(!genuinelyNew.length) return;
+  // Grant silently (no toast for retroactive)
+  genuinelyNew.forEach(id=>_achCache.add(id));
+  localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
+  try{
+    const merged=[..._achCache];
+    await updateDoc(doc(db,'users',cu.uid),{achievements:merged});
+    cud={...cud,achievements:merged};
+    uCache[cu.uid]={...uCache[cu.uid],achievements:merged};
+  }catch{}
 }
 
 function saveAch(ids){
