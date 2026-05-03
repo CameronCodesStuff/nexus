@@ -1849,7 +1849,6 @@ async function doLogout(){
   clsnrs={};acunsub=null;acid=null;aChats={};mCache={};inboxCount=0;
   if(activeCallId)endCall();
   _achCache=null; // reset achievement cache on logout
-  localStorage.removeItem(ACH_PAID_KEY); // recalculate paid bonuses on next login
   await signOut(auth);
 }
 
@@ -5702,31 +5701,43 @@ function syncAchCache(){
 }
 
 async function payUnpaidBonuses(){
-  // Compare unlocked achievements vs ones that have had their bonus paid
-  const paid=new Set(JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]'));
+  // Source of truth for paid bonuses: Firestore field 'achPaid' on user doc
+  // localStorage is just a local mirror to avoid repeat reads
+  const remotePaid=Array.isArray(cud?.achPaid)?cud.achPaid:[];
+  const localPaid=JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]');
+  // Merge both — anything paid on any device counts
+  const paid=new Set([...remotePaid,...localPaid]);
   const unlocked=[..._achCache];
   const unpaid=unlocked.filter(id=>!paid.has(id)&&ACHIEVEMENTS.find(a=>a.id===id));
-  if(!unpaid.length) return;
-  // Calculate total owed bonus
+  if(!unpaid.length){
+    // Sync localStorage with merged paid set
+    localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
+    return;
+  }
   const bonus=unpaid.reduce((s,id)=>{
     const a=ACHIEVEMENTS.find(x=>x.id===id);
     return s+(a?.reward||0);
   },0);
-  if(!bonus) return;
-  // Mark all as paid in localStorage immediately
+  if(!bonus){
+    unpaid.forEach(id=>paid.add(id));
+    localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
+    return;
+  }
+  // Mark paid immediately in both local and in-memory
   unpaid.forEach(id=>paid.add(id));
   localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
-  // Write bonus to Firestore in one update
   try{
     const newCount=(cud?.msgCount||0)+bonus;
     const merged=[..._achCache];
-    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged});
-    cud={...cud,msgCount:newCount,achievements:merged};
-    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
+    const paidArr=[...paid];
+    // Store achPaid in Firestore so cross-device logins don't re-pay
+    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged,achPaid:paidArr});
+    cud={...cud,msgCount:newCount,achievements:merged,achPaid:paidArr};
+    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged,achPaid:paidArr};
     renderProfile();
     toast('🏆 Paid '+unpaid.length+' achievement bonus'+(unpaid.length!==1?'es':'')+': +'+bonus+' messages!','success');
   }catch(e){
-    // Roll back paid flags if write failed
+    // Roll back local paid flags on failure
     unpaid.forEach(id=>paid.delete(id));
     localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
     console.warn('payUnpaidBonuses failed:',e);
@@ -5873,14 +5884,23 @@ async function saveAch(ids){
     // Single batched write for msgCount + achievements
     const newCount=(cud?.msgCount||0)+totalBonus;
     const merged=[..._achCache];
-    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged});
-    cud={...cud,msgCount:newCount,achievements:merged};
-    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
+    const paid2=new Set(JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]'));
+    const remotePaid3=Array.isArray(cud?.achPaid)?cud.achPaid:[];
+    remotePaid3.forEach(id=>paid2.add(id));
+    newOnes.forEach(id=>paid2.add(id));
+    const paidArr2=[...paid2];
+    localStorage.setItem(ACH_PAID_KEY,JSON.stringify(paidArr2));
+    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged,achPaid:paidArr2});
+    cud={...cud,msgCount:newCount,achievements:merged,achPaid:paidArr2};
+    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged,achPaid:paidArr2};
     renderProfile();
-    // Mark these as paid so payUnpaidBonuses won't double-pay on next login
+    // Mark these as paid in localStorage AND Firestore to prevent double-pay
     const paid=new Set(JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]'));
+    const remotePaid2=Array.isArray(cud?.achPaid)?cud.achPaid:[];
+    remotePaid2.forEach(id=>paid.add(id));
     newOnes.forEach(id=>paid.add(id));
     localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
+    // achPaid already written above with updateDoc — no extra write needed
   }catch(e){console.warn('saveAch write failed:',e);}
 }
 
