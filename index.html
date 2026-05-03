@@ -1849,6 +1849,7 @@ async function doLogout(){
   clsnrs={};acunsub=null;acid=null;aChats={};mCache={};inboxCount=0;
   if(activeCallId)endCall();
   _achCache=null; // reset achievement cache on logout
+  localStorage.removeItem(ACH_PAID_KEY); // recalculate paid bonuses on next login
   await signOut(auth);
 }
 
@@ -5674,6 +5675,7 @@ const ACHIEVEMENTS=[
 ];
 
 const ACH_KEY='nexus_achievements';
+const ACH_PAID_KEY='nexus_ach_paid'; // tracks which ach bonuses have been applied to msgCount
 // Single in-memory cache — source of truth, merged from localStorage + Firestore on login
 let _achCache=null;
 
@@ -5693,9 +5695,42 @@ function syncAchCache(){
   const remote=Array.isArray(cud?.achievements)?cud.achievements:[];
   _achCache=new Set([...local,...remote]);
   localStorage.setItem(ACH_KEY,JSON.stringify([..._achCache]));
-  // Retroactively grant achievements based on existing account data
-  // These are silent — no toast, just write to cache+Firestore if not already there
+  // Pay any unpaid bonuses for achievements already in cache
+  payUnpaidBonuses();
+  // Then scan for new retroactive achievements
   retroCheckAchs();
+}
+
+async function payUnpaidBonuses(){
+  // Compare unlocked achievements vs ones that have had their bonus paid
+  const paid=new Set(JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]'));
+  const unlocked=[..._achCache];
+  const unpaid=unlocked.filter(id=>!paid.has(id)&&ACHIEVEMENTS.find(a=>a.id===id));
+  if(!unpaid.length) return;
+  // Calculate total owed bonus
+  const bonus=unpaid.reduce((s,id)=>{
+    const a=ACHIEVEMENTS.find(x=>x.id===id);
+    return s+(a?.reward||0);
+  },0);
+  if(!bonus) return;
+  // Mark all as paid in localStorage immediately
+  unpaid.forEach(id=>paid.add(id));
+  localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
+  // Write bonus to Firestore in one update
+  try{
+    const newCount=(cud?.msgCount||0)+bonus;
+    const merged=[..._achCache];
+    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,achievements:merged});
+    cud={...cud,msgCount:newCount,achievements:merged};
+    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
+    renderProfile();
+    toast('🏆 Paid '+unpaid.length+' achievement bonus'+(unpaid.length!==1?'es':'')+': +'+bonus+' messages!','success');
+  }catch(e){
+    // Roll back paid flags if write failed
+    unpaid.forEach(id=>paid.delete(id));
+    localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
+    console.warn('payUnpaidBonuses failed:',e);
+  }
 }
 
 async function retroCheckAchs(){
@@ -5803,6 +5838,10 @@ async function retroCheckAchs(){
       cud={...cud,msgCount:newCount,achievements:merged};
       uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
       renderProfile();
+      // Mark retro grants as paid
+      const paidSet=new Set(JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]'));
+      genuinelyNew.forEach(id=>paidSet.add(id));
+      localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paidSet]));
       if(genuinelyNew.length===1){
         const a=ACHIEVEMENTS.find(x=>x.id===genuinelyNew[0]);
         if(a) toast('🏆 '+a.name+' unlocked! (+'+a.reward+' msgs)','success');
@@ -5838,6 +5877,10 @@ async function saveAch(ids){
     cud={...cud,msgCount:newCount,achievements:merged};
     uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,achievements:merged};
     renderProfile();
+    // Mark these as paid so payUnpaidBonuses won't double-pay on next login
+    const paid=new Set(JSON.parse(localStorage.getItem(ACH_PAID_KEY)||'[]'));
+    newOnes.forEach(id=>paid.add(id));
+    localStorage.setItem(ACH_PAID_KEY,JSON.stringify([...paid]));
   }catch(e){console.warn('saveAch write failed:',e);}
 }
 
