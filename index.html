@@ -5754,28 +5754,20 @@ async function retroCheckAchs(){
       const chatIds=userChats.slice(0,8).map(c=>c.id); // check up to 8 chats
       for(const chatId of chatIds){
         if(needsScan.length===0) break;
+        // Single query, no composite index needed — filter client-side
         const snap=await getDocs(query(
           collection(db,'chats',chatId,'messages'),
-          where('senderUid','==',cu.uid),
           orderBy('ts','desc'),
-          limit(100)
+          limit(80)
         ));
         snap.docs.forEach(d=>{
           const m=d.data();
-          if(m.type==='voice')                        toGrant.push('first_voice');
-          if(m.type==='file')                         toGrant.push('first_file');
-          if(m.type==='file'&&isImgFile(m.fileName)) toGrant.push('first_image');
-          if(m.replyTo)                               toGrant.push('reply_msg');
-          if(m.type==='ttt')                          toGrant.push('ttt_win');
-        });
-        // Check reactions by others (any message in this chat)
-        const allSnap=await getDocs(query(
-          collection(db,'chats',chatId,'messages'),
-          orderBy('ts','desc'),
-          limit(50)
-        ));
-        allSnap.docs.forEach(d=>{
-          const m=d.data();
+          const mine=m.senderUid===cu.uid;
+          if(mine&&m.type==='voice')                        toGrant.push('first_voice');
+          if(mine&&m.type==='file')                         toGrant.push('first_file');
+          if(mine&&m.type==='file'&&isImgFile(m.fileName)) toGrant.push('first_image');
+          if(mine&&m.replyTo)                               toGrant.push('reply_msg');
+          if(mine&&m.type==='ttt')                          toGrant.push('ttt_win');
           if(m.reactions&&Object.values(m.reactions).some(u=>Array.isArray(u)&&u.includes(cu.uid)))
             toGrant.push('first_reaction');
         });
