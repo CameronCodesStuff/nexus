@@ -1020,7 +1020,8 @@
     <button class="call-btn" id="btn-cam" onclick="N.toggleCamera()" style="display:none">📷</button>
     <button class="call-btn" id="btn-flip" onclick="N.flipCamera()" style="display:none" title="Flip Camera">🔄</button>
     <button class="call-btn" id="btn-screen" onclick="N.toggleScreenShare()" style="display:none">🖥️</button>
-    <button class="call-btn end" onclick="N.endCall()">📵</button>
+    <button class="call-btn end" id="btn-leave" onclick="N.leaveCall()" title="Leave call">🚪</button>
+    <button class="call-btn end" id="btn-end" onclick="N.endCallForAll()" title="End call for everyone" style="display:none">📵</button>
   </div>
 </div>
 
@@ -3518,7 +3519,7 @@ async function answerCall(callId){
   const callSnap = await getDoc(doc(db,'calls',callId));
   if(!callSnap.exists()) return;
   const call = callSnap.data();
-  if(call.status !== 'ringing'){ toast('Call already ended.','danger'); return; }
+  if(call.status === 'ended'||call.status === 'rejected'){ toast('Call has ended.','danger'); return; }
 
   activeCallId = callId;
 
@@ -3569,15 +3570,27 @@ function watchCallDoc(callId){
   if(callUnsub) callUnsub();
   let knownMembers=new Set([cu.uid]);
   callUnsub = onSnapshot(doc(db,'calls',callId), snap=>{
-    if(!snap.exists()) { endCall(); return; }
+    if(!snap.exists()){ endCall(); return; }
     const data=snap.data();
     if(data.status==='ended'||data.status==='rejected'){ endCall(); return; }
-    // When a new member joins, initiate a peer connection to them
-    const active=data.activeMembers||[];
+    const active=new Set(data.activeMembers||[]);
+    // New member joined — connect to them
     active.forEach(uid=>{
       if(uid!==cu.uid&&!knownMembers.has(uid)&&!peerConns[uid]){
         knownMembers.add(uid);
         createPeerConnection(uid, true, callId, data.mode);
+      }
+    });
+    // Member left — close their peer connection and remove their audio tile
+    knownMembers.forEach(uid=>{
+      if(uid!==cu.uid&&!active.has(uid)){
+        knownMembers.delete(uid);
+        if(peerConns[uid]){try{peerConns[uid].close();}catch{}delete peerConns[uid];}
+        // Remove their video/audio tile
+        document.getElementById('tile-'+uid)?.remove();
+        document.getElementById('audio-el-'+uid)?.remove();
+        document.getElementById('audio-tile-'+uid)?.remove();
+        updateVideoGrid();
       }
     });
   });
@@ -3711,6 +3724,7 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
 
 function openCallUI(mode, isCaller){
   $('call-overlay').classList.add('open');
+  updateCallButtons(isCaller);
   $('call-title').textContent = mode==='audio'?'🔊 AUDIO CALL':mode==='video'?'📹 VIDEO CALL':'🖥️ SCREEN SHARE';
   $('btn-cam').style.display  = mode==='video'?'flex':'none';
   $('btn-screen').style.display = mode==='video'?'flex':'none';
@@ -3813,34 +3827,57 @@ function updateVideoGrid(){
   grid.className='video-grid'+(n>=2?' two-col':'');
 }
 
-function endCall(){
-  // Clean up peer connections
+function endCall(endForEveryone=false){
+  // Clean up all peer connections locally
   Object.values(peerConns).forEach(pc=>{ try{pc.close();}catch{} });
   peerConns={};
-  // Stop local media
+  // Stop local media tracks
   localStream?.getTracks().forEach(t=>{ try{t.stop();}catch{} });
   localStream=null;
   screenStream2?.getTracks().forEach(t=>{ try{t.stop();}catch{} });
   screenStream2=null;
-  // Remove audio elements
+  // Remove audio elements for this session
   document.querySelectorAll('[id^="audio-el-"]').forEach(e=>e.remove());
-  // Firestore listeners
+  // Unsubscribe signal listeners
   signalUnsubs.forEach(u=>{ try{u();}catch{} }); signalUnsubs=[];
   if(callUnsub){callUnsub();callUnsub=null;}
-  // Delete call doc + signals to save Firestore storage
+
   if(activeCallId){
     const cid=activeCallId; activeCallId=null;
-    // Delete signals first, then the call doc itself
-    getDocs(collection(db,'calls',cid,'signals')).then(snap=>{
-      const deletes=snap.docs.map(d=>deleteDoc(d.ref).catch(()=>{}));
-      return Promise.all(deletes);
-    }).then(()=>{
-      deleteDoc(doc(db,'calls',cid)).catch(()=>{});
-    }).catch(()=>{
-      // Fallback: just mark ended if delete fails (permissions)
-      updateDoc(doc(db,'calls',cid),{status:'ended'}).catch(()=>{});
-    });
+    if(endForEveryone){
+      // Caller is ending the call for everyone — delete the doc
+      getDocs(collection(db,'calls',cid,'signals')).then(snap=>{
+        Promise.all(snap.docs.map(d=>deleteDoc(d.ref).catch(()=>{}))).then(()=>{
+          deleteDoc(doc(db,'calls',cid)).catch(()=>{});
+        });
+      }).catch(()=>{
+        updateDoc(doc(db,'calls',cid),{status:'ended'}).catch(()=>{});
+      });
+    } else {
+      // Just remove ourselves from activeMembers — others stay in the call
+      updateDoc(doc(db,'calls',cid),{
+        activeMembers: arrayRemove(cu.uid)
+      }).then(async()=>{
+        // If no active members remain, clean up the doc
+        const snap=await getDoc(doc(db,'calls',cid)).catch(()=>null);
+        if(snap?.exists()){
+          const remaining=(snap.data().activeMembers||[]);
+          if(remaining.length===0){
+            getDocs(collection(db,'calls',cid,'signals')).then(s=>{
+              Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{}))).then(()=>{
+                deleteDoc(doc(db,'calls',cid)).catch(()=>{});
+              });
+            });
+          }
+        }
+      }).catch(()=>{});
+    }
+    // Clean up my own signals
+    getDocs(query(collection(db,'calls',cid,'signals'),where('from','==',cu.uid)))
+      .then(snap=>snap.docs.forEach(d=>deleteDoc(d.ref).catch(()=>{})))
+      .catch(()=>{});
   }
+
   if(ctimer){clearInterval(ctimer);ctimer=null;}
   csecs=0;
   $('call-overlay').classList.remove('open');
@@ -6257,6 +6294,25 @@ function tgOnInput(){
 
 function tgKeyDown(e){
   if(e.key==='Tab'){e.preventDefault();tgRestart();return;}
+  if(e.key===' '||e.code==='Space'){
+    const inp=document.getElementById('tg-input');if(!inp)return;
+    const val=inp.value.trim();
+    if(!val) return; // don't advance on empty
+    // Manually trigger word advance (in case oninput doesn't fire for space)
+    e.preventDefault();
+    if(tgFinished) return;
+    if(!tgStarted&&val.length>0){
+      tgStarted=true;tgStartTime=Date.now();
+      tgInterval=setInterval(tgTick,200);
+    }
+    tgTyped[tgWordIdx]=val;
+    const correct=val===tgWords[tgWordIdx];
+    if(correct){tgCorrectWords++;tgEarned++;document.getElementById('tg-earned').textContent='+'+tgEarned;}
+    tgWordIdx++;inp.value='';
+    if(tgWordIdx>=tgWords.length-20){tgWords=tgWords.concat(tgGenWords(40));tgTyped=tgTyped.concat(Array(40).fill(''));}
+    tgUpdateStats();tgRender();
+    return;
+  }
   if(e.key==='Backspace'){
     const inp=document.getElementById('tg-input');if(!inp)return;
     if(inp.value===''&&tgWordIdx>0){
@@ -6291,18 +6347,28 @@ function tgUpdateStats(){
 
 async function tgEnd(){
   clearInterval(tgInterval);tgInterval=null;tgFinished=true;
-  // Grant earned messages
-  if(tgEarned>0&&cu&&cud){
-    try{
-      const newCount=(cud?.msgCount||0)+tgEarned;
-      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
-      cud={...cud,msgCount:newCount};
-      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
-      renderProfile();
-      toast('⌨️ Game over! +'+tgEarned+' messages earned!','success');
-    }catch(e){toast('Could not save score: '+e.message,'danger');}
+  // Grant earned messages — use _N.updateDoc wrapper to avoid any scoping issues
+  const earned=tgEarned;
+  if(earned>0){
+    if(!cu||!cud){
+      toast('⌨️ Game over! +'+earned+' words but not logged in.','danger');
+    } else {
+      try{
+        const newCount=(cud.msgCount||0)+earned;
+        // Use the module-scoped Firestore functions directly
+        const userRef=doc(db,'users',cu.uid);
+        await updateDoc(userRef,{msgCount:newCount});
+        cud={...cud,msgCount:newCount};
+        uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+        renderProfile();
+        toast('⌨️ Game over! +'+earned+' messages earned!','success');
+      }catch(e){
+        console.error('tgEnd save failed:',e);
+        toast('⌨️ +'+earned+' words typed but save failed: '+e.message,'danger');
+      }
+    }
   } else {
-    toast('⌨️ Game over! No words completed.','');
+    toast('⌨️ Game over! No correct words.','');
   }
   // Show restart prompt
   const wWrap=document.getElementById('tg-words-wrapper');
@@ -6316,6 +6382,17 @@ async function tgEnd(){
     wWrap.style.position='relative';
     wWrap.appendChild(overlay);
   }
+}
+
+function leaveCall(){ endCall(false); }
+function endCallForAll(){ endCall(true); }
+
+// Show leave vs end-for-all based on whether user is caller
+function updateCallButtons(isCaller){
+  const leaveBtn=document.getElementById('btn-leave');
+  const endBtn=document.getElementById('btn-end');
+  if(leaveBtn) leaveBtn.style.display=isCaller?'none':'flex';
+  if(endBtn) endBtn.style.display=isCaller?'flex':'none';
 }
 
 // ── GLOBAL EVENTS ──────────────────────────────
@@ -6332,6 +6409,7 @@ window._N = {
   confirmWipe, doWipe, cancelWipe,
   startDM, startCall, endCall, answerCall, rejectCall,
   toggleMute, toggleCamera, toggleScreenShare, toggleFullscreen,
+  leaveCall, endCallForAll, updateCallButtons,
   acceptInvite, declineInvite, toggleInvitee, createGroup,
   confirmLeaveGroup, doLeaveGroup,
   addRxn, applyTheme,
