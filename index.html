@@ -701,6 +701,7 @@
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
             <button onclick="N.openModal('changelog-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">📋 Update Log</button>
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
+            <button onclick="N.openModal('typegame-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⌨️ Type & Earn</button>
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
               <button onclick="N.openOwnerPortal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--danger);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(255,51,85,0.1)'" onmouseout="this.style.background='none'">👑 Owner Portal</button>
@@ -2479,6 +2480,7 @@ function openModal(id){
   if(id==='feedback-modal')openFeedback();
   if(id==='achievements-modal')openAchievementsModal();
   if(id==='lb-modal'){lbCurrentTab='msgs';lbTab('msgs');}
+  if(id==='typegame-modal')tgInit();
 }
 const closeModal=id=>{$(id).classList.remove('open');};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
@@ -3395,14 +3397,29 @@ function listenForIncomingCalls(){
   // Watch calls where I'm a member and status = 'ringing'
   const q = query(
     collection(db,'calls'),
-    where('members','array-contains', cu.uid),
-    where('status','==','ringing')
+    where('members','array-contains', cu.uid)
   );
   incomingCallUnsub = onSnapshot(q, snap=>{
     snap.docChanges().forEach(ch=>{
       if(ch.type==='added'){
         const call={id:ch.doc.id,...ch.doc.data()};
-        if(call.callerId !== cu.uid) showIncomingCall(call);
+        // Show banner for ringing calls from others, or active calls we can join
+        if(call.callerId !== cu.uid && !activeCallId){
+          if(call.status==='ringing'||call.status==='active'){
+            showIncomingCall(call);
+          }
+        }
+      }
+      if(ch.type==='modified'){
+        // If a call we're being invited to becomes active (someone else answered), update banner
+        const call={id:ch.doc.id,...ch.doc.data()};
+        if(call.callerId!==cu.uid&&!activeCallId&&call.status==='active'){
+          const banner=document.getElementById('incoming-call-banner');
+          if(banner){
+            const statusEl=banner.querySelector('div');
+            if(statusEl) statusEl.textContent='📞 IN PROGRESS — join?';
+          }
+        }
       }
     });
   });
@@ -3477,7 +3494,8 @@ async function startCall(mode){
     callerId: cu.uid,
     callerName: cud?.displayName||'User',
     mode,
-    members: chat.members,           // everyone including caller
+    members: chat.members,
+    activeMembers: [cu.uid], // track who is actually in the call
     status: 'ringing',
     createdAt: serverTimestamp()
   });
@@ -3521,15 +3539,22 @@ async function answerCall(callId){
     activeCallId=null; return;
   }
 
-  await updateDoc(doc(db,'calls',callId),{status:'active'});
+  await updateDoc(doc(db,'calls',callId),{
+    status:'active',
+    // Add this user to the activeMembers list so others know to connect to them
+    activeMembers: arrayUnion(cu.uid)
+  });
 
   openCallUI(call.mode, false);
   startCallTimer();
 
-  // Connect to caller (and any other members already in the call)
+  // Connect to everyone in the call (caller + any other joiners)
+  // The caller is always the initiator; we are the answerer for each connection
   const otherMembers = call.members.filter(m=>m!==cu.uid);
   for(const uid of otherMembers){
-    await createPeerConnection(uid, false, callId, call.mode);
+    // Only connect to caller as non-initiator; for other joiners we initiate
+    const isCaller = uid === call.callerId;
+    await createPeerConnection(uid, !isCaller, callId, call.mode);
   }
 
   watchCallDoc(callId);
@@ -3542,10 +3567,19 @@ async function rejectCall(callId){
 
 function watchCallDoc(callId){
   if(callUnsub) callUnsub();
+  let knownMembers=new Set([cu.uid]);
   callUnsub = onSnapshot(doc(db,'calls',callId), snap=>{
     if(!snap.exists()) { endCall(); return; }
-    const s=snap.data().status;
-    if(s==='ended'||s==='rejected') endCall();
+    const data=snap.data();
+    if(data.status==='ended'||data.status==='rejected'){ endCall(); return; }
+    // When a new member joins, initiate a peer connection to them
+    const active=data.activeMembers||[];
+    active.forEach(uid=>{
+      if(uid!==cu.uid&&!knownMembers.has(uid)&&!peerConns[uid]){
+        knownMembers.add(uid);
+        createPeerConnection(uid, true, callId, data.mode);
+      }
+    });
   });
 }
 
@@ -6093,6 +6127,197 @@ async function renderLeaderboard(tab){
   }
 }
 
+// ── TYPE & EARN GAME ─────────────────────────────
+const TG_WORDS=[
+  "the","be","to","of","and","a","in","that","have","it","for","not","on","with",
+  "he","as","you","do","at","this","but","his","by","from","they","we","say","her",
+  "she","or","an","will","my","one","all","would","there","their","what","so","up",
+  "out","if","about","who","get","which","go","me","when","make","can","like","time",
+  "no","just","him","know","take","people","into","year","your","good","some","could",
+  "them","see","other","than","then","now","look","only","come","its","over","think",
+  "also","back","after","use","two","how","our","work","first","well","way","even",
+  "new","want","because","any","these","give","day","most","us","great","between","need",
+  "large","often","hand","high","place","hold","turn","again","off","always","those","both",
+  "open","seem","together","next","white","begin","got","walk","might","carry","mile","night",
+  "river","stand","learn","plant","cover","food","sun","four","thought","city","across","once",
+  "write","heard","stop","without","second","later","idea","enough","eat","face","watch","far",
+  "real","almost","let","above","sometimes","mountain","cut","young","talk","soon","list","song",
+  "body","music","color","form","several","already","road","near","true","table","remember","tree",
+  "space","door","sure","short","wind","question","fish","area","mark","dog","horse","problem",
+  "room","since","ever","piece","friends","easy","order","map","break","voice","power","town",
+  "drive","clear","force","light","deep","free","kind","long","hard","life","part","play",
+  "right","small","world","very","still","should","home","around","help","line","move","set",
+];
+
+let tgWords=[], tgTyped=[], tgWordIdx=0, tgLetterIdx=0;
+let tgStarted=false, tgFinished=false, tgStartTime=null;
+let tgInterval=null, tgModeSecs=60, tgTimeLeft=60;
+let tgEarned=0, tgCorrectWords=0;
+
+function tgRandWord(){ return TG_WORDS[Math.floor(Math.random()*TG_WORDS.length)]; }
+function tgGenWords(n=80){ return Array.from({length:n},tgRandWord); }
+
+function tgInit(){
+  tgWords=tgGenWords(80);
+  tgTyped=tgWords.map(()=>'');
+  tgWordIdx=0;tgLetterIdx=0;
+  tgStarted=false;tgFinished=false;tgStartTime=null;
+  tgEarned=0;tgCorrectWords=0;
+  clearInterval(tgInterval);tgInterval=null;
+  tgTimeLeft=tgModeSecs;
+  document.getElementById('tg-timer').textContent=tgModeSecs;
+  document.getElementById('tg-wpm').textContent='0';
+  document.getElementById('tg-acc').textContent='100%';
+  document.getElementById('tg-earned').textContent='+0';
+  document.getElementById('tg-progress').style.width='0%';
+  const inp=document.getElementById('tg-input');
+  if(inp){inp.value='';inp.onkeydown=tgKeyDown;inp.oninput=tgOnInput;setTimeout(()=>inp.focus(),80);}
+  const wrap=document.getElementById('tg-words-wrapper');
+  if(wrap) wrap.onclick=()=>document.getElementById('tg-input')?.focus();
+  tgRender();
+}
+
+function tgStop(){clearInterval(tgInterval);tgInterval=null;}
+function tgRestart(){tgStop();tgInit();}
+
+function tgSetMode(secs){
+  tgModeSecs=secs;
+  document.querySelectorAll('.tg-mode-btn').forEach(b=>{
+    b.classList.toggle('active',parseInt(b.dataset.secs)===secs);
+  });
+  tgRestart();
+}
+
+function tgRender(){
+  const el=document.getElementById('tg-words');
+  if(!el) return;
+  el.innerHTML='';
+  tgWords.forEach((word,wi)=>{
+    const wEl=document.createElement('span');
+    wEl.dataset.wi=wi;
+    wEl.style.cssText='display:inline-flex;position:relative;';
+    const typed=tgTyped[wi]||'';
+    word.split('').forEach((ch,li)=>{
+      const s=document.createElement('span');
+      s.className='tg-letter';s.textContent=ch;s.style.position='relative';
+      if(wi<tgWordIdx){
+        s.className='tg-letter '+(li<typed.length?(typed[li]===ch?'correct':'wrong'):'wrong');
+      } else if(wi===tgWordIdx){
+        if(li<typed.length) s.className='tg-letter '+(typed[li]===ch?'correct':'wrong');
+        else if(li===typed.length) s.className='tg-letter tg-cursor';
+      }
+      wEl.appendChild(s);
+    });
+    // extra chars
+    if(wi===tgWordIdx&&typed.length>word.length){
+      for(let ei=word.length;ei<typed.length;ei++){
+        const s=document.createElement('span');
+        s.className='tg-letter extra';s.textContent=typed[ei];wEl.appendChild(s);
+      }
+    }
+    el.appendChild(wEl);
+  });
+  // scroll — find current word by data-wi
+  const curWEl=el.querySelector('[data-wi="'+tgWordIdx+'"]');
+  if(curWEl){
+    const top=curWEl.offsetTop;
+    const lineH=Math.round(el.offsetHeight/3)||44;
+    el.style.transform=top>lineH*1.2?`translateY(-${top-lineH*0.4}px)`:'translateY(0)';
+  }
+}
+
+function tgOnInput(){
+  if(tgFinished) return;
+  const inp=document.getElementById('tg-input');if(!inp) return;
+  const val=inp.value;
+  if(!tgStarted&&val.length>0){
+    tgStarted=true;tgStartTime=Date.now();
+    tgInterval=setInterval(tgTick,200);
+  }
+  if(val.endsWith(' ')){
+    const typed=val.trim();
+    if(!typed.length){inp.value='';return;}
+    tgTyped[tgWordIdx]=typed;
+    const correct=typed===tgWords[tgWordIdx];
+    if(correct){
+      tgCorrectWords++;
+      tgEarned++;
+      document.getElementById('tg-earned').textContent='+'+tgEarned;
+    }
+    tgWordIdx++;inp.value='';
+    if(tgWordIdx>=tgWords.length-20){
+      tgWords=tgWords.concat(tgGenWords(40));
+      tgTyped=tgTyped.concat(Array(40).fill(''));
+    }
+    tgUpdateStats();tgRender();return;
+  }
+  tgTyped[tgWordIdx]=val;
+  tgUpdateStats();tgRender();
+}
+
+function tgKeyDown(e){
+  if(e.key==='Tab'){e.preventDefault();tgRestart();return;}
+  if(e.key==='Backspace'){
+    const inp=document.getElementById('tg-input');if(!inp)return;
+    if(inp.value===''&&tgWordIdx>0){
+      e.preventDefault();tgWordIdx--;
+      inp.value=tgTyped[tgWordIdx];tgRender();
+    }
+  }
+}
+
+function tgTick(){
+  if(!tgStarted||tgFinished) return;
+  const elapsed=(Date.now()-tgStartTime)/1000;
+  tgTimeLeft=Math.max(0,tgModeSecs-elapsed);
+  document.getElementById('tg-timer').textContent=Math.ceil(tgTimeLeft);
+  document.getElementById('tg-progress').style.width=Math.min(elapsed/tgModeSecs*100,100)+'%';
+  tgUpdateStats();
+  if(tgTimeLeft<=0) tgEnd();
+}
+
+function tgUpdateStats(){
+  if(!tgStarted) return;
+  const elapsed=Math.max((Date.now()-tgStartTime)/1000/60,0.001);
+  const wpm=Math.round(tgCorrectWords/elapsed);
+  document.getElementById('tg-wpm').textContent=wpm;
+  let tot=0,cor=0;
+  for(let i=0;i<=tgWordIdx;i++){
+    const t=tgTyped[i]||'',w=tgWords[i]||'';
+    for(let j=0;j<t.length;j++){tot++;if(t[j]===w[j])cor++;}
+  }
+  document.getElementById('tg-acc').textContent=(tot>0?Math.round(cor/tot*100):100)+'%';
+}
+
+async function tgEnd(){
+  clearInterval(tgInterval);tgInterval=null;tgFinished=true;
+  // Grant earned messages
+  if(tgEarned>0&&cu&&cud){
+    try{
+      const newCount=(cud?.msgCount||0)+tgEarned;
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+      cud={...cud,msgCount:newCount};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+      renderProfile();
+      toast('⌨️ Game over! +'+tgEarned+' messages earned!','success');
+    }catch(e){toast('Could not save score: '+e.message,'danger');}
+  } else {
+    toast('⌨️ Game over! No words completed.','');
+  }
+  // Show restart prompt
+  const wWrap=document.getElementById('tg-words-wrapper');
+  if(wWrap){
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:absolute;inset:0;background:rgba(13,13,15,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:10px;';
+    overlay.innerHTML='<div style="font-family:Orbitron,monospace;font-size:11px;letter-spacing:3px;color:#f0c060;">FINISHED</div>'
+      +'<div style="font-family:Orbitron,monospace;font-size:2.5rem;font-weight:900;color:#f0c060;">+'+tgEarned+'</div>'
+      +'<div style="font-size:11px;color:#5a5a7a;font-family:JetBrains Mono,monospace;">messages earned</div>'
+      +'<button onclick="tgRestart()" style="margin-top:8px;background:#f0c060;color:#0d0d0f;font-family:Orbitron,monospace;font-size:10px;font-weight:700;padding:8px 20px;border:none;border-radius:6px;cursor:pointer;letter-spacing:2px;">PLAY AGAIN</button>';
+    wWrap.style.position='relative';
+    wWrap.appendChild(overlay);
+  }
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -6139,9 +6364,12 @@ window._N = {
   setBgEffect, eggOpen, eggClose,
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
+  tgSetMode, tgRestart, tgStop,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
+// Expose game fns globally for modal onclicks
+window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
 
 </script>
 <!-- TTT MODAL -->
@@ -6169,6 +6397,71 @@ Object.assign(window.N, window._N);
   <div id="egg-msg">Click anywhere on the canvas to launch the ball!</div>
   <button class="egg-close" onclick="N.eggClose()">CLOSE</button>
 </div>
+
+<!-- TYPE & EARN GAME MODAL -->
+<div class="modal-overlay" id="typegame-modal" style="align-items:center;justify-content:center;">
+  <div style="background:#0d0d0f;border:1px solid rgba(68,102,255,0.25);border-radius:16px;padding:28px 32px;width:min(820px,96vw);max-height:95vh;overflow-y:auto;position:relative;box-shadow:0 0 60px rgba(68,102,255,0.15);">
+    <div style="font-family:'Orbitron',monospace;font-size:12px;letter-spacing:4px;background:linear-gradient(135deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;">NEXUS TYPE</div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#5a5a7a;letter-spacing:2px;margin-bottom:20px;">EVERY CORRECT WORD = +1 MESSAGE</div>
+    <button onclick="N.closeModal('typegame-modal');tgStop()" style="position:absolute;top:16px;right:16px;background:none;border:1px solid rgba(100,100,255,0.15);border-radius:6px;color:#5a5a7a;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">✕</button>
+
+    <!-- Stats row -->
+    <div style="display:flex;gap:28px;margin-bottom:20px;align-items:flex-end;">
+      <div>
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">WPM</div>
+        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#f0c060;line-height:1;" id="tg-wpm">0</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">ACC</div>
+        <div style="font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:700;color:#7dd3b0;line-height:1;" id="tg-acc">100%</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">TIME</div>
+        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#f0c060;line-height:1;" id="tg-timer">60</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">EARNED</div>
+        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#00d4ff;line-height:1;" id="tg-earned">+0</div>
+      </div>
+    </div>
+
+    <!-- Mode buttons -->
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button class="tg-mode-btn" data-secs="30" onclick="tgSetMode(30)">30s</button>
+      <button class="tg-mode-btn active" data-secs="60" onclick="tgSetMode(60)">60s</button>
+      <button class="tg-mode-btn" data-secs="120" onclick="tgSetMode(120)">120s</button>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="height:2px;background:#2a2a30;border-radius:2px;margin-bottom:16px;overflow:hidden;">
+      <div id="tg-progress" style="height:100%;background:#f0c060;border-radius:2px;width:0%;transition:width 0.3s;"></div>
+    </div>
+
+    <!-- Words -->
+    <div id="tg-words-wrapper" style="background:#16161a;border:1px solid #2a2a30;border-radius:10px;padding:24px 28px;cursor:text;min-height:120px;overflow:hidden;position:relative;">
+      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;max-height:120px;overflow:hidden;"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#16161a);pointer-events:none;"></div>
+    </div>
+
+    <!-- Bottom -->
+    <div style="display:flex;align-items:center;margin-top:14px;gap:12px;">
+      <span style="font-size:10px;color:#3a3a45;font-family:'JetBrains Mono',monospace;">click to focus · <kbd style="background:#16161a;border:1px solid #2a2a30;border-radius:3px;padding:1px 5px;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:10px;">tab</kbd> restart</span>
+      <button onclick="tgRestart()" style="margin-left:auto;background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 14px;border-radius:5px;cursor:pointer;">↺ restart</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .tg-mode-btn{background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all 0.15s;}
+  .tg-mode-btn:hover,.tg-mode-btn.active{border-color:#f0c060;color:#f0c060;}
+  .tg-letter{color:#3a3a45;transition:color 0.06s;}
+  .tg-letter.correct{color:#7dd3b0;}
+  .tg-letter.wrong{color:#e06c75;text-decoration:underline;text-decoration-color:#e06c75;}
+  .tg-letter.extra{color:#e06c75;opacity:0.7;}
+  .tg-cursor::before{content:'';position:absolute;left:-2px;top:0;bottom:0;width:2px;background:#f0c060;border-radius:2px;animation:blink 0.9s step-end infinite;}
+</style>
+
+<input id="tg-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position:fixed;top:-999px;left:-999px;opacity:0;">
 
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
   <button id="lightbox-close" onclick="closeLightbox()">✕</button>
