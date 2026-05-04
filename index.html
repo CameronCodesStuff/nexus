@@ -6239,6 +6239,7 @@ function tgRandWord(){ return TG_WORDS[Math.floor(Math.random()*TG_WORDS.length)
 function tgGenWords(n=80){ return Array.from({length:n},tgRandWord); }
 
 function tgInit(){
+  document.getElementById('tg-end-overlay')?.remove();
   tgWords=tgGenWords(80);
   tgTyped=tgWords.map(()=>'');
   tgWordIdx=0;tgLetterIdx=0;
@@ -6263,11 +6264,7 @@ async function tgRestart(){
   // Save any earned messages before restarting
   if(tgStarted&&!tgFinished&&tgEarned>0) await tgSaveEarned();
   // Remove the end overlay if present
-  const wWrap=document.getElementById('tg-words-wrapper');
-  if(wWrap){
-    const overlay=wWrap.querySelector('div[style*="position:absolute"]');
-    if(overlay) overlay.remove();
-  }
+  document.getElementById('tg-end-overlay')?.remove();
   tgStop();tgInit();
 }
 
@@ -6437,6 +6434,7 @@ async function tgEnd(){
     // Remove any existing overlay first
     wWrap.querySelector('div[style*="position:absolute"]')?.remove();
     const overlay=document.createElement('div');
+    overlay.id='tg-end-overlay';
     overlay.style.cssText='position:absolute;inset:0;background:rgba(13,13,15,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:10px;padding:20px;';
     overlay.innerHTML=
       '<div style="font-family:Orbitron,monospace;font-size:9px;letter-spacing:4px;color:#5a5a7a;margin-bottom:4px;">COMPLETED</div>'
