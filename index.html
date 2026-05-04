@@ -606,6 +606,26 @@
   .lb-stat{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:1px;}
 
 
+  /* ── NOTES ── */
+  .note-bubble{position:absolute;top:-22px;left:50%;transform:translateX(-50%);
+    background:var(--bg3);border:1px solid var(--border);border-radius:12px 12px 12px 2px;
+    padding:3px 8px;font-size:10px;font-family:var(--font-mono);color:var(--text);
+    white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;
+    box-shadow:0 2px 8px rgba(0,0,0,0.4);pointer-events:none;z-index:5;
+    animation:note-pop 0.2s ease;}
+  @keyframes note-pop{from{opacity:0;transform:translateX(-50%) scale(0.85);}to{opacity:1;transform:translateX(-50%) scale(1);}}
+  /* Note input in sidebar footer */
+  .note-input-wrap{display:flex;gap:6px;padding:8px 14px;border-top:1px solid var(--border);background:var(--panel);}
+  .note-input{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);
+    padding:5px 10px;border-radius:20px;font-family:var(--font-mono);font-size:11px;
+    outline:none;transition:border-color 0.2s;}
+  .note-input:focus{border-color:var(--accent);}
+  .note-input::placeholder{color:var(--text-dim);}
+  .note-send{background:var(--accent);border:none;color:#fff;border-radius:50%;width:26px;height:26px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;flex-shrink:0;}
+  .note-send:hover{filter:brightness(1.15);}
+
+
 </style>
 </head>
 <body>
@@ -734,7 +754,7 @@
           </div>
         </div>
         <div class="my-info">
-          <div class="my-name" id="my-name-el"></div>
+          <div class="my-name" id="my-name-el" onclick="N.toggleNoteInput()" style="cursor:pointer;" title="Add a note"></div>
           <div class="my-status" id="my-rank-el"></div>
         </div>
         <div class="fb-status"><div class="fb-dot"></div><span>Live</span></div>
@@ -2065,7 +2085,8 @@ function renderSidebar(){
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
-    el.innerHTML=`<div class="feed-avatar${ig?' group':''}">${ava}${isOnline(ou)?`<div class="online-dot ${getStatusDotClass(ou)}"></div>`:''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
+    const noteHtml=(!ig&&ou?.note&&ou.noteTs&&(Date.now()-(ou.noteTs?.seconds||0)*1000)<86400000)?`<div class="note-bubble">${esc(ou.note)}</div>`:'';
+    el.innerHTML=`<div class="feed-avatar${ig?' group':''}" style="position:relative;">${noteHtml}${ava}${isOnline(ou)?`<div class="online-dot ${getStatusDotClass(ou)}"></div>`:''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
     feed.appendChild(el);
   });
 }
@@ -4068,6 +4089,7 @@ function openProfileModal(uid){
     </div>
     <div style="padding:0 20px 20px;">
       <div style="font-family:var(--font-display);font-size:10px;letter-spacing:3px;color:var(--text-dim);margin-bottom:8px;">ABOUT</div>
+      ${u.note&&u.noteTs&&(Date.now()-(u.noteTs?.seconds||0)*1000)<86400000?`<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:5px 12px;margin-bottom:8px;font-size:12px;font-family:var(--font-mono);">💭 ${esc(u.note)}</div>`:''}
       ${bio?`<div class="profile-bio">${esc(bio)}</div>`:`<div class="profile-bio-empty">${isMe?'You haven\'t set a bio yet. Add one in Settings.':'No bio set.'}</div>`}
       ${getRoleBadge(uid)?`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${getRoleBadge(uid)}</div>`:''}
       <div style="margin-top:16px;display:flex;gap:12px;">
@@ -6333,9 +6355,9 @@ function tgOnInput(){
       document.getElementById('tg-earned').textContent='+'+tgEarned;
     }
     tgWordIdx++;inp.value='';
-    if(tgWordIdx>=tgWords.length-20){
-      tgWords=tgWords.concat(tgGenWords(40));
-      tgTyped=tgTyped.concat(Array(40).fill(''));
+    if(tgWordIdx>=tgWords.length-40){
+      tgWords=tgWords.concat(tgGenWords(80));
+      tgTyped=tgTyped.concat(Array(80).fill(''));
     }
     tgUpdateStats();tgRender();return;
   }
@@ -6478,6 +6500,49 @@ function updateCallButtons(isCaller){
   if(endBtn) endBtn.style.display=isCaller?'flex':'none';
 }
 
+// ── NOTES ────────────────────────────────────────
+function toggleNoteInput(){
+  const wrap=document.getElementById('note-input-wrap');
+  if(!wrap) return;
+  const open=wrap.style.display!=='none';
+  wrap.style.display=open?'none':'flex';
+  if(!open){
+    // Populate with existing note
+    const inp=document.getElementById('note-input');
+    if(inp){inp.value=cud?.note||'';inp.focus();}
+  }
+}
+
+async function saveNote(){
+  const inp=document.getElementById('note-input');
+  if(!inp) return;
+  const note=inp.value.trim().substring(0,60);
+  try{
+    const now=new Date();
+    await updateDoc(doc(db,'users',cu.uid),{
+      note: note||null,
+      noteTs: note?serverTimestamp():null
+    });
+    cud={...cud,note,noteTs:{seconds:Math.floor(now.getTime()/1000)}};
+    uCache[cu.uid]={...uCache[cu.uid],note,noteTs:{seconds:Math.floor(now.getTime()/1000)}};
+    document.getElementById('note-input-wrap').style.display='none';
+    renderSidebar();
+    toast(note?'Note posted!':'Note cleared.','success');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function clearNote(){
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{note:null,noteTs:null});
+    cud={...cud,note:null,noteTs:null};
+    uCache[cu.uid]={...uCache[cu.uid],note:null,noteTs:null};
+    document.getElementById('note-input-wrap').style.display='none';
+    document.getElementById('note-input').value='';
+    renderSidebar();
+    toast('Note cleared.','');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -6522,6 +6587,7 @@ window._N = {
   ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
+  toggleNoteInput, saveNote, clearNote,
   setBgEffect, eggOpen, eggClose,
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
