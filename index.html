@@ -740,7 +740,7 @@
         <div class="my-avatar-wrap" style="position:relative;cursor:pointer;" onclick="N.toggleStatusPicker()" title="Change status">
           <div class="my-avatar" id="my-avatar-el"></div>
           <div class="my-status-dot" id="my-status-dot"></div>
-          <!-- Status picker popup -->
+          <!-- Status + Note picker popup -->
           <div class="status-popup" id="status-popup">
             <div class="status-opt" id="sopt-online" onclick="N.setStatus('online')">
               <div class="status-dot-sm" style="background:var(--success);box-shadow:0 0 5px var(--success);"></div>Online
@@ -751,10 +751,19 @@
             <div class="status-opt" id="sopt-dnd" onclick="N.setStatus('dnd')">
               <div class="status-dot-sm" style="background:var(--danger);box-shadow:0 0 5px var(--danger);"></div>Do Not Disturb
             </div>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <div style="padding:6px 10px 4px;font-size:9px;color:var(--text-dim);font-family:var(--font-display);letter-spacing:2px;">NOTE</div>
+            <div style="display:flex;gap:6px;padding:0 8px 8px;">
+              <input id="status-note-input" class="note-input" maxlength="60" placeholder="Add a note…" style="width:140px;font-size:11px;"
+                onclick="event.stopPropagation()"
+                onkeydown="if(event.key==='Enter'){event.stopPropagation();N.saveNote();}">
+              <button onclick="event.stopPropagation();N.saveNote()" class="note-send" title="Post">✓</button>
+              <button onclick="event.stopPropagation();N.clearNote()" class="note-send" style="background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);" title="Clear">✕</button>
+            </div>
           </div>
         </div>
         <div class="my-info">
-          <div class="my-name" id="my-name-el" onclick="N.toggleNoteInput()" style="cursor:pointer;" title="Add a note"></div>
+          <div class="my-name" id="my-name-el" ></div>
           <div class="my-status" id="my-rank-el"></div>
         </div>
         <div class="fb-status"><div class="fb-dot"></div><span>Live</span></div>
@@ -5526,6 +5535,9 @@ function toggleStatusPicker(){
   const isOpen=popup.classList.contains('open');
   popup.classList.toggle('open',!isOpen);
   if(!isOpen){
+    // Pre-fill note input with current note
+    const ni=document.getElementById('status-note-input');
+    if(ni) ni.value=cud?.note||'';
     setTimeout(()=>document.addEventListener('click',()=>{
       popup.classList.remove('open');
     },{once:true}),10);
@@ -6514,7 +6526,7 @@ function toggleNoteInput(){
 }
 
 async function saveNote(){
-  const inp=document.getElementById('note-input');
+  const inp=document.getElementById('status-note-input');
   if(!inp) return;
   const note=inp.value.trim().substring(0,60);
   try{
@@ -6525,7 +6537,8 @@ async function saveNote(){
     });
     cud={...cud,note,noteTs:{seconds:Math.floor(now.getTime()/1000)}};
     uCache[cu.uid]={...uCache[cu.uid],note,noteTs:{seconds:Math.floor(now.getTime()/1000)}};
-    document.getElementById('note-input-wrap').style.display='none';
+    const ni2=document.getElementById('status-note-input');if(ni2) ni2.value=note;
+    document.getElementById('status-popup')?.classList.remove('open');
     renderSidebar();
     toast(note?'Note posted!':'Note cleared.','success');
   }catch(e){toast('Failed: '+e.message,'danger');}
@@ -6536,8 +6549,7 @@ async function clearNote(){
     await updateDoc(doc(db,'users',cu.uid),{note:null,noteTs:null});
     cud={...cud,note:null,noteTs:null};
     uCache[cu.uid]={...uCache[cu.uid],note:null,noteTs:null};
-    document.getElementById('note-input-wrap').style.display='none';
-    document.getElementById('note-input').value='';
+    const ni=document.getElementById('status-note-input');if(ni) ni.value='';
     renderSidebar();
     toast('Note cleared.','');
   }catch(e){toast('Failed: '+e.message,'danger');}
@@ -6587,7 +6599,7 @@ window._N = {
   ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
-  toggleNoteInput, saveNote, clearNote,
+  saveNote, clearNote,
   setBgEffect, eggOpen, eggClose,
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
