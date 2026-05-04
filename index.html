@@ -2247,6 +2247,13 @@ function renderMsgs(cid){
     } else if(msg.type==='voice'){
       wr.appendChild(renderVoiceNote(msg));
 
+    } else if(msg.type==='system'){
+      // System messages span full width, outside normal bubble flow
+      const sysDiv=document.createElement('div');
+      sysDiv.style.cssText='text-align:center;color:var(--text-dim);font-size:11px;font-family:var(--font-mono);padding:6px 0;width:100%;letter-spacing:1px;';
+      sysDiv.textContent=msg.text||'';
+      area.insertBefore(sysDiv,wipe);
+      ls=null;gEl=null; // break grouping after system msg
     } else if(msg.type==='ttt'||msg.type==='ttt_move'){
       const tb=document.createElement('div');tb.className='msg-bubble';
       tb.style.cssText='display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 12px;';
@@ -2281,7 +2288,7 @@ function renderMsgs(cid){
       Object.entries(msg.reactions).forEach(([em,users])=>{const p=document.createElement('div');p.className='reaction-pill';p.innerHTML=`${em} <span>${users.length}</span>`;p.onclick=()=>addRxn(cid,msg.id,em);rd.appendChild(p);});
       wr.appendChild(rd);
     }
-    // Read receipts (own DM messages only)
+    // Read receipts (own messages in DMs and groups)
     if(msg.senderUid===cu.uid){
       const rr=document.createElement('div');
       rr.innerHTML=getReadStatus(msg,cid);
@@ -2481,7 +2488,11 @@ function openModal(id){
   if(id==='feedback-modal')openFeedback();
   if(id==='achievements-modal')openAchievementsModal();
   if(id==='lb-modal'){lbCurrentTab='msgs';lbTab('msgs');}
-  if(id==='typegame-modal')tgInit();
+  if(id==='typegame-modal'){
+    // Save any earned messages before closing
+    if(tgStarted&&!tgFinished&&tgEarned>0) tgSaveEarned();
+    tgStop();tgInit();
+  }
 }
 const closeModal=id=>{$(id).classList.remove('open');};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
@@ -2569,6 +2580,13 @@ async function acceptInvite(iid,cid,type){
     } else {
       await updateDoc(doc(db,'chats',cid),{members:arrayUnion(cu.uid)});
       await deleteDoc(doc(db,'invites',iid));
+      // System join message
+      await addDoc(collection(db,'chats',cid,'messages'),{
+        senderUid:'system',senderName:'system',
+        text:'👋 '+(cud?.displayName||'Someone')+' joined the group.',
+        ts:serverTimestamp(),type:'system',reactions:{}
+      });
+      await updateDoc(doc(db,'chats',cid),{lastMessage:'👋 '+(cud?.displayName||'Someone')+' joined',lastTs:serverTimestamp()});
       closeModal('inbox-modal');openChat(cid);toast('Joined the group!','success');
     }
   }catch(e){toast('Error: '+e.message,'danger');}
@@ -3056,16 +3074,30 @@ async function markRead(cid){
 }
 
 function getReadStatus(msg, chatId){
-  // Only show for own messages in DM chats
-  const chat=aChats[chatId];
-  if(!chat||chat.type==='group') return '';
   if(msg.senderUid!==cu.uid) return '';
-  const otherUid=chat.members?.find(m=>m!==cu.uid);
-  if(!otherUid) return '';
+  const chat=aChats[chatId];
+  if(!chat) return '';
   const readBy=chat.readBy||{};
+  const msgTs=msg.ts?.seconds?msg.ts.seconds*1000:0;
+  if(chat.type==='group'){
+    // Show names of group members who have read this message
+    const readers=(chat.members||[]).filter(uid=>{
+      if(uid===cu.uid) return false;
+      const rt=readBy[uid];
+      if(!rt) return false;
+      const ms=rt?.seconds?rt.seconds*1000:(rt?.toMillis?rt.toMillis():0);
+      return ms>=msgTs;
+    });
+    if(!readers.length) return '<div class="msg-receipt">✓ Sent</div>';
+    const names=readers.slice(0,3).map(uid=>esc(uCache[uid]?.displayName||'?')).join(', ');
+    const extra=readers.length>3?' +'+( readers.length-3):'';
+    return '<div class="msg-receipt read" title="'+names+extra+'">✓✓ '+names+extra+'</div>';
+  }
+  // DM
+  const otherUid=chat.members?.find(m=>m!==cu.uid);
+  if(!otherUid) return '<div class="msg-receipt">✓ Sent</div>';
   const readTs=readBy[otherUid];
   if(!readTs) return '<div class="msg-receipt">✓ Sent</div>';
-  const msgTs=msg.ts?.seconds?msg.ts.seconds*1000:0;
   const readMs=readTs?.seconds?readTs.seconds*1000:(readTs?.toMillis?readTs.toMillis():0);
   if(readMs>=msgTs) return '<div class="msg-receipt read">✓✓ Read</div>';
   return '<div class="msg-receipt">✓ Sent</div>';
@@ -3950,6 +3982,12 @@ async function doLeaveGroup(){
   if(!chat||chat.type!=='group') return;
   try{
     await updateDoc(doc(db,'chats',acid),{members: arrayRemove(cu.uid)});
+    // System leave message
+    try{await addDoc(collection(db,'chats',acid,'messages'),{
+      senderUid:'system',senderName:'system',
+      text:'🚪 '+(cud?.displayName||'Someone')+' left the group.',
+      ts:serverTimestamp(),type:'system',reactions:{}
+    });}catch{}
     const updatedSnap=await getDoc(doc(db,'chats',acid));
     if(updatedSnap.exists()&&(updatedSnap.data().members||[]).length===0){
       const msgsSnap=await getDocs(collection(db,'chats',acid,'messages'));
@@ -4924,7 +4962,13 @@ async function inviteToGc(uid){
 async function removeFromGc(uid, chatId){
   if(!confirm('Remove '+( uCache[uid]?.displayName||'this user')+' from the group?')) return;
   try{
+    const removedUser=uCache[uid]?.displayName||'Someone';
     await updateDoc(doc(db,'chats',chatId),{members:arrayRemove(uid)});
+    await addDoc(collection(db,'chats',chatId,'messages'),{
+      senderUid:'system',senderName:'system',
+      text:'🚫 '+removedUser+' was removed from the group.',
+      ts:serverTimestamp(),type:'system',reactions:{}
+    });
     toast('Member removed.','success');
     openGcMembers(); // refresh
   }catch(e){toast('Failed: '+e.message,'danger');}
@@ -6215,7 +6259,17 @@ function tgInit(){
 }
 
 function tgStop(){clearInterval(tgInterval);tgInterval=null;}
-function tgRestart(){tgStop();tgInit();}
+async function tgRestart(){
+  // Save any earned messages before restarting
+  if(tgStarted&&!tgFinished&&tgEarned>0) await tgSaveEarned();
+  // Remove the end overlay if present
+  const wWrap=document.getElementById('tg-words-wrapper');
+  if(wWrap){
+    const overlay=wWrap.querySelector('div[style*="position:absolute"]');
+    if(overlay) overlay.remove();
+  }
+  tgStop();tgInit();
+}
 
 function tgSetMode(secs){
   tgModeSecs=secs;
@@ -6345,40 +6399,71 @@ function tgUpdateStats(){
   document.getElementById('tg-acc').textContent=(tot>0?Math.round(cor/tot*100):100)+'%';
 }
 
+async function tgSaveEarned(){
+  // Save earned messages without ending — called on early close or end
+  if(!tgEarned||!cu||!cud) return;
+  const earned=tgEarned;
+  tgEarned=0; // prevent double-save
+  try{
+    const newCount=(cud.msgCount||0)+earned;
+    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+    cud={...cud,msgCount:newCount};
+    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+    renderProfile();
+    toast('⌨️ +'+earned+' messages saved!','success');
+  }catch(e){toast('Could not save: '+e.message,'danger');}
+}
+
 async function tgEnd(){
   clearInterval(tgInterval);tgInterval=null;tgFinished=true;
-  // Grant earned messages — use _N.updateDoc wrapper to avoid any scoping issues
-  const earned=tgEarned;
-  if(earned>0){
-    if(!cu||!cud){
-      toast('⌨️ Game over! +'+earned+' words but not logged in.','danger');
-    } else {
-      try{
-        const newCount=(cud.msgCount||0)+earned;
-        // Use the module-scoped Firestore functions directly
-        const userRef=doc(db,'users',cu.uid);
-        await updateDoc(userRef,{msgCount:newCount});
-        cud={...cud,msgCount:newCount};
-        uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
-        renderProfile();
-        toast('⌨️ Game over! +'+earned+' messages earned!','success');
-      }catch(e){
-        console.error('tgEnd save failed:',e);
-        toast('⌨️ +'+earned+' words typed but save failed: '+e.message,'danger');
-      }
-    }
-  } else {
-    toast('⌨️ Game over! No correct words.','');
+
+  // Calculate final stats
+  const elapsedMin=tgModeSecs/60;
+  const finalWpm=Math.round(tgCorrectWords/elapsedMin);
+  let totChars=0,corChars=0;
+  for(let i=0;i<tgWordIdx;i++){
+    const t=tgTyped[i]||'',w=tgWords[i]||'';
+    for(let j=0;j<t.length;j++){totChars++;if(t[j]===w[j])corChars++;}
+    totChars++; // space
   }
-  // Show restart prompt
+  const finalAcc=totChars>0?Math.round(corChars/totChars*100):100;
+  const earned=tgEarned;
+
+  if(earned>0) await tgSaveEarned();
+
+  // Show results overlay replacing the words wrapper content
   const wWrap=document.getElementById('tg-words-wrapper');
   if(wWrap){
+    // Remove any existing overlay first
+    wWrap.querySelector('div[style*="position:absolute"]')?.remove();
     const overlay=document.createElement('div');
-    overlay.style.cssText='position:absolute;inset:0;background:rgba(13,13,15,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:10px;';
-    overlay.innerHTML='<div style="font-family:Orbitron,monospace;font-size:11px;letter-spacing:3px;color:#f0c060;">FINISHED</div>'
-      +'<div style="font-family:Orbitron,monospace;font-size:2.5rem;font-weight:900;color:#f0c060;">+'+tgEarned+'</div>'
-      +'<div style="font-size:11px;color:#5a5a7a;font-family:JetBrains Mono,monospace;">messages earned</div>'
-      +'<button onclick="tgRestart()" style="margin-top:8px;background:#f0c060;color:#0d0d0f;font-family:Orbitron,monospace;font-size:10px;font-weight:700;padding:8px 20px;border:none;border-radius:6px;cursor:pointer;letter-spacing:2px;">PLAY AGAIN</button>';
+    overlay.style.cssText='position:absolute;inset:0;background:rgba(13,13,15,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:10px;padding:20px;';
+    overlay.innerHTML=
+      '<div style="font-family:Orbitron,monospace;font-size:9px;letter-spacing:4px;color:#5a5a7a;margin-bottom:4px;">COMPLETED</div>'
+      // Big WPM
+      +'<div style="font-family:Orbitron,monospace;font-size:3rem;font-weight:900;color:#f0c060;line-height:1;">'+finalWpm+'</div>'
+      +'<div style="font-size:9px;font-family:JetBrains Mono,monospace;color:#5a5a7a;letter-spacing:3px;margin-bottom:8px;">WORDS PER MINUTE</div>'
+      // Stats row
+      +'<div style="display:flex;gap:28px;margin-bottom:10px;">'
+        +'<div style="text-align:center;">'
+          +'<div style="font-family:Orbitron,monospace;font-size:1.4rem;font-weight:700;color:#7dd3b0;">'+finalAcc+'%</div>'
+          +'<div style="font-size:8px;font-family:JetBrains Mono,monospace;color:#3a3a45;letter-spacing:2px;">ACCURACY</div>'
+        +'</div>'
+        +'<div style="text-align:center;">'
+          +'<div style="font-family:Orbitron,monospace;font-size:1.4rem;font-weight:700;color:#7dd3b0;">'+tgCorrectWords+'</div>'
+          +'<div style="font-size:8px;font-family:JetBrains Mono,monospace;color:#3a3a45;letter-spacing:2px;">WORDS</div>'
+        +'</div>'
+        +'<div style="text-align:center;">'
+          +'<div style="font-family:Orbitron,monospace;font-size:1.4rem;font-weight:700;color:#7dd3b0;">'+totChars+'</div>'
+          +'<div style="font-size:8px;font-family:JetBrains Mono,monospace;color:#3a3a45;letter-spacing:2px;">CHARS</div>'
+        +'</div>'
+        +'<div style="text-align:center;">'
+          +'<div style="font-family:Orbitron,monospace;font-size:1.4rem;font-weight:700;color:#00d4ff;">+'+(earned||0)+'</div>'
+          +'<div style="font-size:8px;font-family:JetBrains Mono,monospace;color:#3a3a45;letter-spacing:2px;">MSGS EARNED</div>'
+        +'</div>'
+      +'</div>'
+      // Restart button
+      +'<button onclick="tgRestart()" style="background:#f0c060;color:#0d0d0f;font-family:Orbitron,monospace;font-size:10px;font-weight:700;padding:8px 24px;border:none;border-radius:6px;cursor:pointer;letter-spacing:2px;">PLAY AGAIN</button>';
     wWrap.style.position='relative';
     wWrap.appendChild(overlay);
   }
@@ -6442,7 +6527,7 @@ window._N = {
   setBgEffect, eggOpen, eggClose,
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
-  tgSetMode, tgRestart, tgStop,
+  tgSetMode, tgRestart, tgStop, tgSaveEarned,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
