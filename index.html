@@ -583,6 +583,29 @@
   .profile-ach-icon{font-size:18px;title:attr(title);}
 
 
+  /* ── TIME ON SITE ── */
+  .time-badge{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 8px;border-radius:6px;vertical-align:middle;margin-left:6px;}
+  .time-grey{color:#555;}
+  .time-light{color:#6a8a9a;}
+  .time-bright{color:#00ccff;text-shadow:0 0 8px rgba(0,204,255,0.5);}
+  @keyframes gold-glow{0%,100%{text-shadow:0 0 8px #ffaa00,0 0 20px #ffcc00;}50%{text-shadow:0 0 16px #ffdd00,0 0 32px #ffaa00;}}
+  .time-gold{color:#ffcc00;animation:gold-glow 2s ease infinite;font-weight:700;}
+  .time-rainbow{background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:role-rainbow 2s linear infinite;font-weight:700;}
+  /* Leaderboard */
+  .lb-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;}
+  .lb-tab{flex:1;padding:10px;text-align:center;cursor:pointer;font-family:var(--font-display);font-size:10px;letter-spacing:2px;color:var(--text-dim);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.2s;}
+  .lb-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .lb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:6px;transition:border-color 0.2s;}
+  .lb-row:hover{border-color:rgba(68,102,255,0.3);}
+  .lb-row.me{border-color:var(--accent);background:rgba(68,102,255,0.06);}
+  .lb-pos{font-family:var(--font-display);font-size:14px;font-weight:900;width:28px;text-align:center;flex-shrink:0;}
+  .lb-pos.gold{color:#ffcc00;}.lb-pos.silver{color:#aaaacc;}.lb-pos.bronze{color:#cc8844;}
+  .lb-avatar{width:34px;height:34px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden;}
+  .lb-info{flex:1;min-width:0;}
+  .lb-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lb-stat{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:1px;}
+
+
 </style>
 </head>
 <body>
@@ -671,6 +694,7 @@
         <div style="position:relative;">
           <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
           <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:160px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+            <button onclick="N.openModal('lb-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏅 Leaderboard</button>
             <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
             <button onclick="N.openModal('credits-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">✦ Credits</button>
             <button onclick="N.openModal('help-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">❓ Help</button>
@@ -888,6 +912,19 @@
     <div class="modal-title">🏆 ACHIEVEMENTS</div>
     <button class="modal-close" onclick="N.closeModal('achievements-modal')">✕</button>
     <div id="achievements-content"></div>
+  </div>
+</div>
+
+<!-- LEADERBOARD MODAL -->
+<div class="modal-overlay" id="lb-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title">🏅 LEADERBOARD</div>
+    <button class="modal-close" onclick="N.closeModal('lb-modal')">✕</button>
+    <div class="lb-tabs">
+      <div class="lb-tab active" id="lb-tab-msgs" onclick="N.lbTab('msgs')">MESSAGES</div>
+      <div class="lb-tab" id="lb-tab-time" onclick="N.lbTab('time')">TIME ON SITE</div>
+    </div>
+    <div id="lb-content"></div>
   </div>
 </div>
 
@@ -1849,6 +1886,7 @@ async function doLogout(){
   clsnrs={};acunsub=null;acid=null;aChats={};mCache={};inboxCount=0;
   if(activeCallId)endCall();
   _achCache=null; // reset achievement cache on logout
+  stopTimeTracking();
   await signOut(auth);
 }
 
@@ -1870,6 +1908,7 @@ async function enterApp(){
   checkAnnouncement();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
+  startTimeTracking();
   // Dismiss loading screen
   const ls=document.getElementById('loading-screen');
   if(ls){
@@ -2439,6 +2478,7 @@ function openModal(id){
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
   if(id==='achievements-modal')openAchievementsModal();
+  if(id==='lb-modal'){lbCurrentTab='msgs';lbTab('msgs');}
 }
 const closeModal=id=>{$(id).classList.remove('open');};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
@@ -5946,6 +5986,109 @@ function openAchievementsModal(){
   el.innerHTML=html;
 }
 
+// ── TIME ON SITE ─────────────────────────────────
+let timeTrackInterval=null;
+
+function startTimeTracking(){
+  if(timeTrackInterval) clearInterval(timeTrackInterval);
+  // Add 1 minute every 60 seconds the user is on the page
+  timeTrackInterval=setInterval(async()=>{
+    if(!cu||document.hidden) return; // don't count time when tab is hidden
+    try{
+      const newMins=(cud?.minutesOnSite||0)+1;
+      await updateDoc(doc(db,'users',cu.uid),{minutesOnSite:newMins});
+      cud={...cud,minutesOnSite:newMins};
+      uCache[cu.uid]={...uCache[cu.uid],minutesOnSite:newMins};
+    }catch{}
+  },60000);
+}
+
+function stopTimeTracking(){
+  if(timeTrackInterval){clearInterval(timeTrackInterval);timeTrackInterval=null;}
+}
+
+function getTimeClass(mins){
+  if(!mins||mins<10)   return 'time-grey';
+  if(mins<60)          return 'time-light';
+  if(mins<6000)        return 'time-bright';  // under 100 hours
+  if(mins<60000)       return 'time-gold';    // 100-999 hours
+  return 'time-rainbow';                        // 1000+ hours
+}
+
+function fmtTime(mins){
+  if(!mins||mins<1) return '<1m';
+  if(mins<60) return mins+'m';
+  const h=Math.floor(mins/60),m=mins%60;
+  if(h<24) return h+'h'+(m?(' '+m+'m'):'');
+  const d=Math.floor(h/24),rh=h%24;
+  return d+'d'+(rh?' '+rh+'h':'');
+}
+
+// ── LEADERBOARD ──────────────────────────────────
+let lbCurrentTab='msgs';
+
+function lbTab(tab){
+  lbCurrentTab=tab;
+  document.getElementById('lb-tab-msgs')?.classList.toggle('active',tab==='msgs');
+  document.getElementById('lb-tab-time')?.classList.toggle('active',tab==='time');
+  renderLeaderboard(tab);
+}
+
+async function renderLeaderboard(tab){
+  const el=document.getElementById('lb-content');
+  if(!el) return;
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    let users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(tab==='msgs'){
+      users=users.filter(u=>(u.msgCount||0)>0).sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).slice(0,20);
+    } else {
+      users=users.filter(u=>(u.minutesOnSite||0)>0).sort((a,b)=>(b.minutesOnSite||0)-(a.minutesOnSite||0)).slice(0,20);
+    }
+    if(!users.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No data yet.</div>';return;}
+    el.innerHTML='';
+    users.forEach((u,i)=>{
+      const rank=getRank(u.msgCount||0);
+      const isMe=u.id===cu?.uid;
+      const row=document.createElement('div');
+      row.className='lb-row'+(isMe?' me':'');
+      const pos=i+1;
+      const posClass=pos===1?'gold':pos===2?'silver':pos===3?'bronze':'';
+      const posDisplay=pos===1?'🥇':pos===2?'🥈':pos===3?'🥉':'#'+pos;
+      // Avatar
+      const avEl=document.createElement('div');avEl.className='lb-avatar';
+      const avH=avatarHtml(u.id,'34px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;
+      // Stat value
+      let statVal,statLabel;
+      if(tab==='msgs'){
+        statVal=u.msgCount||0;statLabel=statVal.toLocaleString()+' messages';
+      } else {
+        const mins=u.minutesOnSite||0;
+        statVal=mins;statLabel=fmtTime(mins)+' on site';
+      }
+      row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
+      row.appendChild(avEl);
+      const info=document.createElement('div');info.className='lb-info';
+      info.innerHTML='<div class="lb-name '+rank.c+'" style="'+getUserFontStyle(u.id)+'">'+esc(u.displayName||u.id)+(isMe?' <span style="font-size:9px;color:var(--accent);font-family:var(--font-mono);">(you)</span>':'')+'</div>'
+        +'<div class="lb-stat">'+statLabel+'</div>';
+      row.appendChild(info);
+      // Time badge for time tab
+      if(tab==='time'){
+        const mins=u.minutesOnSite||0;
+        const tc=getTimeClass(mins);
+        const badge=document.createElement('div');
+        badge.className='time-badge '+tc;
+        badge.textContent=fmtTime(mins);
+        row.appendChild(badge);
+      }
+      el.appendChild(row);
+    });
+  }catch(e){
+    el.innerHTML='<div style="color:var(--danger);font-family:var(--font-mono);font-size:12px;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -5991,6 +6134,7 @@ window._N = {
   setStatus, toggleStatusPicker, updateMyStatusDot,
   setBgEffect, eggOpen, eggClose,
   openAchievementsModal, unlockAch, syncAchCache,
+  lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
