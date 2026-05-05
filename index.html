@@ -4566,7 +4566,7 @@ async function loadOwnerUsers(){
     const users=snap.docs.map(d=>({id:d.id,...d.data()}));
     panel.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:12px;">'+users.length+' registered users</div>';
     users.sort((a,b)=>(a.username||'').localeCompare(b.username||'')).forEach(u=>{
-      if(u.id===cu.uid) return; // skip owner themselves
+      // show all users including owner
       const rank=getRank(u.msgCount||0);
       const card=document.createElement('div');
       card.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;';
