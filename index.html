@@ -6872,7 +6872,7 @@ function flapDrawIdle(ctx,W,H){
   ctx.textAlign='center';
   ctx.shadowColor='#4466ff';ctx.shadowBlur=28*pulse;
   ctx.font='900 36px Orbitron,monospace';
-  ctx.fillStyle=`rgba(68,102,255,${0.7+0.3*pulse})`;
+  ctx.fillStyle='rgba(68,102,255,'+(0.7+0.3*pulse)+')';
   ctx.fillText('NEXUS FLAP',W/2,H/2-58);
   ctx.shadowBlur=6;ctx.font='400 9px Orbitron,monospace';
   ctx.fillStyle='#00d4ff';
@@ -6904,7 +6904,7 @@ function flapDrawDead(ctx,W,H){
   const ease=Math.min(1,_flapScreenAnim/1.2);
   const slideY=(1-ease)*40;
   ctx.save();
-  ctx.fillStyle=`rgba(0,0,0,${0.6*ease})`;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,'+(0.6*ease)+')' ;ctx.fillRect(0,0,W,H);
   const cw=260,ch=200,cx=(W-cw)/2,cy=H/2-ch/2-10+slideY;
   ctx.globalAlpha=ease;
   ctx.shadowColor='#4466ff';ctx.shadowBlur=20;
@@ -6951,14 +6951,14 @@ function flapDrawDead(ctx,W,H){
   const bp=ready?0.65+0.35*Math.sin(_flapScreenAnim*4):0;
   ctx.font='700 11px Orbitron,monospace';
   ctx.shadowColor='#4466ff';ctx.shadowBlur=ready?12*bp:0;
-  ctx.fillStyle=ready?`rgba(68,102,255,${bp})`:'rgba(68,102,255,0.15)';
+  ctx.fillStyle=ready?('rgba(68,102,255,'+bp+')'):'rgba(68,102,255,0.15)';
   ctx.fillText('[ TAP TO RESTART ]',W/2,cy+182);
   ctx.shadowBlur=0;ctx.restore();
 }
 
 function flapDrawDeathFlash(ctx,W,H){
   const t=Math.min(1,(_flapFrame-_flapBird._df)/18);
-  ctx.save();ctx.fillStyle=`rgba(255,51,85,${0.3*(1-t)})`;ctx.fillRect(0,0,W,H);ctx.restore();
+  ctx.save();ctx.fillStyle='rgba(255,51,85,'+(0.3*(1-t))+')' ;ctx.fillRect(0,0,W,H);ctx.restore();
 }
 
 function _flapLoop(){
@@ -6979,7 +6979,7 @@ function _flapLoop(){
   if(!_flapBird.alive&&_flapBird._df!==undefined) flapDrawDeathFlash(ctx2,W,H);
   if(_flapState==='idle') flapDrawIdle(ctx2,W,H);
   if(_flapState==='dead') flapDrawDead(ctx2,W,H);
-  }catch(e){console.error('FlapLoop error:',e);_flapActive=false;return;}
+  }catch(e){console.error('FlapLoop error:',e);}
   _flapRaf=requestAnimationFrame(_flapLoop);
 }
 
