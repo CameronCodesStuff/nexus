@@ -1999,7 +1999,7 @@ function setupPresence(){
   // Heartbeat every 30s so we can detect stale presence
   if(presenceInterval) clearInterval(presenceInterval);
   presenceInterval = setInterval(()=>{
-    updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp(),status:currentStatus}).catch(()=>{});
+    if(cu) updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp(),status:currentStatus}).catch(()=>{});
   }, 30000);
   // Mark offline on page unload/close
   const markOffline=()=>{
@@ -2021,7 +2021,7 @@ function setupPresence(){
       }, 120000); // 2 minutes hidden = offline
     } else {
       if(hiddenTimer){clearTimeout(hiddenTimer);hiddenTimer=null;}
-      updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp()}).catch(()=>{});
+      if(cu) updateDoc(doc(db,'users',cu.uid),{online:true,lastSeen:serverTimestamp()}).catch(()=>{});
     }
   });
 }
@@ -2680,6 +2680,27 @@ async function createGroup(){
   for(const uid of ginvitees)await addDoc(collection(db,'invites'),{toUid:uid,fromUid:cu.uid,fromName:cud?.displayName||'User',groupName:nm,chatId:ref.id,ts:serverTimestamp()});
   unlockAch('first_group');
   $('group-name-input').value='';closeModal('group-modal');openChat(ref.id);toast(`Group "${nm}" created!`,'success');
+}
+
+async function leaveGroup(chatId){
+  if(!cu||!chatId) return;
+  if(!confirm('Leave this group?')) return;
+  try{
+    const chatRef=doc(db,'chats',chatId);
+    const snap=await getDoc(chatRef);
+    if(!snap.exists()) return;
+    const data=snap.data();
+    const newMembers=(data.members||[]).filter(m=>m!==cu.uid);
+    await updateDoc(chatRef,{members:newMembers});
+    // System message
+    await addDoc(collection(db,'chats',chatId,'messages'),{
+      text:(cud?.username||'Someone')+' left the group 🚪',
+      uid:'system',type:'system',ts:serverTimestamp()
+    });
+    // Navigate away if currently in this chat
+    if(acid===chatId){ acid=null; document.getElementById('chat-area').innerHTML=''; }
+    renderSidebar();
+  }catch(e){ toast('Failed to leave group: '+e.message,'danger'); }
 }
 
 function renderSettings(){
