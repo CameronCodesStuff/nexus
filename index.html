@@ -1971,7 +1971,7 @@ async function enterApp(){
       uCache[cu.uid]={...uCache[cu.uid],nexusEnergy:0};
     }
   }catch{}
-  localStorage.removeItem('nexus_energy_save');
+  // save preserved across logins
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
   startTimeTracking();
@@ -7268,7 +7268,15 @@ function cps(){var c=G.bps;BLDS.forEach(function(b){c+=blds[b.id].cnt*b.bps*(G.b
 function cpc(){return Math.max(1,G.cm*(1+G.sb)+G.cb);}
 function bco(id){var b=BLDS.find(function(x){return x.id===id;});return Math.ceil(b.bc*Math.pow(1.18,blds[id].cnt));}
 function totB(){return BLDS.reduce(function(s,b){return s+blds[b.id].cnt;},0);}
-function rdmAvail(){return Math.floor(G.total/5e10)-G.rdmSpent;}
+function rdmAvail(){
+ return Math.floor(G.total/5e10)-G.rdmSpent;
+}
+function hourlyRemaining(){
+ var now=Date.now();
+ // Reset hourly bucket if over 1 hour old
+ if(!G.hourTs||now-G.hourTs>=3600000){G.hourTs=now;G.hourRdm=0;}
+ return Math.max(0,1000-G.hourRdm);
+}
 
 document.getElementById('orb').addEventListener('click',function(e){
  var c=cpc(),crit=false;
@@ -7301,11 +7309,11 @@ function buyBld(id){
  if(G.en<c){notif('Need '+fmt(c)+' - have '+fmt(G.en));return;}
  G.en-=c;
  blds[id].cnt++;
- // Only update display for this building, not full re-render
  updBldDisplay();
  chkMs();chkRb();
+ saveState();
 }
-function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b)return;if(G.en<u.cost){notif('Need '+fmt(u.cost)+' energy!');return;}G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();rBlds();notif(u.n+' unlocked!');}
+function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b)return;if(G.en<u.cost){notif('Need '+fmt(u.cost)+' energy!');return;}G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();rBlds();notif(u.n+' unlocked!');saveState();}
 
 var atab='click';
 function stab(t,el){atab=t;document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});el.classList.add('on');rUpgs();}
@@ -7322,6 +7330,14 @@ function rUpgs(){
  });
 }
 
+function fmtBps(n){
+ if(n>=1e9) return (n/1e9).toFixed(2)+'B';
+ if(n>=1e6) return (n/1e6).toFixed(2)+'M';
+ if(n>=1000) return (n/1000).toFixed(2)+'K';
+ if(n>=1) return n.toFixed(2);
+ if(n>=0.01) return n.toFixed(3);
+ return n.toFixed(4);
+}
 function rBlds(){
  var l=document.getElementById('blist');l.innerHTML='';
  BLDS.forEach(function(b){
@@ -7358,8 +7374,18 @@ function chkRb(){}
 
 function updRdm(){
  var a=rdmAvail();
- var rc=document.getElementById('rdmC');if(rc)rc.textContent=a+' message'+(a!==1?'s':'')+' available';
- var rb=document.getElementById('rdm-btn');if(rb)rb.classList.toggle('on',a>0);
+ var hr=hourlyRemaining();
+ var canRdm=Math.min(a,hr);
+ var rc=document.getElementById('rdmC');
+ if(rc){
+  if(hr<=0){
+   var ms=3600000-(Date.now()-(G.hourTs||Date.now()));
+   rc.textContent='Hourly limit reached (resets in '+Math.ceil(ms/60000)+'m)';
+  } else {
+   rc.textContent=a+' available · '+hr+'/1000 left this hour';
+  }
+ }
+ var rb=document.getElementById('rdm-btn');if(rb)rb.classList.toggle('on',canRdm>0);
 }
 
 function doRedeem(){
@@ -7423,6 +7449,7 @@ window.addEventListener('message',function(e){
  G.bm=s.bm||{};G.lc=s.lc||0;G.critm=s.critm||2;
  G.chain=s.chain||false;G.msd=s.msd||{};G.ub=s.ub||{};
  G.totalRdm=s.totalRdm||0;G.rdmSpent=s.rdmSpent||0;
+ G.hourTs=s.hourTs||0;G.hourRdm=s.hourRdm||0;
  if(s.blds){Object.keys(s.blds).forEach(function(id){if(blds[id])blds[id].cnt=s.blds[id]||0;});}
  if(s.upgs){s.upgs.forEach(function(id){var u=UPGS.find(function(x){return x.id===id;});if(u&amp;&amp;!u.b){u.b=true;u.eff();}});}
  // Re-apply milestone effects
@@ -7434,14 +7461,14 @@ function saveState(){
  var bldState={};BLDS.forEach(function(b){bldState[b.id]=blds[b.id].cnt;});
  var upgState=UPGS.filter(function(u){return u.b;}).map(function(u){return u.id;});
  pm({type:'nexusSave',v:3,state:{
-  en:G.en,total:G.total,clicks:G.clicks,cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
+  en:G.en,total:G.total,clicks:G.clicks,hourTs:G.hourTs||0,hourRdm:G.hourRdm||0,cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
   chain:G.chain,msd:G.msd,ub:G.ub,totalRdm:G.totalRdm,rdmSpent:G.rdmSpent,
   blds:bldState,upgs:upgState
  }});
 }
 
 // Save every 30 seconds and on redeem
-setInterval(saveState,30000);
+setInterval(saveState,15000);
 
 // Request load on init
 pm({type:'nexusLoad'});
