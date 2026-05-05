@@ -6646,6 +6646,7 @@ window.addEventListener('message',async function(e){
       cud={...cud,msgCount:newCount};
       uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
       renderProfile();
+      toast('🐦 +'+delta+' messages earned!','success');
     }catch(e2){console.warn('flap save:',e2);}
   }
 });
