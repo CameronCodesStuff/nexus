@@ -7220,18 +7220,18 @@ function notif(t){var e=document.createElement('div');e.className='notif';e.text
 function floatNum(x,y,t){var e=document.createElement('div');e.className='float';e.textContent=t;e.style.left=(x-20+Math.random()*40-20)+'px';e.style.top=(y-20)+'px';document.body.appendChild(e);setTimeout(function(){e.remove();},1000)}
 
 var BLDS=[
- {id:'solar',n:'Solar Harvester',i:'☀️',bc:25,bps:0.005},
- {id:'crystal',n:'Crystal Array',i:'💎',bc:200,bps:0.02},
- {id:'drone',n:'Nano Drone',i:'🤖',bc:1500,bps:0.08},
- {id:'portal',n:'Nexus Portal',i:'🌀',bc:10000,bps:0.3},
- {id:'blackhole',n:'Black Hole',i:'🕳️',bc:60000,bps:1},
- {id:'pulsar',n:'Pulsar Beacon',i:'⚡',bc:400000,bps:4},
- {id:'dyson',n:'Dyson Sphere',i:'🔆',bc:2500000,bps:15},
- {id:'galaxy',n:'Galaxy Farm',i:'🌌',bc:20000000,bps:60},
- {id:'nebula',n:'Nebula Engine',i:'🌠',bc:100000000,bps:200},
- {id:'bigbang',n:'Big Bang',i:'💥',bc:1000000000,bps:800},
- {id:'cosmos',n:'Cosmos Weaver',i:'✨',bc:15000000000,bps:3000},
- {id:'void',n:'Void Condenser',i:'🌑',bc:200000000000,bps:15000}
+ {id:'solar',n:'Solar Harvester',i:'☀️',bc:25,bps:0.1},
+ {id:'crystal',n:'Crystal Array',i:'💎',bc:200,bps:0.5},
+ {id:'drone',n:'Nano Drone',i:'🤖',bc:1500,bps:2},
+ {id:'portal',n:'Nexus Portal',i:'🌀',bc:10000,bps:8},
+ {id:'blackhole',n:'Black Hole',i:'🕳️',bc:60000,bps:25},
+ {id:'pulsar',n:'Pulsar Beacon',i:'⚡',bc:400000,bps:80},
+ {id:'dyson',n:'Dyson Sphere',i:'🔆',bc:2500000,bps:250},
+ {id:'galaxy',n:'Galaxy Farm',i:'🌌',bc:20000000,bps:800},
+ {id:'nebula',n:'Nebula Engine',i:'🌠',bc:100000000,bps:2500},
+ {id:'bigbang',n:'Big Bang',i:'💥',bc:1000000000,bps:8000},
+ {id:'cosmos',n:'Cosmos Weaver',i:'✨',bc:15000000000,bps:25000},
+ {id:'void',n:'Void Condenser',i:'🌑',bc:200000000000,bps:80000}
 ];
 var UPGS=[
  {id:'c1',tab:'click',n:'Focused Beam',i:'🔦',cost:1000,d:'Click x2',eff:function(){G.cm*=2},b:false},
