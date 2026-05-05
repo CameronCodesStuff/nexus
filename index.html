@@ -6621,6 +6621,9 @@ function openFlapGame(){
   _flapLastSaved=0;
   const el=document.getElementById('flap-earned');
   if(el) el.textContent='+0';
+  // Reload iframe so game resets completely
+  const iframe=document.getElementById('flap-iframe');
+  if(iframe){const src=iframe.srcdoc||'';iframe.srcdoc='';setTimeout(()=>{iframe.srcdoc=src;},10);}
   document.getElementById('flap-modal').classList.add('open');
 }
 
