@@ -7208,9 +7208,31 @@ document.getElementById('orb').addEventListener('click',function(e){
  chkMs();updRdm();chkRb();
 });
 
-// click handled directly via onclick on each element
+// Reliable event delegation on containers
+document.getElementById('blist').addEventListener('click',function(e){
+ var el=e.target;
+ while(el&amp;&amp;el!==this){
+  if(el.hasAttribute('data-bld')){buyBld(el.getAttribute('data-bld'));return;}
+  el=el.parentElement;
+ }
+});
+document.getElementById('ugrid').addEventListener('click',function(e){
+ var el=e.target;
+ while(el&amp;&amp;el!==this){
+  if(el.hasAttribute('data-upg')){buyUpg(el.getAttribute('data-upg'));return;}
+  el=el.parentElement;
+ }
+});
 
-function buyBld(id){var c=bco(id);if(G.en<c){notif('Not enough energy!');return;}G.en-=c;blds[id].cnt++;rBlds();rUpgs();chkMs();chkRb();}
+function buyBld(id){
+ var c=bco(id);
+ if(G.en<c){notif('Need '+fmt(c)+' - have '+fmt(G.en));return;}
+ G.en-=c;
+ blds[id].cnt++;
+ // Only update display for this building, not full re-render
+ updBldDisplay();
+ chkMs();chkRb();
+}
 function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b)return;if(G.en<u.cost){notif('Need '+fmt(u.cost)+' energy!');return;}G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();rBlds();notif(u.n+' unlocked!');}
 
 var atab='click';
@@ -7222,7 +7244,7 @@ function rUpgs(){
   var ca=G.en>=u.cost;
   var d=document.createElement('div');
   d.className='upg'+(u.b?' bought':ca?'':' locked');
-  if(!u.b){var _uid=u.id;d.onclick=function(){buyUpg(_uid);};}
+  d.setAttribute('data-upg',u.id);
   d.innerHTML='<div class=&quot;ui&quot;>'+u.i+'</div><div class=&quot;un&quot;>'+u.n+'</div>'+(u.b?'':'<div class=&quot;uc&quot;>'+fmt(u.cost)+'</div>')+'<div class=&quot;ud&quot;>'+u.d+'</div>';
   g.appendChild(d);
  });
@@ -7236,7 +7258,7 @@ function rBlds(){
   var m=(G.bm[b.id]||1)*G.gcm*(1+G.sb);
   var d=document.createElement('div');
   d.className='bld'+(locked?' locked':'');
-  var _id=b.id;d.onclick=function(){buyBld(_id);};
+  d.setAttribute('data-bld',b.id);
   d.innerHTML='<div class=&quot;bi&quot;>'+b.i+'</div><div><div class=&quot;bn&quot;>'+b.n+'</div><div class=&quot;bd&quot;>'+(b.bps*m).toFixed(1)+'/s</div><div class=&quot;bc&quot;>'+fmt(c)+'</div></div><div class=&quot;bcount&quot;>'+cnt+'</div>';
   l.appendChild(d);
  });
@@ -7289,6 +7311,25 @@ document.getElementById('rb-btn').addEventListener('click',function(){
  renderAll();notif('Rebirth! +'+sd+' Shards!');
 });
 
+function updBldDisplay(){
+ // Only update cost/count numbers, don't recreate elements
+ BLDS.forEach(function(b){
+  var c=bco(b.id),cnt=blds[b.id].cnt,ca=G.en>=c;
+  var locked=!ca&amp;&amp;cnt===0&amp;&amp;G.en<b.bc*0.5;
+  var el=document.querySelector('[data-bld=&quot;'+b.id+'&quot;]');
+  if(!el)return;
+  el.className='bld'+(locked?' locked':'');
+  var cntEl=el.querySelector('.bcount');if(cntEl)cntEl.textContent=cnt;
+  var costEl=el.querySelector('.bc');if(costEl)costEl.textContent=fmt(c);
+ });
+ // Update upgrade affordability styling
+ UPGS.forEach(function(u){
+  var el=document.querySelector('[data-upg=&quot;'+u.id+'&quot;]');
+  if(!el)return;
+  var ca=G.en>=u.cost;
+  el.className='upg'+(u.b?' bought':ca?'':' locked');
+ });
+}
 function rStats(){
  document.getElementById('scC').textContent=fmt(G.clicks);
  document.getElementById('scB').textContent=fmt(totB());
@@ -7306,7 +7347,7 @@ setInterval(function(){
  document.getElementById('curA').textContent=fmt(G.en);
  document.getElementById('cpsD').textContent=fmt(c)+' / sec';
  document.getElementById('cpcD').textContent=fmt(cpc());
- chkMs();updRdm();chkRb();rStats();rMs();rBlds();
+ chkMs();updRdm();chkRb();rStats();rMs();updBldDisplay();
 },50);
 
 renderAll();
