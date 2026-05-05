@@ -6618,9 +6618,9 @@ let _flapEarnedTotal=0;
 
 function openFlapGame(){
   _flapEarnedTotal=0;
+  _flapLastSaved=0;
   const el=document.getElementById('flap-earned');
   if(el) el.textContent='+0';
-  closeModal('flap-modal'); // reset if already open
   document.getElementById('flap-modal').classList.add('open');
 }
 
@@ -6629,19 +6629,19 @@ function closeFlapGame(){
 }
 
 // Listen for score messages from the iframe
+let _flapLastSaved=0;
 window.addEventListener('message',async function(e){
   if(!e.data||e.data.type!=='flapScore') return;
-  const earned=e.data.earned||0;
-  _flapEarnedTotal=earned;
+  const totalEarned=e.data.earned||0;
+  const delta=totalEarned-_flapLastSaved; // only save new points
+  if(delta<=0) return;
+  _flapLastSaved=totalEarned;
+  _flapEarnedTotal=totalEarned;
   const el=document.getElementById('flap-earned');
-  if(el) el.textContent='+'+earned;
-  // Save to Firestore
+  if(el) el.textContent='+'+totalEarned;
   if(cu&&cud){
     try{
-      // Only save delta (2 per point, tracked cumulatively)
-      // Save every 2 messages (every point) - use earned as absolute total
-      // so we only write the new delta each time
-      const newCount=(cud.msgCount||0)+2;
+      const newCount=(cud.msgCount||0)+delta;
       await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
       cud={...cud,msgCount:newCount};
       uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
@@ -6970,7 +6970,7 @@ iStars();reset();loop();
 <div id=&quot;sc&quot; style=&quot;display:none&quot;>+0</div>
 </body></html>"
       style="width:360px;height:540px;border:1px solid rgba(68,102,255,0.25);border-radius:8px;display:block;box-shadow:0 0 20px rgba(68,102,255,0.1);"
-      scrolling="no" sandbox="allow-scripts">
+      scrolling="no" sandbox="allow-scripts allow-same-origin">
     </iframe>
   </div>
 </div>
