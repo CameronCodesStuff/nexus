@@ -7394,13 +7394,12 @@ function updBldDisplay(){
  });
 }
 function rStats(){
- document.getElementById('scC').textContent=fmt(G.clicks);
- document.getElementById('scB').textContent=fmt(totB());
- document.getElementById('scU').textContent=Object.keys(G.ub).length;
- document.getElementById('hT').textContent=fmt(G.total);
- document.getElementById('hS').textContent=G.shards;
- document.getElementById('hR').textContent=G.rebirths;
- document.getElementById('hM').textContent=G.totalRdm;
+ var el;
+ el=document.getElementById('scC');if(el)el.textContent=fmt(G.clicks);
+ el=document.getElementById('scB');if(el)el.textContent=fmt(totB());
+ el=document.getElementById('scU');if(el)el.textContent=Object.keys(G.ub).length;
+ el=document.getElementById('hT');if(el)el.textContent=fmt(G.total);
+ el=document.getElementById('hM');if(el)el.textContent=G.totalRdm;
 }
 
 function renderAll(){rBlds();rUpgs();rMs();rStats();}
