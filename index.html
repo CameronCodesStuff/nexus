@@ -6705,7 +6705,7 @@ window.addEventListener('message',async function(e){
       if(saved){
         const iframe=document.getElementById('nexus-game-iframe');
         if(iframe&&iframe.contentWindow){
-          iframe.contentWindow.postMessage({type:'nexusLoad',state:JSON.parse(saved)},'*');
+          const sv=JSON.parse(saved);iframe.contentWindow.postMessage({type:'nexusLoad',v:2,state:sv},'*');
         }
       }
     }catch{}
@@ -7052,8 +7052,7 @@ iStars();reset();loop();
 
 <!-- NEXUS ENERGY GAME -->
 <div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
-  <iframe id="nexus-game-iframe"
-    srcdoc="<!DOCTYPE html>
+  <iframe id="nexus-game-ifra<!DOCTYPE html>
 <html>
 <head>
 <meta charset=&quot;UTF-8&quot;>
@@ -7162,7 +7161,7 @@ html,body{width:100%;height:100%;background:#050508;color:#c8c8e8;font-family:mo
     <div class=&quot;cs&quot; id=&quot;cpsD&quot;>0 / sec</div>
    </div>
    <div class=&quot;rdm-box&quot;>
-    <div class=&quot;rdm-info&quot;>1 Billion energy = 1 Message</div>
+    <div class=&quot;rdm-info&quot;>10 Billion energy = 1 Message</div>
     <div class=&quot;rdm-cnt&quot; id=&quot;rdmC&quot;>0 available</div>
     <button class=&quot;rdm-btn&quot; id=&quot;rdm-btn&quot; onclick=&quot;doRedeem()&quot;>REDEEM MESSAGES</button>
     <div class=&quot;rdm-tot&quot; id=&quot;rdmT&quot;>Total redeemed: 0</div>
@@ -7187,18 +7186,18 @@ function notif(t){var e=document.createElement('div');e.className='notif';e.text
 function floatNum(x,y,t){var e=document.createElement('div');e.className='float';e.textContent=t;e.style.left=(x-20+Math.random()*40-20)+'px';e.style.top=(y-20)+'px';document.body.appendChild(e);setTimeout(function(){e.remove();},1000)}
 
 var BLDS=[
- {id:'solar',n:'Solar Harvester',i:'☀️',bc:10,bps:0.1},
- {id:'crystal',n:'Crystal Array',i:'💎',bc:80,bps:0.5},
- {id:'drone',n:'Nano Drone',i:'🤖',bc:500,bps:3},
- {id:'portal',n:'Nexus Portal',i:'🌀',bc:3000,bps:15},
- {id:'blackhole',n:'Black Hole',i:'🕳️',bc:15000,bps:80},
- {id:'pulsar',n:'Pulsar Beacon',i:'⚡',bc:80000,bps:350},
- {id:'dyson',n:'Dyson Sphere',i:'🔆',bc:400000,bps:1500},
- {id:'galaxy',n:'Galaxy Farm',i:'🌌',bc:2000000,bps:8000},
- {id:'nebula',n:'Nebula Engine',i:'🌠',bc:10000000,bps:40000},
- {id:'bigbang',n:'Big Bang',i:'💥',bc:100000000,bps:300000},
- {id:'cosmos',n:'Cosmos Weaver',i:'✨',bc:1000000000,bps:2000000},
- {id:'void',n:'Void Condenser',i:'🌑',bc:10000000000,bps:20000000}
+ {id:'solar',n:'Solar Harvester',i:'☀️',bc:15,bps:0.02},
+ {id:'crystal',n:'Crystal Array',i:'💎',bc:120,bps:0.08},
+ {id:'drone',n:'Nano Drone',i:'🤖',bc:800,bps:0.4},
+ {id:'portal',n:'Nexus Portal',i:'🌀',bc:5000,bps:1.5},
+ {id:'blackhole',n:'Black Hole',i:'🕳️',bc:25000,bps:6},
+ {id:'pulsar',n:'Pulsar Beacon',i:'⚡',bc:150000,bps:20},
+ {id:'dyson',n:'Dyson Sphere',i:'🔆',bc:800000,bps:80},
+ {id:'galaxy',n:'Galaxy Farm',i:'🌌',bc:5000000,bps:350},
+ {id:'nebula',n:'Nebula Engine',i:'🌠',bc:30000000,bps:1500},
+ {id:'bigbang',n:'Big Bang',i:'💥',bc:300000000,bps:8000},
+ {id:'cosmos',n:'Cosmos Weaver',i:'✨',bc:3000000000,bps:40000},
+ {id:'void',n:'Void Condenser',i:'🌑',bc:30000000000,bps:200000}
 ];
 var UPGS=[
  {id:'c1',tab:'click',n:'Focused Beam',i:'🔦',cost:50,d:'Click x2',eff:function(){G.cm*=2},b:false},
@@ -7212,12 +7211,12 @@ var UPGS=[
  {id:'p3',tab:'passive',n:'Drone AI',i:'🧠',cost:8000,d:'Drones x3',eff:function(){G.bm.drone=(G.bm.drone||1)*3},b:false},
  {id:'p4',tab:'passive',n:'Portal Flux',i:'🌀',cost:40000,d:'Portals x2',eff:function(){G.bm.portal=(G.bm.portal||1)*2},b:false},
  {id:'p5',tab:'passive',n:'Event Horizon',i:'🕳',cost:200000,d:'Black Holes x2',eff:function(){G.bm.blackhole=(G.bm.blackhole||1)*2},b:false},
- {id:'p6',tab:'passive',n:'Global Boost',i:'🌍',cost:5000000,d:'All blds x2',eff:function(){G.gcm*=2},b:false},
- {id:'p7',tab:'passive',n:'Cosmic Harmony',i:'🎵',cost:50000000,d:'All blds x5',eff:function(){G.gcm*=5},b:false},
+ {id:'p6',tab:'passive',n:'Global Boost',i:'🌍',cost:5000000,d:'All blds x1.5',eff:function(){G.gcm*=1.5},b:false},
+ {id:'p7',tab:'passive',n:'Cosmic Harmony',i:'🎵',cost:50000000,d:'All blds x2',eff:function(){G.gcm*=2},b:false},
  {id:'s1',tab:'special',n:'Lucky Star',i:'⭐',cost:100,d:'10% chance: 10x click',eff:function(){G.lc+=0.1},b:false},
  {id:'s2',tab:'special',n:'Crit Matrix',i:'💠',cost:2000,d:'Crits deal 5x',eff:function(){G.critm=5},b:false},
  {id:'s3',tab:'special',n:'Chain Link',i:'🔗',cost:20000,d:'Every 100 clicks: burst',eff:function(){G.chain=true},b:false},
- {id:'s4',tab:'special',n:'Singularity',i:'🌟',cost:50000000,d:'All x3 permanent',eff:function(){G.gcm*=3;G.cm*=3},b:false}
+ {id:'s4',tab:'special',n:'Singularity',i:'🌟',cost:100000000,d:'All x2 permanent',eff:function(){G.gcm*=2;G.cm*=2},b:false}
 ];
 var MS=[
  {id:'m1',n:'First Signal',c:function(){return G.clicks>=10},l:'10 clicks',r:'x2 click',a:function(){G.cm*=2}},
@@ -7235,7 +7234,7 @@ function cps(){var c=G.bps;BLDS.forEach(function(b){c+=blds[b.id].cnt*b.bps*(G.b
 function cpc(){return Math.max(1,G.cm*(1+G.sb)+G.cb);}
 function bco(id){var b=BLDS.find(function(x){return x.id===id;});return Math.ceil(b.bc*Math.pow(1.18,blds[id].cnt));}
 function totB(){return BLDS.reduce(function(s,b){return s+blds[b.id].cnt;},0);}
-function rdmAvail(){return Math.floor(G.total/1e9)-G.rdmSpent;}
+function rdmAvail(){return Math.floor(G.total/1e10)-G.rdmSpent;}
 
 document.getElementById('orb').addEventListener('click',function(e){
  var c=cpc(),crit=false;
@@ -7411,7 +7410,7 @@ window.addEventListener('message',function(e){
 function saveState(){
  var bldState={};BLDS.forEach(function(b){bldState[b.id]=blds[b.id].cnt;});
  var upgState=UPGS.filter(function(u){return u.b;}).map(function(u){return u.id;});
- pm({type:'nexusSave',state:{
+ pm({type:'nexusSave',v:2,state:{
   en:G.en,total:G.total,clicks:G.clicks,rebirths:G.rebirths,shards:G.shards,
   sb:G.sb,cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
   chain:G.chain,msd:G.msd,ub:G.ub,totalRdm:G.totalRdm,rdmSpent:G.rdmSpent,
@@ -7429,6 +7428,8 @@ setTimeout(function(){pm({type:'nexusLoad'});},500);
 renderAll();
 document.getElementById('rb-btn').style.cssText='background:linear-gradient(135deg,#9933ff,#ff4090);border:none;color:#fff;font-size:9px;font-weight:bold;padding:5px 10px;border-radius:6px;cursor:pointer;opacity:0.4;letter-spacing:1px';
 &lt;/script&gt;
+</body>
+</html>
 </body>
 </html>"
     style="width:100%;height:100%;border:none;display:block;"
