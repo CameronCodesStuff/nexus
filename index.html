@@ -7210,8 +7210,8 @@ document.getElementById('orb').addEventListener('click',function(e){
 
 // click handled directly via onclick on each element
 
-function buyBld(id){var c=bco(id);if(G.en<c)return;G.en-=c;blds[id].cnt++;rBlds();rUpgs();chkMs();chkRb();}
-function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b||G.en<u.cost)return;G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();rBlds();notif(u.n+' unlocked!');}
+function buyBld(id){var c=bco(id);if(G.en<c){notif('Not enough energy!');return;}G.en-=c;blds[id].cnt++;rBlds();rUpgs();chkMs();chkRb();}
+function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b)return;if(G.en<u.cost){notif('Need '+fmt(u.cost)+' energy!');return;}G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();rBlds();notif(u.n+' unlocked!');}
 
 var atab='click';
 function stab(t,el){atab=t;document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});el.classList.add('on');rUpgs();}
@@ -7222,7 +7222,7 @@ function rUpgs(){
   var ca=G.en>=u.cost;
   var d=document.createElement('div');
   d.className='upg'+(u.b?' bought':ca?'':' locked');
-  if(!u.b&amp;&amp;ca){var _uid=u.id;d.onclick=function(){buyUpg(_uid);};}
+  if(!u.b){var _uid=u.id;d.onclick=function(){buyUpg(_uid);};}
   d.innerHTML='<div class=&quot;ui&quot;>'+u.i+'</div><div class=&quot;un&quot;>'+u.n+'</div>'+(u.b?'':'<div class=&quot;uc&quot;>'+fmt(u.cost)+'</div>')+'<div class=&quot;ud&quot;>'+u.d+'</div>';
   g.appendChild(d);
  });
@@ -7236,7 +7236,7 @@ function rBlds(){
   var m=(G.bm[b.id]||1)*G.gcm*(1+G.sb);
   var d=document.createElement('div');
   d.className='bld'+(locked?' locked':'');
-  if(!locked){var _id=b.id;d.onclick=function(){buyBld(_id);};}
+  var _id=b.id;d.onclick=function(){buyBld(_id);};
   d.innerHTML='<div class=&quot;bi&quot;>'+b.i+'</div><div><div class=&quot;bn&quot;>'+b.n+'</div><div class=&quot;bd&quot;>'+(b.bps*m).toFixed(1)+'/s</div><div class=&quot;bc&quot;>'+fmt(c)+'</div></div><div class=&quot;bcount&quot;>'+cnt+'</div>';
   l.appendChild(d);
  });
