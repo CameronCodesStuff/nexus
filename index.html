@@ -6617,22 +6617,27 @@ let _flapInputCooldown=false, _flapScreenAnim=0, _flapEarned=0;
 let _flapActive=false;
 
 function flapInit(){
-  _flapActive=true;
   const cv=document.getElementById('flap-canvas');
-  if(!cv) return;
+  if(!cv||cv.width===0){
+    // Canvas not ready yet, retry
+    setTimeout(flapInit,80);return;
+  }
+  if(_flapRaf){cancelAnimationFrame(_flapRaf);_flapRaf=null;}
+  _flapActive=true;
   _flapEarned=0;
-  document.getElementById('flap-earned').textContent='+0';
+  const earnedEl=document.getElementById('flap-earned');
+  if(earnedEl) earnedEl.textContent='+0';
   flapInitStars(cv.width,cv.height);
   flapReset();
   _flapState='idle';_flapScreenAnim=0;
-  if(_flapRaf){cancelAnimationFrame(_flapRaf);_flapRaf=null;}
+  // Wire controls — use named handler so we don't stack duplicate listeners
   const container=document.getElementById('flap-container');
-  // Wire controls
-  const newC=container.cloneNode(false);
-  newC.appendChild(cv);
-  container.parentNode.replaceChild(newC,container);
-  newC.addEventListener('click',flapHandleInput);
-  newC.addEventListener('touchstart',e=>{e.preventDefault();flapHandleInput();},{passive:false});
+  if(container&&!container._flapWired){
+    container._flapWired=true;
+    container.addEventListener('click',flapHandleInput);
+    container.addEventListener('touchstart',e=>{e.preventDefault();flapHandleInput();},{passive:false});
+  }
+  document.removeEventListener('keydown',_flapKeyHandler);
   document.addEventListener('keydown',_flapKeyHandler);
   _flapLoop();
 }
