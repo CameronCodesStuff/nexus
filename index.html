@@ -735,6 +735,7 @@
             <button onclick="N.openModal('help-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">❓ Help</button>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
             <button onclick="N.openModal('changelog-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">📋 Update Log</button>
+            <button onclick="N.openNexusGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⬡ Nexus Energy</button>
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
             <button onclick="N.openFlapGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐦 Nexus Flap</button>
             <button onclick="N.openModal('typegame-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⌨️ Type & Earn</button>
@@ -6654,6 +6655,35 @@ window.addEventListener('message',async function(e){
   }
 });
 
+// ── NEXUS ENERGY GAME ────────────────────────────
+function openNexusGame(){
+  const overlay=document.getElementById('nexus-game-overlay');
+  if(!overlay) return;
+  // Reload iframe for fresh game
+  const iframe=document.getElementById('nexus-game-iframe');
+  if(iframe){const s=iframe.srcdoc;iframe.srcdoc='';setTimeout(()=>{iframe.srcdoc=s;},10);}
+  overlay.style.display='block';
+}
+
+window.addEventListener('message',async function(e){
+  if(!e.data) return;
+  if(e.data.type==='closeNexusGame'){
+    document.getElementById('nexus-game-overlay').style.display='none';
+  }
+  if(e.data.type==='nexusGameRedeem'&&cu&&cud){
+    const amount=e.data.amount||0;
+    if(amount<=0) return;
+    try{
+      const newCount=(cud.msgCount||0)+amount;
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+      cud={...cud,msgCount:newCount};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+      renderProfile();
+      toast('⬡ +'+amount+' messages redeemed from Nexus Energy!','success');
+    }catch(err){toast('Could not save messages.','danger');}
+  }
+});
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -6704,6 +6734,7 @@ window._N = {
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
   openFlapGame, closeFlapGame,
+  openNexusGame,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
@@ -6977,6 +7008,266 @@ iStars();reset();loop();
       scrolling="no" sandbox="allow-scripts allow-same-origin">
     </iframe>
   </div>
+</div>
+
+<!-- NEXUS ENERGY GAME -->
+<div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
+  <iframe id="nexus-game-iframe"
+    srcdoc="<!DOCTYPE html>
+<html lang=&quot;en&quot;>
+<head>
+<meta charset=&quot;UTF-8&quot;>
+<meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;>
+<title>NEXUS Energy</title>
+<link href=&quot;https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&amp;family=Rajdhani:wght@300;400;600&amp;display=swap&quot; rel=&quot;stylesheet&quot;>
+<style>
+  :root {
+    --bg:#050508;--bg2:#08080f;--bg3:#0d0d18;--panel:#060610;
+    --border:rgba(68,102,255,0.25);--accent:#4466ff;--accent2:#00d4ff;
+    --accent3:#00ff88;--gold:#ffcc44;--text:#c8c8e8;--textdim:#5a5a7a;
+    --glow:0 0 12px rgba(68,102,255,0.5);--glow2:0 0 12px rgba(0,212,255,0.5);
+    --glow3:0 0 12px rgba(0,255,136,0.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:Rajdhani,sans-serif;font-size:15px;min-height:100vh;overflow-x:hidden;user-select:none;}
+  .layout{display:grid;grid-template-columns:300px 1fr 280px;grid-template-rows:auto 1fr;min-height:100vh;position:relative;z-index:1;}
+  header{grid-column:1/-1;padding:10px 20px;background:linear-gradient(90deg,#060610,#08080f,#060610);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:20px;}
+  header h1{font-family:Orbitron,monospace;font-size:18px;font-weight:900;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px;}
+  .header-stats{display:flex;gap:24px;margin-left:auto;align-items:center;}
+  .stat-block{display:flex;flex-direction:column;align-items:flex-end;}
+  .stat-label{font-size:10px;color:var(--textdim);letter-spacing:1px;text-transform:uppercase;}
+  .stat-val{font-family:Orbitron,monospace;font-size:13px;color:var(--gold);}
+  .close-btn{padding:7px 16px;background:rgba(255,51,85,0.15);border:1px solid rgba(255,51,85,0.4);border-radius:8px;color:#ff3355;font-family:Orbitron,monospace;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:all 0.2s;}
+  .close-btn:hover{background:rgba(255,51,85,0.3);box-shadow:0 0 12px rgba(255,51,85,0.4);}
+  .redeem-btn{padding:7px 16px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-family:Orbitron,monospace;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:all 0.2s;opacity:0.4;}
+  .redeem-btn.ready{opacity:1;animation:pulseRed 2s infinite;}
+  @keyframes pulseRed{0%,100%{box-shadow:var(--glow);}50%{box-shadow:0 0 24px rgba(68,102,255,0.9),0 0 48px rgba(68,102,255,0.3);}}
+  .rebirth-btn{padding:7px 16px;background:linear-gradient(135deg,#9933ff,#ff4090);border:none;border-radius:8px;color:#fff;font-family:Orbitron,monospace;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;opacity:0.4;transition:all 0.2s;}
+  .rebirth-btn.ready{opacity:1;animation:pulseRb 2s infinite;}
+  @keyframes pulseRb{0%,100%{box-shadow:0 0 12px rgba(153,51,255,0.5);}50%{box-shadow:0 0 24px rgba(153,51,255,0.9);}}
+  .left-panel{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:20px 14px;gap:14px;overflow-y:auto;}
+  .click-area{position:relative;display:flex;align-items:center;justify-content:center;height:250px;width:250px;}
+  .orb-ring{position:absolute;border-radius:50%;border:1px solid rgba(68,102,255,0.3);animation:spinRing 8s linear infinite;}
+  .orb-ring:nth-child(1){width:190px;height:190px;}
+  .orb-ring:nth-child(2){width:210px;height:210px;animation-duration:12s;animation-direction:reverse;border-color:rgba(0,212,255,0.2);}
+  .orb-ring:nth-child(3){width:230px;height:230px;animation-duration:6s;border-color:rgba(0,255,136,0.15);}
+  @keyframes spinRing{to{transform:rotate(360deg);}}
+  .orb{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#6688ff,#2233aa,#050515);box-shadow:0 0 30px rgba(68,102,255,0.6),0 0 60px rgba(68,102,255,0.3),inset 0 0 20px rgba(0,0,0,0.5);cursor:pointer;transition:transform 0.08s;position:relative;z-index:2;}
+  .orb:hover{box-shadow:0 0 40px rgba(68,102,255,0.9),0 0 80px rgba(68,102,255,0.4),inset 0 0 20px rgba(0,0,0,0.5);}
+  .orb:active{transform:scale(0.92);}
+  .orb::after{content:&quot;&quot;;position:absolute;top:18%;left:22%;width:35%;height:20%;background:rgba(255,255,255,0.15);border-radius:50%;transform:rotate(-30deg);}
+  .cpc-display{text-align:center;background:rgba(68,102,255,0.08);border:1px solid var(--border);border-radius:10px;padding:8px 16px;width:100%;}
+  .cpc-display .label{font-size:10px;color:var(--textdim);text-transform:uppercase;letter-spacing:1px;}
+  .cpc-display .val{font-family:Orbitron,monospace;font-size:16px;color:var(--accent3);margin-top:2px;}
+  .upgrades-section{width:100%;}
+  .section-title{font-family:Orbitron,monospace;font-size:10px;letter-spacing:2px;color:var(--textdim);text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+  .upgrades-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+  .upgrade-btn{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:7px;cursor:pointer;transition:all 0.2s;text-align:left;position:relative;overflow:hidden;}
+  .upgrade-btn:hover:not(.bought):not(.locked){border-color:var(--accent);box-shadow:var(--glow);}
+  .upgrade-btn.bought{border-color:var(--accent3);background:rgba(0,255,136,0.06);opacity:0.7;cursor:default;}
+  .upgrade-btn.locked{opacity:0.3;cursor:not-allowed;}
+  .upg-icon{font-size:18px;line-height:1;}
+  .upg-name{font-size:11px;font-weight:600;color:#ddd;margin-top:3px;line-height:1.2;}
+  .upg-cost{font-family:Orbitron,monospace;font-size:9px;color:var(--gold);margin-top:2px;}
+  .upg-desc{font-size:9px;color:var(--textdim);margin-top:2px;line-height:1.3;}
+  .upg-tag{position:absolute;top:3px;right:3px;font-size:8px;background:var(--accent3);color:#000;padding:1px 4px;border-radius:3px;font-weight:700;}
+  .tabs{display:flex;gap:5px;width:100%;margin-bottom:10px;}
+  .tab{flex:1;padding:5px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:Rajdhani,sans-serif;font-size:11px;font-weight:600;color:var(--textdim);letter-spacing:1px;text-transform:uppercase;transition:all 0.2s;text-align:center;}
+  .tab.active{border-color:var(--accent);color:var(--accent);background:rgba(68,102,255,0.1);}
+  .mid-panel{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:28px 20px;gap:16px;position:relative;overflow:hidden;}
+  .main-currency{text-align:center;z-index:1;}
+  .currency-label{font-size:12px;color:var(--textdim);letter-spacing:2px;text-transform:uppercase;}
+  .currency-amount{font-family:Orbitron,monospace;font-size:38px;font-weight:900;background:linear-gradient(135deg,#fff,var(--gold),#ffaa30);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;filter:drop-shadow(0 0 20px rgba(255,200,0,0.3));transition:filter 0.1s;}
+  .cps-amount{font-family:Orbitron,monospace;font-size:13px;color:var(--accent3);margin-top:4px;}
+  .redeem-section{background:rgba(68,102,255,0.08);border:1px solid var(--border);border-radius:12px;padding:14px 20px;text-align:center;z-index:1;width:100%;max-width:420px;}
+  .redeem-info{font-size:12px;color:var(--textdim);margin-bottom:8px;}
+  .redeem-count{font-family:Orbitron,monospace;font-size:22px;color:var(--accent2);margin-bottom:8px;}
+  .redeem-action{display:flex;gap:10px;justify-content:center;align-items:center;}
+  .redeem-action-btn{padding:8px 20px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:8px;color:#fff;font-family:Orbitron,monospace;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;opacity:0.4;transition:all 0.2s;}
+  .redeem-action-btn.ready{opacity:1;animation:pulseRed 2s infinite;}
+  .redeemed-total{font-size:11px;color:var(--textdim);font-family:Orbitron,monospace;}
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%;max-width:420px;z-index:1;}
+  .stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+  .sc-val{font-family:Orbitron,monospace;font-size:14px;color:var(--accent3);}
+  .sc-label{font-size:10px;color:var(--textdim);margin-top:3px;text-transform:uppercase;letter-spacing:1px;}
+  .milestones{width:100%;max-width:420px;z-index:1;}
+  .milestone-bar{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;}
+  .ms-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+  .ms-name{font-size:12px;font-weight:600;}
+  .ms-reward{font-size:10px;color:var(--gold);}
+  .ms-progress-track{height:5px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;}
+  .ms-progress-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 0.5s ease;}
+  .ms-pct{font-size:9px;color:var(--textdim);margin-top:3px;text-align:right;}
+  .prestige-display{display:flex;gap:6px;z-index:1;}
+  .prestige-star{font-size:20px;filter:grayscale(1);transition:filter 0.3s;}
+  .prestige-star.earned{filter:grayscale(0) drop-shadow(0 0 6px gold);}
+  .right-panel{background:var(--panel);border-left:1px solid var(--border);overflow-y:auto;padding:14px;}
+  .building-item{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:6px;cursor:pointer;transition:all 0.2s;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;position:relative;overflow:hidden;}
+  .building-item:hover:not(.locked){border-color:var(--accent);background:rgba(68,102,255,0.08);}
+  .building-item.locked{opacity:0.25;cursor:not-allowed;}
+  .building-item::before{content:&quot;&quot;;position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity 0.2s;}
+  .building-item:hover:not(.locked)::before{opacity:1;}
+  .bld-icon{font-size:24px;line-height:1;}
+  .bld-info{min-width:0;}
+  .bld-name{font-weight:600;font-size:12px;color:#ddd;}
+  .bld-owned{font-size:10px;color:var(--textdim);}
+  .bld-cps{font-size:10px;color:var(--accent3);}
+  .bld-right{text-align:right;}
+  .bld-cost{font-family:Orbitron,monospace;font-size:11px;color:var(--gold);}
+  .bld-count{font-family:Orbitron,monospace;font-size:20px;font-weight:700;color:var(--accent);min-width:28px;text-align:right;}
+  .float-num{position:fixed;pointer-events:none;font-family:Orbitron,monospace;font-size:16px;font-weight:700;color:var(--gold);text-shadow:0 0 10px rgba(255,200,0,0.8);animation:floatUp 1s ease-out forwards;z-index:9999;}
+  @keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:1;}100%{transform:translateY(-70px) scale(0.6);opacity:0;}}
+  .particle{position:fixed;pointer-events:none;width:5px;height:5px;border-radius:50%;animation:particleBurst 0.6s ease-out forwards;z-index:9998;}
+  @keyframes particleBurst{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0;}}
+  .notif{position:fixed;top:16px;right:16px;background:var(--bg2);border:1px solid var(--accent3);border-radius:10px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--accent3);box-shadow:var(--glow3);z-index:9000;animation:slideInOut 3s ease-out forwards;}
+  @keyframes slideInOut{0%{transform:translateX(120%);opacity:0;}10%{transform:translateX(0);opacity:1;}75%{transform:translateX(0);opacity:1;}100%{transform:translateX(120%);opacity:0;}}
+  .rebirth-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;align-items:center;justify-content:center;flex-direction:column;gap:24px;}
+  .rebirth-overlay.show{display:flex;}
+  .rebirth-modal{background:var(--bg2);border:1px solid var(--accent);border-radius:20px;padding:36px;max-width:440px;text-align:center;box-shadow:0 0 60px rgba(68,102,255,0.3);}
+  .rebirth-modal h2{font-family:Orbitron,monospace;font-size:24px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:14px;}
+  .rebirth-modal p{color:var(--text);line-height:1.7;margin-bottom:10px;}
+  .rebirth-modal .reward{font-family:Orbitron,monospace;font-size:22px;color:var(--gold);margin:14px 0;}
+  .modal-btns{display:flex;gap:14px;justify-content:center;margin-top:20px;}
+  .modal-btn{padding:10px 24px;border-radius:10px;border:none;cursor:pointer;font-family:Orbitron,monospace;font-size:12px;font-weight:700;transition:all 0.2s;}
+  .modal-btn.confirm{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow);}
+  .modal-btn.cancel{background:var(--bg3);color:var(--textdim);border:1px solid var(--border);}
+  .modal-btn:hover{transform:scale(1.04);}
+</style>
+</head>
+<body>
+<div class=&quot;rebirth-overlay&quot; id=&quot;rebirthOverlay&quot;>
+  <div class=&quot;rebirth-modal&quot;>
+    <h2>⬡ NEXUS REBIRTH ⬡</h2>
+    <p>You have gathered enough energy to collapse and rebirth this universe. Reset and gain permanent Nexus Shard bonuses!</p>
+    <div class=&quot;reward&quot; id=&quot;rebirthReward&quot;>+5% bonus</div>
+    <p style=&quot;font-size:12px;color:var(--textdim);&quot;>All buildings and upgrades reset. Shards and bonuses are permanent.</p>
+    <div class=&quot;modal-btns&quot;>
+      <button class=&quot;modal-btn cancel&quot; onclick=&quot;closeRebirth()&quot;>Cancel</button>
+      <button class=&quot;modal-btn confirm&quot; onclick=&quot;confirmRebirth()&quot;>Rebirth ⬡</button>
+    </div>
+  </div>
+</div>
+
+<div class=&quot;layout&quot;>
+  <header>
+    <h1>⬡ NEXUS ENERGY</h1>
+    <div class=&quot;header-stats&quot;>
+      <div class=&quot;stat-block&quot;><span class=&quot;stat-label&quot;>Total Earned</span><span class=&quot;stat-val&quot; id=&quot;hTotalEarned&quot;>0</span></div>
+      <div class=&quot;stat-block&quot;><span class=&quot;stat-label&quot;>Shards</span><span class=&quot;stat-val&quot; id=&quot;hStardust&quot;>0</span></div>
+      <div class=&quot;stat-block&quot;><span class=&quot;stat-label&quot;>Rebirths</span><span class=&quot;stat-val&quot; id=&quot;hRebirths&quot;>0</span></div>
+      <div class=&quot;stat-block&quot;><span class=&quot;stat-label&quot;>Messages</span><span class=&quot;stat-val&quot; id=&quot;hMessages&quot;>0</span></div>
+      <button class=&quot;rebirth-btn&quot; id=&quot;rebirthBtn&quot; onclick=&quot;openRebirth()&quot;>⬡ REBIRTH</button>
+      <button class=&quot;close-btn&quot; onclick=&quot;window.parent.postMessage({type:&amp;quot;closeNexusGame&amp;quot;},&amp;quot;*&amp;quot;)&quot;>&amp;#10005; CLOSE</button>
+    </div>
+  </header>
+
+  <div class=&quot;left-panel&quot;>
+    <div class=&quot;click-area&quot;>
+      <div class=&quot;orb-ring&quot;></div><div class=&quot;orb-ring&quot;></div><div class=&quot;orb-ring&quot;></div>
+      <div class=&quot;orb&quot; id=&quot;mainOrb&quot; onclick=&quot;handleClick(event)&quot;></div>
+    </div>
+    <div class=&quot;cpc-display&quot;>
+      <div class=&quot;label&quot;>Energy per Click</div>
+      <div class=&quot;val&quot; id=&quot;cpcDisplay&quot;>1</div>
+    </div>
+    <div class=&quot;upgrades-section&quot;>
+      <div class=&quot;section-title&quot;>Upgrades</div>
+      <div class=&quot;tabs&quot;>
+        <div class=&quot;tab active&quot; onclick=&quot;switchTab(&amp;quot;click&amp;quot;,this)&quot;>Click</div>
+        <div class=&quot;tab&quot; onclick=&quot;switchTab(&amp;quot;passive&amp;quot;,this)&quot;>Passive</div>
+        <div class=&quot;tab&quot; onclick=&quot;switchTab(&amp;quot;special&amp;quot;,this)&quot;>Special</div>
+      </div>
+      <div class=&quot;upgrades-grid&quot; id=&quot;upgradesGrid&quot;></div>
+    </div>
+  </div>
+
+  <div class=&quot;mid-panel&quot;>
+    <div class=&quot;main-currency&quot;>
+      <div class=&quot;currency-label&quot;>⬡ Nexus Energy</div>
+      <div class=&quot;currency-amount&quot; id=&quot;mainCurrency&quot;>0</div>
+      <div class=&quot;cps-amount&quot; id=&quot;cpsDisplay&quot;>0 / sec</div>
+    </div>
+    <div class=&quot;redeem-section&quot;>
+      <div class=&quot;redeem-info&quot;>Every 1 Billion energy = 1 Message · Redeemable below</div>
+      <div class=&quot;redeem-count&quot; id=&quot;redeemCount&quot;>0 messages available</div>
+      <div class=&quot;redeem-action&quot;>
+        <button class=&quot;redeem-action-btn&quot; id=&quot;redeemBtn&quot; onclick=&quot;redeemMessages()&quot;>⬡ REDEEM MESSAGES</button>
+        <div class=&quot;redeemed-total&quot; id=&quot;redeemedTotal&quot;>Total redeemed: 0</div>
+      </div>
+    </div>
+    <div class=&quot;prestige-display&quot; id=&quot;prestigeStars&quot;></div>
+    <div class=&quot;stats-grid&quot;>
+      <div class=&quot;stat-card&quot;><div class=&quot;sc-val&quot; id=&quot;scClicks&quot;>0</div><div class=&quot;sc-label&quot;>Clicks</div></div>
+      <div class=&quot;stat-card&quot;><div class=&quot;sc-val&quot; id=&quot;scBuildings&quot;>0</div><div class=&quot;sc-label&quot;>Buildings</div></div>
+      <div class=&quot;stat-card&quot;><div class=&quot;sc-val&quot; id=&quot;scUpgrades&quot;>0</div><div class=&quot;sc-label&quot;>Upgrades</div></div>
+    </div>
+    <div class=&quot;milestones&quot;>
+      <div class=&quot;section-title&quot;>Milestones</div>
+      <div id=&quot;milestonesList&quot;></div>
+    </div>
+  </div>
+
+  <div class=&quot;right-panel&quot;>
+    <div class=&quot;section-title&quot; style=&quot;margin-bottom:10px;&quot;>Buildings</div>
+    <div id=&quot;buildingsList&quot;></div>
+  </div>
+</div>
+
+<script>
+var fmt=function(n){if(n>=1e15)return(n/1e15).toFixed(2)+&quot;Q&quot;;if(n>=1e12)return(n/1e12).toFixed(2)+&quot;T&quot;;if(n>=1e9)return(n/1e9).toFixed(2)+&quot;B&quot;;if(n>=1e6)return(n/1e6).toFixed(2)+&quot;M&quot;;if(n>=1e3)return(n/1e3).toFixed(1)+&quot;K&quot;;return Math.floor(n).toString();};
+var BUILDINGS=[{id:&quot;solar&quot;,name:&quot;Solar Harvester&quot;,icon:&quot;☀️&quot;,baseCost:10,baseCps:0.1,desc:&quot;Collects solar energy&quot;},{id:&quot;crystal&quot;,name:&quot;Crystal Array&quot;,icon:&quot;💎&quot;,baseCost:80,baseCps:0.5,desc:&quot;Resonates frequencies&quot;},{id:&quot;drone&quot;,name:&quot;Nano Drone&quot;,icon:&quot;🤖&quot;,baseCost:500,baseCps:3,desc:&quot;Automated collector&quot;},{id:&quot;portal&quot;,name:&quot;Nexus Portal&quot;,icon:&quot;🌀&quot;,baseCost:3000,baseCps:15,desc:&quot;Draws cross-dimensional energy&quot;},{id:&quot;blackhole&quot;,name:&quot;Micro Black Hole&quot;,icon:&quot;🕳️&quot;,baseCost:15000,baseCps:80,desc:&quot;Converts mass to energy&quot;},{id:&quot;pulsar&quot;,name:&quot;Pulsar Beacon&quot;,icon:&quot;⚡&quot;,baseCost:80000,baseCps:350,desc:&quot;Neutron star pulses&quot;},{id:&quot;dyson&quot;,name:&quot;Dyson Sphere&quot;,icon:&quot;🔆&quot;,baseCost:400000,baseCps:1500,desc:&quot;Envelops a full star&quot;},{id:&quot;galaxy&quot;,name:&quot;Galaxy Farm&quot;,icon:&quot;🌌&quot;,baseCost:2000000,baseCps:8000,desc:&quot;Farms an entire galaxy&quot;},{id:&quot;nebula&quot;,name:&quot;Nebula Engine&quot;,icon:&quot;🌠&quot;,baseCost:10000000,baseCps:40000,desc:&quot;Converts nebulae to fuel&quot;},{id:&quot;bigbang&quot;,name:&quot;Big Bang Reactor&quot;,icon:&quot;💥&quot;,baseCost:100000000,baseCps:300000,desc:&quot;Harnesses creation&quot;},{id:&quot;cosmos&quot;,name:&quot;Cosmos Weaver&quot;,icon:&quot;✨&quot;,baseCost:1000000000,baseCps:2000000,desc:&quot;Reshapes universal constants&quot;},{id:&quot;void&quot;,name:&quot;Void Condenser&quot;,icon:&quot;🌑&quot;,baseCost:10000000000,baseCps:20000000,desc:&quot;Energy from nothingness&quot;}];
+var UPGRADES=[{id:&quot;c1&quot;,tab:&quot;click&quot;,name:&quot;Focused Beam&quot;,icon:&quot;🔦&quot;,cost:50,desc:&quot;Click x2&quot;,effect:function(){G.cpcMult*=2;},bought:false},{id:&quot;c2&quot;,tab:&quot;click&quot;,name:&quot;Charged Strike&quot;,icon:&quot;⚡&quot;,cost:300,desc:&quot;Click x3&quot;,effect:function(){G.cpcMult*=3;},bought:false},{id:&quot;c3&quot;,tab:&quot;click&quot;,name:&quot;Quantum Tap&quot;,icon:&quot;🔬&quot;,cost:2000,desc:&quot;Click x5&quot;,effect:function(){G.cpcMult*=5;},bought:false},{id:&quot;c4&quot;,tab:&quot;click&quot;,name:&quot;Photon Burst&quot;,icon:&quot;💫&quot;,cost:80000,desc:&quot;Click x8&quot;,effect:function(){G.cpcMult*=8;},bought:false},{id:&quot;c5&quot;,tab:&quot;click&quot;,name:&quot;Infinity Pulse&quot;,icon:&quot;♾️&quot;,cost:500000,desc:&quot;Click x10&quot;,effect:function(){G.cpcMult*=10;},bought:false},{id:&quot;c6&quot;,tab:&quot;click&quot;,name:&quot;Nexus Core&quot;,icon:&quot;⬡&quot;,cost:5000000,desc:&quot;Click x20&quot;,effect:function(){G.cpcMult*=20;},bought:false},{id:&quot;p1&quot;,tab:&quot;passive&quot;,name:&quot;Solar Boost&quot;,icon:&quot;🌤️&quot;,cost:200,desc:&quot;Harvesters x2&quot;,effect:function(){G.bldMult.solar=(G.bldMult.solar||1)*2;},bought:false},{id:&quot;p2&quot;,tab:&quot;passive&quot;,name:&quot;Crystal Tune&quot;,icon:&quot;✨&quot;,cost:1500,desc:&quot;Arrays x2&quot;,effect:function(){G.bldMult.crystal=(G.bldMult.crystal||1)*2;},bought:false},{id:&quot;p3&quot;,tab:&quot;passive&quot;,name:&quot;Drone AI&quot;,icon:&quot;🧠&quot;,cost:8000,desc:&quot;Drones x3&quot;,effect:function(){G.bldMult.drone=(G.bldMult.drone||1)*3;},bought:false},{id:&quot;p4&quot;,tab:&quot;passive&quot;,name:&quot;Portal Flux&quot;,icon:&quot;🌀&quot;,cost:40000,desc:&quot;Portals x2&quot;,effect:function(){G.bldMult.portal=(G.bldMult.portal||1)*2;},bought:false},{id:&quot;p5&quot;,tab:&quot;passive&quot;,name:&quot;Event Horizon&quot;,icon:&quot;🕳️&quot;,cost:200000,desc:&quot;Black Holes x2&quot;,effect:function(){G.bldMult.blackhole=(G.bldMult.blackhole||1)*2;},bought:false},{id:&quot;p6&quot;,tab:&quot;passive&quot;,name:&quot;Global Boost&quot;,icon:&quot;🌍&quot;,cost:5000000,desc:&quot;All buildings x2&quot;,effect:function(){G.globalCpsMult*=2;},bought:false},{id:&quot;p7&quot;,tab:&quot;passive&quot;,name:&quot;Cosmic Harmony&quot;,icon:&quot;🎵&quot;,cost:50000000,desc:&quot;All buildings x5&quot;,effect:function(){G.globalCpsMult*=5;},bought:false},{id:&quot;s1&quot;,tab:&quot;special&quot;,name:&quot;Lucky Star&quot;,icon:&quot;⭐&quot;,cost:100,desc:&quot;10% chance: 10x click&quot;,effect:function(){G.luckyChance+=0.10;},bought:false},{id:&quot;s2&quot;,tab:&quot;special&quot;,name:&quot;Crit Matrix&quot;,icon:&quot;💠&quot;,cost:2000,desc:&quot;Crits deal 5x&quot;,effect:function(){G.critMult=5;},bought:false},{id:&quot;s3&quot;,tab:&quot;special&quot;,name:&quot;Chain Link&quot;,icon:&quot;🔗&quot;,cost:20000,desc:&quot;Every 100 clicks: burst&quot;,effect:function(){G.chainActive=true;},bought:false},{id:&quot;s4&quot;,tab:&quot;special&quot;,name:&quot;Singularity&quot;,icon:&quot;🌟&quot;,cost:50000000,desc:&quot;All x3 permanently&quot;,effect:function(){G.globalCpsMult*=3;G.cpcMult*=3;},bought:false}];
+var MILESTONES=[{id:&quot;m1&quot;,name:&quot;First Signal&quot;,goal:function(n){return n.totalClicks>=10;},label:&quot;10 clicks&quot;,reward:&quot;x2 click power&quot;,apply:function(){G.cpcMult*=2;}},{id:&quot;m2&quot;,name:&quot;Energy Awakened&quot;,goal:function(n){return n.totalEarned>=1000;},label:&quot;1K energy&quot;,reward:&quot;+5 CPS&quot;,apply:function(){G.bonusCps+=5;}},{id:&quot;m3&quot;,name:&quot;Builder&quot;,goal:function(n){return n.totalBuildings>=10;},label:&quot;10 buildings&quot;,reward:&quot;x1.5 all CPS&quot;,apply:function(){G.globalCpsMult*=1.5;}},{id:&quot;m4&quot;,name:&quot;Nexus Hoarder&quot;,goal:function(n){return n.totalEarned>=1e6;},label:&quot;1M energy&quot;,reward:&quot;x2 click power&quot;,apply:function(){G.cpcMult*=2;}},{id:&quot;m5&quot;,name:&quot;Stellar Empire&quot;,goal:function(n){return n.totalBuildings>=50;},label:&quot;50 buildings&quot;,reward:&quot;x2 all CPS&quot;,apply:function(){G.globalCpsMult*=2;}},{id:&quot;m6&quot;,name:&quot;Galaxy Brain&quot;,goal:function(n){return n.totalEarned>=1e9;},label:&quot;1B energy&quot;,reward:&quot;+500 CPS&quot;,apply:function(){G.bonusCps+=500;}},{id:&quot;m7&quot;,name:&quot;Click Master&quot;,goal:function(n){return n.totalClicks>=10000;},label:&quot;10K clicks&quot;,reward:&quot;x5 click power&quot;,apply:function(){G.cpcMult*=5;}},{id:&quot;m8&quot;,name:&quot;Void Touched&quot;,goal:function(n){return n.totalEarned>=1e12;},label:&quot;1T energy&quot;,reward:&quot;x3 all production&quot;,apply:function(){G.globalCpsMult*=3;G.cpcMult*=3;}}];
+var G={energy:0,totalEarned:0,totalClicks:0,rebirths:0,stardust:0,stardustBonus:0,cpcMult:1,cpcBonus:0,globalCpsMult:1,bonusCps:0,bldMult:{},luckyChance:0,critMult:2,chainActive:false,hasteActive:false,voidMirror:false,hasteTimer:0,clickStreak:0,lastClickTime:0,milestonesCompleted:{},upgradesBought:{},totalRedeemed:0,redeemableSpent:0};
+var buildings={};BUILDINGS.forEach(function(b){buildings[b.id]={count:0,cps:b.baseCps,baseCost:b.baseCost,baseCps:b.baseCps};});
+function calcCps(){var cps=G.bonusCps;BUILDINGS.forEach(function(b){var m=(G.bldMult[b.id]||1)*G.globalCpsMult;cps+=buildings[b.id].count*b.baseCps*m;});cps*=(1+G.stardustBonus);return cps;}
+function calcCpc(){return Math.max(1,G.cpcMult*(1+G.stardustBonus)+G.cpcBonus);}
+function calcBldCost(id){var b=buildings[id];return Math.ceil(BUILDINGS.find(function(x){return x.id===id;}).baseCost*Math.pow(1.18,b.count));}
+function totalBuildings(){return BUILDINGS.reduce(function(s,b){return s+buildings[b.id].count;},0);}
+function calcRedeemable(){return Math.floor(G.totalEarned/1e9)-G.redeemableSpent;}
+function handleClick(e){
+  var cpc=calcCpc(),isCrit=false;
+  if(Math.random()<G.luckyChance){cpc*=G.critMult;isCrit=true;}
+  var now=Date.now();
+  if(G.chainActive&amp;&amp;now-G.lastClickTime<300){G.clickStreak++;if(G.clickStreak%100===0){var burst=cpc*50;G.energy+=burst;G.totalEarned+=burst;showNotif(&quot;⚡ Chain x100! +&quot;+fmt(burst)+&quot; energy!&quot;);}}else{G.clickStreak=0;}
+  G.lastClickTime=now;
+  G.energy+=cpc;G.totalEarned+=cpc;G.totalClicks++;
+  spawnFloat(e.clientX,e.clientY,isCrit?&quot;💥 &quot;+fmt(cpc):&quot;+&quot;+fmt(cpc),isCrit);
+  spawnParticles(e.clientX,e.clientY,isCrit?10:4);
+  if(isCrit){document.getElementById(&quot;mainOrb&quot;).style.boxShadow=&quot;0 0 60px rgba(0,212,255,0.9),0 0 100px rgba(68,102,255,0.4)&quot;;setTimeout(function(){document.getElementById(&quot;mainOrb&quot;).style.boxShadow=&quot;&quot;;},200);}
+  checkMilestones();updateRedeem();checkRebirth();
+}
+function spawnFloat(x,y,text,isCrit){var el=document.createElement(&quot;div&quot;);el.className=&quot;float-num&quot;;el.textContent=text;el.style.left=(x-20+Math.random()*40-20)+&quot;px&quot;;el.style.top=(y-20)+&quot;px&quot;;if(isCrit){el.style.color=&quot;#00d4ff&quot;;el.style.fontSize=&quot;22px&quot;;}document.body.appendChild(el);setTimeout(function(){el.remove();},1000);}
+function spawnParticles(x,y,count){var cols=[&quot;#4466ff&quot;,&quot;#00d4ff&quot;,&quot;#00ff88&quot;,&quot;#ffcc44&quot;,&quot;#9933ff&quot;];for(var i=0;i<count;i++){var p=document.createElement(&quot;div&quot;);p.className=&quot;particle&quot;;p.style.background=cols[Math.floor(Math.random()*cols.length)];p.style.left=x+&quot;px&quot;;p.style.top=y+&quot;px&quot;;var a=Math.random()*6.28,d=30+Math.random()*50;p.style.setProperty(&quot;--dx&quot;,Math.cos(a)*d+&quot;px&quot;);p.style.setProperty(&quot;--dy&quot;,Math.sin(a)*d+&quot;px&quot;);document.body.appendChild(p);setTimeout(function(){p.remove();},600);}}
+function buyBuilding(id){var cost=calcBldCost(id);if(G.energy<cost)return;G.energy-=cost;buildings[id].count++;renderBuildings();renderUpgrades();checkMilestones();checkRebirth();}
+function buyUpgrade(id){var upg=UPGRADES.find(function(u){return u.id===id;});if(!upg||upg.bought||G.energy<upg.cost)return;G.energy-=upg.cost;upg.bought=true;G.upgradesBought[id]=true;upg.effect();renderUpgrades();showNotif(&quot;⬡ &quot;+upg.name+&quot; unlocked!&quot;);}
+function showNotif(msg){var el=document.createElement(&quot;div&quot;);el.className=&quot;notif&quot;;el.textContent=msg;document.body.appendChild(el);setTimeout(function(){el.remove();},3000);}
+var activeTab=&quot;click&quot;;
+function switchTab(tab,el){activeTab=tab;document.querySelectorAll(&quot;.tab&quot;).forEach(function(t){t.classList.remove(&quot;active&quot;);});el.classList.add(&quot;active&quot;);renderUpgrades();}
+function renderUpgrades(){var grid=document.getElementById(&quot;upgradesGrid&quot;);var filtered=UPGRADES.filter(function(u){return u.tab===activeTab;});grid.innerHTML=filtered.map(function(u){var ca=G.energy>=u.cost;var cls=u.bought?&quot;upgrade-btn bought&quot;:(ca?&quot;upgrade-btn&quot;:&quot;upgrade-btn locked&quot;);var badge=u.bought?&quot;<div class=&quot;upg-tag&quot;>✓</div>&quot;:&quot;&quot;;return &quot;<div class=&quot;&quot;+cls+&quot;&quot; data-upg=&quot;&quot;+u.id+&quot;&quot;>&quot;+badge+&quot;<div class=&quot;upg-icon&quot;>&quot;+u.icon+&quot;</div><div class=&quot;upg-name&quot;>&quot;+u.name+&quot;</div>&quot;+(u.bought?&quot;&quot;:&quot;<div class=&quot;upg-cost&quot;>&quot;+fmt(u.cost)+&quot;</div>&quot;)+&quot;<div class=&quot;upg-desc&quot;>&quot;+u.desc+&quot;</div></div>&quot;;}).join(&quot;&quot;);}
+function renderBuildings(){var list=document.getElementById(&quot;buildingsList&quot;);list.innerHTML=BUILDINGS.map(function(b){var cost=calcBldCost(b.id);var bld=buildings[b.id];var ca=G.energy>=cost;var locked=!ca&amp;&amp;bld.count===0&amp;&amp;G.energy<b.baseCost*0.5;var m=(G.bldMult[b.id]||1)*G.globalCpsMult*(1+G.stardustBonus);var cpsEach=(b.baseCps*m).toFixed(1);return &quot;<div class=&quot;building-item&quot;+(locked?&quot; locked&quot;:&quot;&quot;)+&quot;&quot; data-bld=&quot;&quot;+b.id+&quot;&quot;><div class=&quot;bld-icon&quot;>&quot;+b.icon+&quot;</div><div class=&quot;bld-info&quot;><div class=&quot;bld-name&quot;>&quot;+b.name+&quot;</div><div class=&quot;bld-owned&quot;>&quot;+b.desc+&quot;</div><div class=&quot;bld-cps&quot;>&quot;+cpsEach+&quot;/s each</div></div><div class=&quot;bld-right&quot;><div class=&quot;bld-count&quot;>&quot;+bld.count+&quot;</div><div class=&quot;bld-cost&quot;>&quot;+fmt(cost)+&quot;</div></div></div>&quot;;}).join(&quot;&quot;);}
+document.addEventListener(&quot;click&quot;,function(e){var bldEl=e.target.closest(&quot;[data-bld]&quot;);if(bldEl){buyBuilding(bldEl.dataset.bld);return;}var upgEl=e.target.closest(&quot;[data-upg]&quot;);if(upgEl){buyUpgrade(upgEl.dataset.upg);return;}});
+function renderMilestones(){var list=document.getElementById(&quot;milestonesList&quot;);list.innerHTML=MILESTONES.map(function(m){var done=!!G.milestonesCompleted[m.id];var pct=0;if(!done){if(m.id===&quot;m1&quot;||m.id===&quot;m7&quot;)pct=Math.min(1,G.totalClicks/(m.id===&quot;m1&quot;?10:10000));else if(m.id===&quot;m3&quot;||m.id===&quot;m5&quot;)pct=Math.min(1,totalBuildings()/(m.id===&quot;m3&quot;?10:50));else{var goals={m2:1000,m4:1e6,m6:1e9,m8:1e12};pct=Math.min(1,G.totalEarned/(goals[m.id]||1));}}else pct=1;return &quot;<div class=&quot;milestone-bar&quot; style=&quot;&quot;+(done?&quot;opacity:0.5;border-color:var(--accent3);&quot;:&quot;&quot;)+&quot;&quot;>&quot;+&quot;<div class=&quot;ms-header&quot;><span class=&quot;ms-name&quot;>&quot;+(done?&quot;✓ &quot;:&quot;&quot;)+m.name+&quot;</span><span class=&quot;ms-reward&quot;>&quot;+m.reward+&quot;</span></div>&quot;+&quot;<div class=&quot;ms-progress-track&quot;><div class=&quot;ms-progress-fill&quot; style=&quot;width:&quot;+(pct*100).toFixed(1)+&quot;%&quot;></div></div>&quot;+&quot;<div class=&quot;ms-pct&quot;>&quot;+m.label+&quot; — &quot;+(pct*100).toFixed(0)+&quot;%</div></div>&quot;;}).join(&quot;&quot;);}
+function checkMilestones(){MILESTONES.forEach(function(m){if(!G.milestonesCompleted[m.id]){var state={totalClicks:G.totalClicks,totalEarned:G.totalEarned,totalBuildings:totalBuildings()};if(m.goal(state)){G.milestonesCompleted[m.id]=true;m.apply();showNotif(&quot;🏆 &quot;+m.name+&quot;! &quot;+m.reward);}}});}
+function updateRedeem(){var avail=calcRedeemable();var redeemEl=document.getElementById(&quot;redeemCount&quot;);var btn=document.getElementById(&quot;redeemBtn&quot;);if(redeemEl)redeemEl.textContent=avail+&quot; message&quot;+(avail!==1?&quot;s&quot;:&quot;&quot;)+&quot; available&quot;;if(btn){btn.classList.toggle(&quot;ready&quot;,avail>0);btn.style.opacity=avail>0?&quot;1&quot;:&quot;0.4&quot;;}}
+function redeemMessages(){var avail=calcRedeemable();if(avail<=0)return;G.redeemableSpent+=avail;G.totalRedeemed+=avail;document.getElementById(&quot;redeemedTotal&quot;).textContent=&quot;Total redeemed: &quot;+G.totalRedeemed;updateRedeem();window.parent.postMessage({type:&quot;nexusGameRedeem&quot;,amount:avail},&quot;*&quot;);showNotif(&quot;⬡ Redeemed &quot;+avail+&quot; message&quot;+(avail!==1?&quot;s&quot;:&quot;&quot;)+&quot;! Check NEXUS!&quot;);}
+function calcRebirthStardust(){return Math.floor(Math.pow(G.totalEarned/1e6,0.5));}
+function checkRebirth(){var sd=calcRebirthStardust();var btn=document.getElementById(&quot;rebirthBtn&quot;);if(btn)btn.classList.toggle(&quot;ready&quot;,sd>=1);}
+function openRebirth(){var sd=calcRebirthStardust();document.getElementById(&quot;rebirthReward&quot;).textContent=&quot;+&quot;+sd+&quot; Shards (&quot;+(sd*5)+&quot;% bonus)&quot;;document.getElementById(&quot;rebirthOverlay&quot;).classList.add(&quot;show&quot;);}
+function closeRebirth(){document.getElementById(&quot;rebirthOverlay&quot;).classList.remove(&quot;show&quot;);}
+function confirmRebirth(){var sd=calcRebirthStardust();G.stardust+=sd;G.stardustBonus=G.stardust*0.05;G.rebirths++;G.energy=0;G.totalEarned=0;G.totalClicks=0;G.cpcMult=1;G.cpcBonus=0;G.globalCpsMult=1;G.bonusCps=0;G.bldMult={};G.luckyChance=0;G.critMult=2;G.chainActive=false;G.voidMirror=false;G.hasteTimer=0;G.clickStreak=0;G.milestonesCompleted={};G.upgradesBought={};G.redeemableSpent=0;BUILDINGS.forEach(function(b){buildings[b.id].count=0;});UPGRADES.forEach(function(u){u.bought=false;});closeRebirth();renderAll();showNotif(&quot;⬡ Rebirth! +&quot;+sd+&quot; Shards! Bonus: &quot;+(G.stardust*5)+&quot;%&quot;);}
+function renderPrestige(){var el=document.getElementById(&quot;prestigeStars&quot;);var stars=&quot;&quot;;for(var i=0;i<Math.max(5,G.rebirths+1);i++){stars+=&quot;<div class=&quot;prestige-star&quot;+(i<G.rebirths?&quot; earned&quot;:&quot;&quot;)+&quot;&quot; style=&quot;font-size:18px;&quot;>⭐</div>&quot;;}el.innerHTML=stars;}
+function renderStats(){document.getElementById(&quot;scClicks&quot;).textContent=fmt(G.totalClicks);document.getElementById(&quot;scBuildings&quot;).textContent=fmt(totalBuildings());document.getElementById(&quot;scUpgrades&quot;).textContent=Object.keys(G.upgradesBought).length;document.getElementById(&quot;hTotalEarned&quot;).textContent=fmt(G.totalEarned);document.getElementById(&quot;hStardust&quot;).textContent=G.stardust;document.getElementById(&quot;hRebirths&quot;).textContent=G.rebirths;document.getElementById(&quot;hMessages&quot;).textContent=G.totalRedeemed;}
+function renderAll(){renderBuildings();renderUpgrades();renderMilestones();renderPrestige();renderStats();}
+setInterval(function(){var cps=calcCps();var tick=cps/20;G.energy+=tick;G.totalEarned+=tick;if(G.hasteTimer>0)G.hasteTimer-=0.05;document.getElementById(&quot;mainCurrency&quot;).textContent=fmt(G.energy);document.getElementById(&quot;cpsDisplay&quot;).textContent=fmt(cps)+&quot; / sec&quot;;document.getElementById(&quot;cpcDisplay&quot;).textContent=fmt(calcCpc());checkMilestones();updateRedeem();checkRebirth();renderStats();renderMilestones();renderBuildings();},50);
+renderAll();
+&lt;/script&gt;
+</body>
+</html>"
+    style="width:100%;height:100%;border:none;display:block;"
+    scrolling="no"
+    sandbox="allow-scripts allow-same-origin">
+  </iframe>
 </div>
 
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
