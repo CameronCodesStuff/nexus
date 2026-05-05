@@ -7275,7 +7275,7 @@ function hourlyRemaining(){
  var now=Date.now();
  // Reset hourly bucket if over 1 hour old
  if(!G.hourTs||now-G.hourTs>=3600000){G.hourTs=now;G.hourRdm=0;}
- return Math.max(0,1000-G.hourRdm);
+ return Math.max(0,100-G.hourRdm);
 }
 
 document.getElementById('orb').addEventListener('click',function(e){
@@ -7382,19 +7382,29 @@ function updRdm(){
    var ms=3600000-(Date.now()-(G.hourTs||Date.now()));
    rc.textContent='Hourly limit reached (resets in '+Math.ceil(ms/60000)+'m)';
   } else {
-   rc.textContent=a+' available · '+hr+'/1000 left this hour';
+   rc.textContent=a+' available · '+hr+'/100 left this hour';
   }
  }
  var rb=document.getElementById('rdm-btn');if(rb)rb.classList.toggle('on',canRdm>0);
 }
 
 function doRedeem(){
- var a=rdmAvail();if(a<=0)return;
- G.rdmSpent+=a;G.totalRdm+=a;
+ // Enforce hourly cap of 100 messages
+ var now=Date.now();
+ if(!G.hourTs||now-G.hourTs>=3600000){G.hourTs=now;G.hourRdm=0;}
+ var hourLeft=Math.max(0,100-G.hourRdm);
+ if(hourLeft<=0){
+  var mins=Math.ceil((3600000-(now-G.hourTs))/60000);
+  notif('Hourly limit! Resets in '+mins+'m');return;
+ }
+ var avail=rdmAvail();
+ if(avail<=0){notif('Nothing to redeem yet!');return;}
+ var a=Math.min(avail,hourLeft);
+ G.rdmSpent+=a;G.totalRdm+=a;G.hourRdm+=a;
  var rt=document.getElementById('rdmT');if(rt)rt.textContent='Total redeemed: '+G.totalRdm;
  updRdm();
  pm({type:'nexusGameRedeem',amount:a});
- notif('Redeemed '+a+' message'+(a!==1?'s':'')+'!');
+ notif('Redeemed '+a+' msg'+(a!==1?'s':'')+' ('+Math.max(0,100-G.hourRdm)+' left this hour)');
  saveState();
 }
 
@@ -7440,10 +7450,10 @@ setInterval(function(){
 
 function loadState(){
  try{
-  var raw=localStorage.getItem('nexus_energy_save');
+  var raw=localStorage.getItem('nexus_energy_save4');
   if(!raw)return;
   var s=JSON.parse(raw);
-  if(!s||s.v!==3)return;
+  if(!s||s.v!==4)return;
   G.en=s.en||0;G.total=s.total||0;G.clicks=s.clicks||0;
   G.cm=s.cm||1;G.gcm=s.gcm||1;G.bps=s.bps||0;
   G.bm=s.bm||{};G.lc=s.lc||0;G.critm=s.critm||2;
@@ -7463,11 +7473,11 @@ function saveState(){
   en:G.en,total:G.total,clicks:G.clicks,hourTs:G.hourTs||0,hourRdm:G.hourRdm||0,
   cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
   chain:G.chain,msd:G.msd,ub:G.ub,totalRdm:G.totalRdm,rdmSpent:G.rdmSpent,
-  blds:bldState,upgs:upgState,v:3
+  blds:bldState,upgs:upgState,v:4
  };
- try{localStorage.setItem('nexus_energy_save',JSON.stringify(state));}catch(err){}
+ try{localStorage.setItem('nexus_energy_save4',JSON.stringify(state));}catch(err){}
  // Also notify parent to update Firestore leaderboard
- pm({type:'nexusSave',v:3,state:state});
+ pm({type:'nexusSave',v:4,state:state});
 }
 
 // Save every 30 seconds and on redeem
