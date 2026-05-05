@@ -6617,20 +6617,17 @@ let _flapInputCooldown=false, _flapScreenAnim=0, _flapEarned=0;
 let _flapActive=false;
 
 function flapInit(){
-  const cv=document.getElementById('flap-canvas');
-  if(!cv||cv.width===0){
-    // Canvas not ready yet, retry
-    setTimeout(flapInit,80);return;
-  }
   if(_flapRaf){cancelAnimationFrame(_flapRaf);_flapRaf=null;}
   _flapActive=true;
   _flapEarned=0;
+  _flapState='idle';
+  _flapScreenAnim=0;
   const earnedEl=document.getElementById('flap-earned');
   if(earnedEl) earnedEl.textContent='+0';
-  flapInitStars(cv.width,cv.height);
+  // Init stars with fixed size since canvas attrs are always 360x540
+  if(!_flapStars||!_flapStars.length) flapInitStars(360,540);
   flapReset();
-  _flapState='idle';_flapScreenAnim=0;
-  // Wire controls — use named handler so we don't stack duplicate listeners
+  // Wire click on container
   const container=document.getElementById('flap-container');
   if(container&&!container._flapWired){
     container._flapWired=true;
@@ -6639,10 +6636,8 @@ function flapInit(){
   }
   document.removeEventListener('keydown',_flapKeyHandler);
   document.addEventListener('keydown',_flapKeyHandler);
-  // Ensure Orbitron font is loaded before starting loop
-  document.fonts.load("900 16px Orbitron").catch(()=>{}).finally(()=>{
-    _flapLoop();
-  });
+  // Start loop directly - no font waiting
+  _flapLoop();
 }
 
 function flapStop(){
@@ -6774,6 +6769,7 @@ function flapDrawBg(ctx,W,H){
   const bg=ctx.createLinearGradient(0,0,0,H);
   bg.addColorStop(0,'#020208');bg.addColorStop(0.5,'#050515');bg.addColorStop(1,'#080510');
   ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  if(!_flapStars) return;
   _flapStars.forEach(s=>{
     s.tw+=s.tws;
     const alpha=0.4+0.6*Math.abs(Math.sin(s.tw));
@@ -6969,6 +6965,7 @@ function _flapLoop(){
   if(!_flapActive) return;
   const cv=document.getElementById('flap-canvas');
   if(!cv){_flapActive=false;return;}
+  try{
   const ctx2=cv.getContext('2d');
   const W=cv.width,H=cv.height;
   ctx2.clearRect(0,0,W,H);
@@ -6982,6 +6979,7 @@ function _flapLoop(){
   if(!_flapBird.alive&&_flapBird._df!==undefined) flapDrawDeathFlash(ctx2,W,H);
   if(_flapState==='idle') flapDrawIdle(ctx2,W,H);
   if(_flapState==='dead') flapDrawDead(ctx2,W,H);
+  }catch(e){console.error('FlapLoop error:',e);_flapActive=false;return;}
   _flapRaf=requestAnimationFrame(_flapLoop);
 }
 
