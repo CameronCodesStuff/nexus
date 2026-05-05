@@ -6387,22 +6387,66 @@ async function renderLeaderboard(tab){
 const TG_WORDS=[
   "the","be","to","of","and","a","in","that","have","it","for","not","on","with",
   "he","as","you","do","at","this","but","his","by","from","they","we","say","her",
-  "she","or","an","will","my","one","all","would","there","their","what","so","up",
-  "out","if","about","who","get","which","go","me","when","make","can","like","time",
-  "no","just","him","know","take","people","into","year","your","good","some","could",
-  "them","see","other","than","then","now","look","only","come","its","over","think",
-  "also","back","after","use","two","how","our","work","first","well","way","even",
-  "new","want","because","any","these","give","day","most","us","great","between","need",
-  "large","often","hand","high","place","hold","turn","again","off","always","those","both",
-  "open","seem","together","next","white","begin","got","walk","might","carry","mile","night",
-  "river","stand","learn","plant","cover","food","sun","four","thought","city","across","once",
-  "write","heard","stop","without","second","later","idea","enough","eat","face","watch","far",
-  "real","almost","let","above","sometimes","mountain","cut","young","talk","soon","list","song",
-  "body","music","color","form","several","already","road","near","true","table","remember","tree",
-  "space","door","sure","short","wind","question","fish","area","mark","dog","horse","problem",
-  "room","since","ever","piece","friends","easy","order","map","break","voice","power","town",
-  "drive","clear","force","light","deep","free","kind","long","hard","life","part","play",
-  "right","small","world","very","still","should","home","around","help","line","move","set",
+  "she","or","an","will","my","one","all","would","there","their","what","so",
+  "up","out","if","about","who","get","which","go","me","when","make","can","like",
+  "time","no","just","him","know","take","people","into","year","your","good","some",
+  "could","them","see","other","than","then","now","look","only","come","its","over",
+  "think","also","back","after","use","two","how","our","work","first","well","way",
+  "even","new","want","because","any","these","give","day","most","us","great","between",
+  "need","large","often","hand","high","place","hold","turn","without","follow","act",
+  "ask","men","change","went","light","kind","off","play","spell","air","away","animal",
+  "house","point","page","letter","mother","answer","found","study","still","learn",
+  "plant","cover","food","sun","four","between","state","keep","eye","never","last",
+  "let","thought","city","tree","cross","farm","hard","start","might","story","saw",
+  "far","sea","draw","left","late","run","while","press","close","night","real","life",
+  "few","north","open","seem","together","next","white","children","begin","got","walk",
+  "example","ease","paper","group","always","music","those","both","mark","book","carry",
+  "took","science","eat","room","friend","began","idea","fish","mountain","stop","once",
+  "base","hear","horse","cut","sure","watch","color","face","wood","main","enough",
+  "plain","girl","usual","young","ready","above","ever","red","list","though","feel",
+  "talk","bird","soon","body","dog","family","direct","pose","leave","song","measure",
+  "door","product","black","short","numeral","class","wind","question","happen","complete",
+  "ship","area","half","rock","order","fire","south","problem","piece","told","knew",
+  "pass","since","top","whole","king","space","heard","best","hour","better","true",
+  "during","hundred","five","remember","step","early","hold","west","ground","interest",
+  "reach","fast","verb","sing","listen","six","table","travel","less","morning","ten",
+  "simple","several","vowel","toward","power","town","fine","drive","stood","contain",
+  "front","teach","week","final","gave","green","oh","quick","develop","ocean","warm",
+  "free","minute","strong","special","behind","clear","tail","produce","fact","street",
+  "inch","multiply","nothing","course","stay","wheel","full","force","blue","object",
+  "decide","surface","deep","moon","island","foot","system","busy","test","record",
+  "boat","common","gold","possible","plane","stead","dry","wonder","laugh","thousand",
+  "ran","check","game","shape","equate","miss","brought","heat","snow","tire","bring",
+  "yes","distant","fill","east","paint","language","among","grand","ball","yet","wave",
+  "drop","heart","am","present","heavy","dance","engine","position","arm","wide","sail",
+  "material","size","vary","settle","speak","weight","general","ice","matter","circle",
+  "pair","include","divide","syllable","felt","perhaps","pick","sudden","count","square",
+  "reason","length","represent","art","subject","region","energy","hunt","probable",
+  "bed","brother","egg","ride","cell","believe","fraction","forest","sit","race","window",
+  "store","summer","train","sleep","prove","lone","leg","exercise","wall","catch","mount",
+  "wish","sky","board","joy","winter","sat","written","wild","instrument","kept","glass",
+  "grass","cow","job","edge","sign","visit","past","soft","fun","bright","gas","weather",
+  "month","million","bear","finish","happy","hope","flower","clothe","strange","gone",
+  "trade","melody","trip","office","receive","row","mouth","exact","symbol","die","least",
+  "trouble","shout","except","wrote","seed","tone","join","suggest","clean","break",
+  "lady","yard","rise","bad","blow","oil","blood","touch","grew","cent","mix","team",
+  "wire","cost","lost","brown","wear","garden","equal","sent","choose","fell","fit",
+  "flow","fair","bank","collect","save","control","decimal","gentle","woman","captain",
+  "practice","separate","difficult","doctor","please","protect","noon","whose","locate",
+  "ring","character","insect","caught","period","indicate","radio","spoke","atom","human",
+  "history","effect","electric","expect","crop","modern","element","hit","student","corner",
+  "party","supply","bone","rail","imagine","provide","agree","thus","capital","chair",
+  "danger","fruit","rich","thick","soldier","process","operate","guess","necessary",
+  "sharp","wing","create","neighbor","wash","bat","rather","crowd","corn","compare",
+  "poem","string","bell","depend","meat","rub","tube","famous","dollar","stream","fear",
+  "sight","thin","triangle","planet","hurry","chief","colony","clock","mine","tie","enter",
+  "major","fresh","search","send","yellow","gun","allow","print","dead","spot","desert",
+  "suit","current","lift","rose","continue","block","chart","hat","sell","success","company",
+  "subtract","event","particular","deal","swim","term","opposite","wife","shoe","shoulder",
+  "spread","arrange","camp","invent","cotton","born","determine","quart","nine","truck",
+  "noise","level","chance","gather","shop","stretch","throw","shine","property","column",
+  "molecule","select","wrong","gray","repeat","require","broad","prepare","salt","nose",
+  "plural","anger","claim","tone","nut","please","wonder","shell","knew","forest","probably"
 ];
 
 let tgWords=[], tgTyped=[], tgWordIdx=0, tgLetterIdx=0;
@@ -6455,7 +6499,11 @@ function tgRender(){
   const el=document.getElementById('tg-words');
   if(!el) return;
   el.innerHTML='';
-  tgWords.forEach((word,wi)=>{
+  // Only render a window of words around current position for performance
+  const winStart=Math.max(0,tgWordIdx-10);
+  const winEnd=Math.min(tgWords.length,tgWordIdx+80);
+  tgWords.slice(winStart,winEnd).forEach((word,i)=>{
+    const wi=winStart+i;
     const wEl=document.createElement('span');
     wEl.dataset.wi=wi;
     wEl.style.cssText='display:inline-flex;position:relative;';
@@ -6508,9 +6556,9 @@ function tgOnInput(){
       document.getElementById('tg-earned').textContent='+'+tgEarned;
     }
     tgWordIdx++;inp.value='';
-    if(tgWordIdx>=tgWords.length-40){
-      tgWords=tgWords.concat(tgGenWords(80));
-      tgTyped=tgTyped.concat(Array(80).fill(''));
+    if(tgWordIdx>=tgWords.length-80){
+      tgWords=tgWords.concat(tgGenWords(150));
+      tgTyped=tgTyped.concat(Array(150).fill(''));
     }
     tgUpdateStats();tgRender();return;
   }
@@ -6535,7 +6583,7 @@ function tgKeyDown(e){
     const correct=val===tgWords[tgWordIdx];
     if(correct){tgCorrectWords++;tgEarned++;document.getElementById('tg-earned').textContent='+'+tgEarned;}
     tgWordIdx++;inp.value='';
-    if(tgWordIdx>=tgWords.length-20){tgWords=tgWords.concat(tgGenWords(40));tgTyped=tgTyped.concat(Array(40).fill(''));}
+    if(tgWordIdx>=tgWords.length-80){tgWords=tgWords.concat(tgGenWords(150));tgTyped=tgTyped.concat(Array(150).fill(''));}
     tgUpdateStats();tgRender();
     return;
   }
@@ -6949,6 +6997,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
 
     <!-- Mode buttons -->
     <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button class="tg-mode-btn" data-secs="15" onclick="tgSetMode(15)">15s</button>
       <button class="tg-mode-btn" data-secs="30" onclick="tgSetMode(30)">30s</button>
       <button class="tg-mode-btn active" data-secs="60" onclick="tgSetMode(60)">60s</button>
       <button class="tg-mode-btn" data-secs="120" onclick="tgSetMode(120)">120s</button>
