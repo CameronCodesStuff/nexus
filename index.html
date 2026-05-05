@@ -973,6 +973,7 @@
       <div class="lb-tab active" id="lb-tab-msgs" onclick="N.lbTab('msgs')">MESSAGES</div>
       <div class="lb-tab" id="lb-tab-time" onclick="N.lbTab('time')">TIME ON SITE</div>
       <div class="lb-tab" id="lb-tab-energy" onclick="N.lbTab('energy')">NEXUS ENERGY</div>
+      <div class="lb-tab" id="lb-tab-flap" onclick="N.lbTab('flap')">NEXUS FLAP</div>
     </div>
     <div id="lb-content"></div>
   </div>
@@ -6245,6 +6246,7 @@ function lbTab(tab){
   document.getElementById('lb-tab-msgs')?.classList.toggle('active',tab==='msgs');
   document.getElementById('lb-tab-time')?.classList.toggle('active',tab==='time');
   document.getElementById('lb-tab-energy')?.classList.toggle('active',tab==='energy');
+  document.getElementById('lb-tab-flap')?.classList.toggle('active',tab==='flap');
   renderLeaderboard(tab);
 }
 
@@ -6260,8 +6262,10 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.msgCount||0)>0).sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).slice(0,20);
     } else if(tab==='time'){
       users=users.filter(u=>(u.minutesOnSite||0)>0).sort((a,b)=>(b.minutesOnSite||0)-(a.minutesOnSite||0)).slice(0,20);
-    } else {
+    } else if(tab==='energy'){
       users=users.filter(u=>(u.nexusEnergy||0)>0).sort((a,b)=>(b.nexusEnergy||0)-(a.nexusEnergy||0)).slice(0,20);
+    } else {
+      users=users.filter(u=>(u.flapBest||0)>0).sort((a,b)=>(b.flapBest||0)-(a.flapBest||0)).slice(0,20);
     }
     if(!users.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No data yet.</div>';return;}
     el.innerHTML='';
@@ -6283,9 +6287,11 @@ async function renderLeaderboard(tab){
       } else if(tab==='time'){
         const mins=u.minutesOnSite||0;
         statVal=mins;statLabel=fmtTime(mins)+' on site';
-      } else {
+      } else if(tab==='energy'){
         const ne=u.nexusEnergy||0;
         statVal=ne;statLabel=fmtEnergy(ne)+' energy';
+      } else {
+        statVal=u.flapBest||0;statLabel=statVal+' points';
       }
       row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
       row.appendChild(avEl);
@@ -6306,6 +6312,11 @@ async function renderLeaderboard(tab){
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#4466ff;letter-spacing:1px;';
         badge.textContent='⬡ '+fmtEnergy(ne);
+        row.appendChild(badge);
+      } else if(tab==='flap'){
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#00d4ff;letter-spacing:1px;';
+        badge.textContent='🐦 '+(u.flapBest||0);
         row.appendChild(badge);
       }
       el.appendChild(row);
@@ -6659,19 +6670,30 @@ function closeFlapGame(){
 
 // Listen for score messages from the iframe
 let _flapLastSaved=0;
+let _flapSessionBest=0;
 window.addEventListener('message',async function(e){
   if(!e.data||e.data.type!=='flapScore') return;
   const totalEarned=e.data.earned||0;
-  const delta=totalEarned-_flapLastSaved; // only save new points
+  const delta=totalEarned-_flapLastSaved;
   if(delta<=0) return;
   _flapLastSaved=totalEarned;
   _flapEarnedTotal=totalEarned;
   const el=document.getElementById('flap-earned');
   if(el) el.textContent='+'+totalEarned;
+  // Track flap score (score = earned/2 since each point = +2 msgs)
+  const flapScore=Math.floor(totalEarned/2);
+  if(flapScore>_flapSessionBest) _flapSessionBest=flapScore;
   if(cu&&cud){
     try{
       const newCount=(cud.msgCount||0)+delta;
-      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+      const updates={msgCount:newCount};
+      // Save highscore if beaten
+      if(flapScore>(cud.flapBest||0)){
+        updates.flapBest=flapScore;
+        cud={...cud,flapBest:flapScore};
+        uCache[cu.uid]={...uCache[cu.uid],flapBest:flapScore};
+      }
+      await updateDoc(doc(db,'users',cu.uid),updates);
       cud={...cud,msgCount:newCount};
       uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
       renderProfile();
@@ -7101,8 +7123,8 @@ html,body{width:100%;height:100%;background:#050508;color:#c8c8e8;font-family:mo
 .upg:hover:not(.bought):not(.locked){border-color:#4466ff}
 .upg.bought{border-color:#00ff88;opacity:0.6;cursor:default}
 .upg.locked{opacity:0.25;cursor:not-allowed}
-.upg.affordable{border-color:rgba(0,255,136,0.6);box-shadow:0 0 6px rgba(0,255,136,0.2)}
-.upg.affordable .uc{color:#00ff88}
+.upg.affordable{border-color:rgba(0,255,136,0.8);box-shadow:0 0 8px rgba(0,255,136,0.3);background:rgba(0,255,136,0.04)}
+.upg.affordable .uc{color:#00ff88;font-weight:bold}
 .upg .ui{font-size:14px}
 .upg .un{font-size:9px;font-weight:bold;color:#ddd;margin-top:2px}
 .upg .uc{font-size:8px;color:#ffcc44;margin-top:1px}
@@ -7124,8 +7146,8 @@ html,body{width:100%;height:100%;background:#050508;color:#c8c8e8;font-family:mo
 .bld{background:#0d0d18;border:1px solid rgba(68,102,255,0.2);border-radius:8px;padding:8px;margin-bottom:5px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:6px}
 .bld:hover:not(.locked){border-color:#4466ff;background:rgba(68,102,255,0.06)}
 .bld.locked{opacity:0.35;cursor:not-allowed}
-.bld.affordable{border-color:rgba(0,255,136,0.6);box-shadow:0 0 8px rgba(0,255,136,0.2)}
-.bld.affordable .bc{color:#00ff88}
+.bld.affordable{border-color:rgba(0,255,136,0.8);box-shadow:0 0 10px rgba(0,255,136,0.3);background:rgba(0,255,136,0.04)}
+.bld.affordable .bc{color:#00ff88;font-weight:bold}
 .bi{font-size:20px;flex-shrink:0}
 .bn{font-size:10px;font-weight:bold;color:#ddd}
 .bd{font-size:8px;color:#5a5a7a}
@@ -7304,10 +7326,9 @@ function rBlds(){
  var l=document.getElementById('blist');l.innerHTML='';
  BLDS.forEach(function(b){
   var c=bco(b.id),cnt=blds[b.id].cnt,ca=G.en>=c;
-  var locked=!ca&amp;&amp;cnt===0&amp;&amp;G.en<b.bc*0.5;
   var m=(G.bm[b.id]||1)*G.gcm*(1+G.sb);
   var d=document.createElement('div');
-  d.className='bld'+(locked?' locked':ca?' affordable':'');
+  d.className='bld'+(!ca?' locked':' affordable');
   d.setAttribute('data-bld',b.id);
   d.innerHTML='<div class=&quot;bi&quot;>'+b.i+'</div><div><div class=&quot;bn&quot;>'+b.n+'</div><div class=&quot;bd&quot;>'+(b.bps*m).toFixed(1)+'/s</div><div class=&quot;bc&quot;>'+fmt(c)+'</div></div><div class=&quot;bcount&quot;>'+cnt+'</div>';
   l.appendChild(d);
@@ -7360,7 +7381,7 @@ function updBldDisplay(){
   var locked=!ca;
   var el=document.querySelector('[data-bld=&quot;'+b.id+'&quot;]');
   if(!el)return;
-  el.className='bld'+(locked?' locked':ca?' affordable':'');
+  el.className='bld'+(!ca?' locked':' affordable');
   var cntEl=el.querySelector('.bcount');if(cntEl)cntEl.textContent=cnt;
   var costEl=el.querySelector('.bc');if(costEl)costEl.textContent=fmt(c);
  });
