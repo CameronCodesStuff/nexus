@@ -1962,16 +1962,7 @@ async function enterApp(){
   }
   applyMobileMode(mobileMode);
   checkAnnouncement();
-  // Reset nexus energy score to 0 on login (new balance patch)
-  try{
-    const _ne=cud?.nexusEnergy||0;
-    if(_ne>0){
-      await updateDoc(doc(db,'users',cu.uid),{nexusEnergy:0});
-      cud={...cud,nexusEnergy:0};
-      uCache[cu.uid]={...uCache[cu.uid],nexusEnergy:0};
-    }
-  }catch{}
-  // save preserved across logins
+  // nexus energy persists across logins
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
   startTimeTracking();
@@ -7447,42 +7438,43 @@ setInterval(function(){
  chkMs();updRdm();chkRb();rStats();rMs();updBldDisplay();
 },50);
 
-// Load saved state from parent
-window.addEventListener('message',function(e){
- if(!e.data||e.data.type!=='nexusLoad')return;
- var s=e.data.state;
- if(!s)return;
- G.en=s.en||0;G.total=s.total||0;G.clicks=s.clicks||0;
- 
- G.cm=s.cm||1;G.gcm=s.gcm||1;G.bps=s.bps||0;
- G.bm=s.bm||{};G.lc=s.lc||0;G.critm=s.critm||2;
- G.chain=s.chain||false;G.msd=s.msd||{};G.ub=s.ub||{};
- G.totalRdm=s.totalRdm||0;G.rdmSpent=s.rdmSpent||0;
- G.hourTs=s.hourTs||0;G.hourRdm=s.hourRdm||0;
- if(s.blds){Object.keys(s.blds).forEach(function(id){if(blds[id])blds[id].cnt=s.blds[id]||0;});}
- if(s.upgs){s.upgs.forEach(function(id){var u=UPGS.find(function(x){return x.id===id;});if(u&amp;&amp;!u.b){u.b=true;u.eff();}});}
- // Re-apply milestone effects
- if(s.msd){Object.keys(s.msd).forEach(function(id){var m=MS.find(function(x){return x.id===id;});if(m)m.a();});}
- renderAll();
-});
+function loadState(){
+ try{
+  var raw=localStorage.getItem('nexus_energy_save');
+  if(!raw)return;
+  var s=JSON.parse(raw);
+  if(!s||s.v!==3)return;
+  G.en=s.en||0;G.total=s.total||0;G.clicks=s.clicks||0;
+  G.cm=s.cm||1;G.gcm=s.gcm||1;G.bps=s.bps||0;
+  G.bm=s.bm||{};G.lc=s.lc||0;G.critm=s.critm||2;
+  G.chain=s.chain||false;G.msd=s.msd||{};G.ub=s.ub||{};
+  G.totalRdm=s.totalRdm||0;G.rdmSpent=s.rdmSpent||0;
+  G.hourTs=s.hourTs||0;G.hourRdm=s.hourRdm||0;
+  if(s.blds){Object.keys(s.blds).forEach(function(id){if(blds[id])blds[id].cnt=s.blds[id]||0;});}
+  if(s.upgs){s.upgs.forEach(function(id){var u=UPGS.find(function(x){return x.id===id;});if(u&amp;&amp;!u.b){u.b=true;u.eff();}});}
+  if(s.msd){Object.keys(s.msd).forEach(function(id){var m=MS.find(function(x){return x.id===id;});if(m)m.a();});}
+ }catch(err){}
+}
 
 function saveState(){
  var bldState={};BLDS.forEach(function(b){bldState[b.id]=blds[b.id].cnt;});
  var upgState=UPGS.filter(function(u){return u.b;}).map(function(u){return u.id;});
- pm({type:'nexusSave',v:3,state:{
-  en:G.en,total:G.total,clicks:G.clicks,hourTs:G.hourTs||0,hourRdm:G.hourRdm||0,cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
+ var state={
+  en:G.en,total:G.total,clicks:G.clicks,hourTs:G.hourTs||0,hourRdm:G.hourRdm||0,
+  cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
   chain:G.chain,msd:G.msd,ub:G.ub,totalRdm:G.totalRdm,rdmSpent:G.rdmSpent,
-  blds:bldState,upgs:upgState
- }});
+  blds:bldState,upgs:upgState,v:3
+ };
+ try{localStorage.setItem('nexus_energy_save',JSON.stringify(state));}catch(err){}
+ // Also notify parent to update Firestore leaderboard
+ pm({type:'nexusSave',v:3,state:state});
 }
 
 // Save every 30 seconds and on redeem
 setInterval(saveState,15000);
 
-// Request load on init
-pm({type:'nexusLoad'});
-setTimeout(function(){pm({type:'nexusLoad'});},500);
-
+// Load saved state directly from localStorage
+loadState();
 renderAll();
 &lt;/script&gt;
 </body>
