@@ -7052,7 +7052,8 @@ iStars();reset();loop();
 
 <!-- NEXUS ENERGY GAME -->
 <div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
-  <iframe id="nexus-game-ifra<!DOCTYPE html>
+  <iframe id="nexus-game-iframe"
+    srcdoc="<!DOCTYPE html>
 <html>
 <head>
 <meta charset=&quot;UTF-8&quot;>
@@ -7212,7 +7213,7 @@ var UPGS=[
  {id:'p4',tab:'passive',n:'Portal Flux',i:'🌀',cost:40000,d:'Portals x2',eff:function(){G.bm.portal=(G.bm.portal||1)*2},b:false},
  {id:'p5',tab:'passive',n:'Event Horizon',i:'🕳',cost:200000,d:'Black Holes x2',eff:function(){G.bm.blackhole=(G.bm.blackhole||1)*2},b:false},
  {id:'p6',tab:'passive',n:'Global Boost',i:'🌍',cost:5000000,d:'All blds x1.5',eff:function(){G.gcm*=1.5},b:false},
- {id:'p7',tab:'passive',n:'Cosmic Harmony',i:'🎵',cost:50000000,d:'All blds x2',eff:function(){G.gcm*=2},b:false},
+ {id:'p7',tab:'passive',n:'Cosmic Harmony',i:'🎵',cost:50000000,d:'All blds x1.5',eff:function(){G.gcm*=1.5},b:false},
  {id:'s1',tab:'special',n:'Lucky Star',i:'⭐',cost:100,d:'10% chance: 10x click',eff:function(){G.lc+=0.1},b:false},
  {id:'s2',tab:'special',n:'Crit Matrix',i:'💠',cost:2000,d:'Crits deal 5x',eff:function(){G.critm=5},b:false},
  {id:'s3',tab:'special',n:'Chain Link',i:'🔗',cost:20000,d:'Every 100 clicks: burst',eff:function(){G.chain=true},b:false},
@@ -7429,15 +7430,12 @@ renderAll();
 document.getElementById('rb-btn').style.cssText='background:linear-gradient(135deg,#9933ff,#ff4090);border:none;color:#fff;font-size:9px;font-weight:bold;padding:5px 10px;border-radius:6px;cursor:pointer;opacity:0.4;letter-spacing:1px';
 &lt;/script&gt;
 </body>
-</html>
-</body>
 </html>"
     style="width:100%;height:100%;border:none;display:block;"
     scrolling="no"
     sandbox="allow-scripts allow-same-origin">
   </iframe>
 </div>
-
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
   <button id="lightbox-close" onclick="closeLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="">
