@@ -7019,10 +7019,11 @@ iStars();reset();loop();
 <html><head><meta charset='UTF-8'>
 
 <style>
+html,body{height:100%;margin:0;padding:0;}
 :root{--bg:#050508;--bg2:#08080f;--bg3:#0d0d18;--panel:#060610;--border:rgba(68,102,255,0.25);--accent:#4466ff;--accent2:#00d4ff;--accent3:#00ff88;--gold:#ffcc44;--text:#c8c8e8;--textdim:#5a5a7a;}
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;font-size:15px;min-height:100vh;overflow-x:hidden;user-select:none;}
-.layout{display:grid;grid-template-columns:300px 1fr 280px;grid-template-rows:auto 1fr;min-height:100vh;}
+.layout{display:grid;grid-template-columns:300px 1fr 280px;grid-template-rows:auto 1fr;height:100vh;overflow:hidden;}
 header{grid-column:1/-1;padding:10px 20px;background:#060610;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;}
 header h1{font-family:'Courier New',monospace;font-size:16px;font-weight:900;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px;}
 .hstats{display:flex;gap:20px;margin-left:auto;align-items:center;}
@@ -7382,7 +7383,7 @@ function doRedeem(){
   G.rdmSpent+=avail;G.totalRdm+=avail;
   document.getElementById('rdmTotal').textContent='Total redeemed: '+G.totalRdm;
   updRdm();
-  window.parent.postMessage({type:'nexusGameRedeem',amount:avail},'*');
+  try{window.parent.postMessage({type:'nexusGameRedeem',amount:avail},'*');}catch(e){}
   notif('⬡ Redeemed '+avail+' message'+(avail!==1?'s':'')+'!');
 }
 
@@ -7402,7 +7403,7 @@ document.getElementById('rbBtn').addEventListener('click',openRb);
 document.getElementById('rbCancel').addEventListener('click',closeRb);
 document.getElementById('rbConfirm').addEventListener('click',confirmRb);
 document.getElementById('rdmBtn').addEventListener('click',doRedeem);
-document.getElementById('closeBtn').addEventListener('click',function(){window.parent.postMessage({type:'closeNexusGame'},'*');});
+document.getElementById('closeBtn').addEventListener('click',function(){try{window.parent.postMessage({type:'closeNexusGame'},'*');}catch(e){}});
 
 function renderAll(){rBlds();rUpgs();rMs();rPstars();rStats();}
 
