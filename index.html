@@ -972,6 +972,7 @@
     <div class="lb-tabs">
       <div class="lb-tab active" id="lb-tab-msgs" onclick="N.lbTab('msgs')">MESSAGES</div>
       <div class="lb-tab" id="lb-tab-time" onclick="N.lbTab('time')">TIME ON SITE</div>
+      <div class="lb-tab" id="lb-tab-energy" onclick="N.lbTab('energy')">NEXUS ENERGY</div>
     </div>
     <div id="lb-content"></div>
   </div>
@@ -6233,9 +6234,11 @@ function lbTab(tab){
   lbCurrentTab=tab;
   document.getElementById('lb-tab-msgs')?.classList.toggle('active',tab==='msgs');
   document.getElementById('lb-tab-time')?.classList.toggle('active',tab==='time');
+  document.getElementById('lb-tab-energy')?.classList.toggle('active',tab==='energy');
   renderLeaderboard(tab);
 }
 
+function fmtEnergy(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
 async function renderLeaderboard(tab){
   const el=document.getElementById('lb-content');
   if(!el) return;
@@ -6245,8 +6248,10 @@ async function renderLeaderboard(tab){
     let users=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(tab==='msgs'){
       users=users.filter(u=>(u.msgCount||0)>0).sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).slice(0,20);
-    } else {
+    } else if(tab==='time'){
       users=users.filter(u=>(u.minutesOnSite||0)>0).sort((a,b)=>(b.minutesOnSite||0)-(a.minutesOnSite||0)).slice(0,20);
+    } else {
+      users=users.filter(u=>(u.nexusEnergy||0)>0).sort((a,b)=>(b.nexusEnergy||0)-(a.nexusEnergy||0)).slice(0,20);
     }
     if(!users.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No data yet.</div>';return;}
     el.innerHTML='';
@@ -6265,9 +6270,12 @@ async function renderLeaderboard(tab){
       let statVal,statLabel;
       if(tab==='msgs'){
         statVal=u.msgCount||0;statLabel=statVal.toLocaleString()+' messages';
-      } else {
+      } else if(tab==='time'){
         const mins=u.minutesOnSite||0;
         statVal=mins;statLabel=fmtTime(mins)+' on site';
+      } else {
+        const ne=u.nexusEnergy||0;
+        statVal=ne;statLabel=fmtEnergy(ne)+' energy';
       }
       row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
       row.appendChild(avEl);
@@ -6275,13 +6283,19 @@ async function renderLeaderboard(tab){
       info.innerHTML='<div class="lb-name '+rank.c+'" style="'+getUserFontStyle(u.id)+'">'+esc(u.displayName||u.id)+(isMe?' <span style="font-size:9px;color:var(--accent);font-family:var(--font-mono);">(you)</span>':'')+'</div>'
         +'<div class="lb-stat">'+statLabel+'</div>';
       row.appendChild(info);
-      // Time badge for time tab
+      // Badge for time/energy tab
       if(tab==='time'){
         const mins=u.minutesOnSite||0;
         const tc=getTimeClass(mins);
         const badge=document.createElement('div');
         badge.className='time-badge '+tc;
         badge.textContent=fmtTime(mins);
+        row.appendChild(badge);
+      } else if(tab==='energy'){
+        const ne=u.nexusEnergy||0;
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#4466ff;letter-spacing:1px;';
+        badge.textContent='⬡ '+fmtEnergy(ne);
         row.appendChild(badge);
       }
       el.appendChild(row);
@@ -6670,6 +6684,31 @@ window.addEventListener('message',async function(e){
   if(!e.data) return;
   if(e.data.type==='closeNexusGame'){
     document.getElementById('nexus-game-overlay').style.display='none';
+  }
+  if(e.data.type==='nexusSave'){
+    // Save game state to localStorage
+    try{localStorage.setItem('nexus_energy_save',JSON.stringify(e.data.state));}catch{}
+    // Save total energy to Firestore for leaderboard
+    if(cu&&cud&&e.data.state){
+      const totalEnergy=e.data.state.total||0;
+      try{
+        await updateDoc(doc(db,'users',cu.uid),{nexusEnergy:totalEnergy});
+        cud={...cud,nexusEnergy:totalEnergy};
+        uCache[cu.uid]={...uCache[cu.uid],nexusEnergy:totalEnergy};
+      }catch{}
+    }
+  }
+  if(e.data.type==='nexusLoad'){
+    // Send saved state back to iframe
+    try{
+      const saved=localStorage.getItem('nexus_energy_save');
+      if(saved){
+        const iframe=document.getElementById('nexus-game-iframe');
+        if(iframe&&iframe.contentWindow){
+          iframe.contentWindow.postMessage({type:'nexusLoad',state:JSON.parse(saved)},'*');
+        }
+      }
+    }catch{}
   }
   if(e.data.type==='nexusGameRedeem'&&cu&&cud){
     const amount=e.data.amount||0;
@@ -7072,7 +7111,7 @@ html,body{width:100%;height:100%;background:#050508;color:#c8c8e8;font-family:mo
 .sl{font-size:8px;color:#5a5a7a;margin-top:2px;text-transform:uppercase}
 .bld{background:#0d0d18;border:1px solid rgba(68,102,255,0.2);border-radius:8px;padding:8px;margin-bottom:5px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:6px}
 .bld:hover:not(.locked){border-color:#4466ff;background:rgba(68,102,255,0.06)}
-.bld.locked{opacity:0.2;cursor:not-allowed}
+.bld.locked{opacity:0.35;cursor:not-allowed}
 .bi{font-size:20px;flex-shrink:0}
 .bn{font-size:10px;font-weight:bold;color:#ddd}
 .bd{font-size:8px;color:#5a5a7a}
@@ -7299,6 +7338,7 @@ function doRedeem(){
  updRdm();
  pm({type:'nexusGameRedeem',amount:a});
  notif('Redeemed '+a+' message'+(a!==1?'s':'')+'!');
+ saveState();
 }
 
 document.getElementById('rb-btn').addEventListener('click',function(){
@@ -7308,14 +7348,14 @@ document.getElementById('rb-btn').addEventListener('click',function(){
  G.en=0;G.total=0;G.clicks=0;G.cm=1;G.cb=0;G.gcm=1;G.bps=0;G.bm={};G.lc=0;G.critm=2;G.chain=false;G.streak=0;G.msd={};G.ub={};G.rdmSpent=0;
  BLDS.forEach(function(b){blds[b.id].cnt=0;});
  UPGS.forEach(function(u){u.b=false;});
- renderAll();notif('Rebirth! +'+sd+' Shards!');
+ renderAll();notif('Rebirth! +'+sd+' Shards!');saveState();
 });
 
 function updBldDisplay(){
  // Only update cost/count numbers, don't recreate elements
  BLDS.forEach(function(b){
   var c=bco(b.id),cnt=blds[b.id].cnt,ca=G.en>=c;
-  var locked=!ca&amp;&amp;cnt===0&amp;&amp;G.en<b.bc*0.5;
+  var locked=!ca;
   var el=document.querySelector('[data-bld=&quot;'+b.id+'&quot;]');
   if(!el)return;
   el.className='bld'+(locked?' locked':'');
@@ -7349,6 +7389,42 @@ setInterval(function(){
  document.getElementById('cpcD').textContent=fmt(cpc());
  chkMs();updRdm();chkRb();rStats();rMs();updBldDisplay();
 },50);
+
+// Load saved state from parent
+window.addEventListener('message',function(e){
+ if(!e.data||e.data.type!=='nexusLoad')return;
+ var s=e.data.state;
+ if(!s)return;
+ G.en=s.en||0;G.total=s.total||0;G.clicks=s.clicks||0;
+ G.rebirths=s.rebirths||0;G.shards=s.shards||0;G.sb=s.sb||0;
+ G.cm=s.cm||1;G.gcm=s.gcm||1;G.bps=s.bps||0;
+ G.bm=s.bm||{};G.lc=s.lc||0;G.critm=s.critm||2;
+ G.chain=s.chain||false;G.msd=s.msd||{};G.ub=s.ub||{};
+ G.totalRdm=s.totalRdm||0;G.rdmSpent=s.rdmSpent||0;
+ if(s.blds){Object.keys(s.blds).forEach(function(id){if(blds[id])blds[id].cnt=s.blds[id]||0;});}
+ if(s.upgs){s.upgs.forEach(function(id){var u=UPGS.find(function(x){return x.id===id;});if(u&amp;&amp;!u.b){u.b=true;u.eff();}});}
+ // Re-apply milestone effects
+ if(s.msd){Object.keys(s.msd).forEach(function(id){var m=MS.find(function(x){return x.id===id;});if(m)m.a();});}
+ renderAll();
+});
+
+function saveState(){
+ var bldState={};BLDS.forEach(function(b){bldState[b.id]=blds[b.id].cnt;});
+ var upgState=UPGS.filter(function(u){return u.b;}).map(function(u){return u.id;});
+ pm({type:'nexusSave',state:{
+  en:G.en,total:G.total,clicks:G.clicks,rebirths:G.rebirths,shards:G.shards,
+  sb:G.sb,cm:G.cm,gcm:G.gcm,bps:G.bps,bm:G.bm,lc:G.lc,critm:G.critm,
+  chain:G.chain,msd:G.msd,ub:G.ub,totalRdm:G.totalRdm,rdmSpent:G.rdmSpent,
+  blds:bldState,upgs:upgState
+ }});
+}
+
+// Save every 30 seconds and on redeem
+setInterval(saveState,30000);
+
+// Request load on init
+pm({type:'nexusLoad'});
+setTimeout(function(){pm({type:'nexusLoad'});},500);
 
 renderAll();
 document.getElementById('rb-btn').style.cssText='background:linear-gradient(135deg,#9933ff,#ff4090);border:none;color:#fff;font-size:9px;font-weight:bold;padding:5px 10px;border-radius:6px;cursor:pointer;opacity:0.4;letter-spacing:1px';
