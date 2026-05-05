@@ -6706,10 +6706,21 @@ window.addEventListener('message',async function(e){
 function openNexusGame(){
   const overlay=document.getElementById('nexus-game-overlay');
   if(!overlay) return;
-  // Reload iframe for fresh game
-  const iframe=document.getElementById('nexus-game-iframe');
-  if(iframe){const s=iframe.srcdoc;iframe.srcdoc='';setTimeout(()=>{iframe.srcdoc=s;},10);}
   overlay.style.display='block';
+  // If iframe hasn't loaded yet, initialize it
+  const iframe=document.getElementById('nexus-game-iframe');
+  if(iframe&&!iframe._loaded){
+    iframe._loaded=true;
+    // Give it a moment to load then request state
+    setTimeout(()=>{
+      try{
+        const saved=localStorage.getItem('nexus_energy_save');
+        if(saved&&iframe.contentWindow){
+          iframe.contentWindow.postMessage({type:'nexusLoad',v:3,state:JSON.parse(saved)},'*');
+        }
+      }catch{}
+    },300);
+  }
 }
 
 window.addEventListener('message',async function(e){
@@ -6731,14 +6742,12 @@ window.addEventListener('message',async function(e){
     }
   }
   if(e.data.type==='nexusLoad'){
-    // Send saved state back to iframe
+    // Reply directly to the source window (avoids stale contentWindow ref)
     try{
       const saved=localStorage.getItem('nexus_energy_save');
-      if(saved){
-        const iframe=document.getElementById('nexus-game-iframe');
-        if(iframe&&iframe.contentWindow){
-          const sv=JSON.parse(saved);iframe.contentWindow.postMessage({type:'nexusLoad',v:3,state:sv},'*');
-        }
+      if(saved&&e.source){
+        const sv=JSON.parse(saved);
+        e.source.postMessage({type:'nexusLoad',v:3,state:sv},'*');
       }
     }catch{}
   }
