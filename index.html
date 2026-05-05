@@ -4615,6 +4615,26 @@ async function loadOwnerUsers(){
       pwBtn.onclick=()=>adminSetPassword(u.id,u.username||'',pwInput.value.trim(),()=>{pwInput.value='';pwInput.placeholder='Password set ✓';});
       pwRow.appendChild(pwLabel);pwRow.appendChild(pwInput);pwRow.appendChild(pwBtn);
       fields.appendChild(pwRow);
+      // Message count field
+      const mcRow=document.createElement('div');mcRow.style.cssText='display:flex;gap:6px;align-items:center;';
+      const mcLabel=document.createElement('span');mcLabel.style.cssText='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);width:50px;flex-shrink:0;';mcLabel.textContent='MSGS';
+      const mcInput=document.createElement('input');mcInput.className='modal-input';mcInput.type='number';
+      mcInput.style.cssText='flex:1;padding:6px 10px;font-size:12px;font-family:var(--font-mono);';
+      mcInput.value=u.msgCount||0;mcInput.min=0;
+      const mcBtn=document.createElement('button');mcBtn.className='btn-small primary';mcBtn.style.fontSize='9px';mcBtn.textContent='SET';
+      mcBtn.onclick=()=>adminSetMsgCount(u.id,parseInt(mcInput.value)||0);
+      mcRow.appendChild(mcLabel);mcRow.appendChild(mcInput);mcRow.appendChild(mcBtn);
+      fields.appendChild(mcRow);
+      // Messages field
+      const msgRow=document.createElement('div');msgRow.style.cssText='display:flex;gap:6px;align-items:center;';
+      const msgLabel=document.createElement('span');msgLabel.style.cssText='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);width:50px;flex-shrink:0;';msgLabel.textContent='MSGS';
+      const msgInput=document.createElement('input');msgInput.className='modal-input';msgInput.type='number';
+      msgInput.style.cssText='flex:1;padding:6px 10px;font-size:12px;font-family:var(--font-mono);';
+      msgInput.placeholder='Set message count…';msgInput.value=u.msgCount||0;msgInput.min='0';
+      const msgBtn=document.createElement('button');msgBtn.className='btn-small primary';msgBtn.style.fontSize='9px';msgBtn.textContent='SET';
+      msgBtn.onclick=()=>adminSetMsgCount(u.id,parseInt(msgInput.value)||0);
+      msgRow.appendChild(msgLabel);msgRow.appendChild(msgInput);msgRow.appendChild(msgBtn);
+      fields.appendChild(msgRow);
       card.appendChild(fields);
 
       // Action buttons
@@ -4630,8 +4650,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','tester','bugfinder','feedback','og','easter'];
-const ROLE_LABELS={owner:'Owner',tester:'Tester',bugfinder:'Bug Finder',feedback:'Feedback',og:'OG',easter:'Easter Egg 🐣'};
+const ROLE_OPTS=['owner','tester','beginner_tester','bugfinder','feedback','og','easter'];
+const ROLE_LABELS={owner:'Owner',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',og:'OG',easter:'Easter Egg 🐣'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -4699,6 +4719,18 @@ async function adminResetMsgs(uid,name){
     loadOwnerUsers();
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
+
+async function adminSetMsgCount(uid,count){
+  if(isNaN(count)||count<0){toast('Invalid number.','danger');return;}
+  try{
+    await updateDoc(doc(db,'users',uid),{msgCount:count});
+    if(uCache[uid]) uCache[uid].msgCount=count;
+    if(uid===cu?.uid&&cud){cud={...cud,msgCount:count};renderProfile();}
+    toast('Messages set to '+count,'success');
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+
 
 function renderAdminPanel(){
   const panel=document.getElementById('op-panel-admin');
@@ -5278,12 +5310,13 @@ function getUserFontStyle(uid){
 }
 
 const ROLES=[
-  {id:'',          label:'No Role'},
-  {id:'owner',     label:'Owner'},
-  {id:'tester',    label:'Tester'},
-  {id:'bugfinder', label:'Bug Finder'},
-  {id:'feedback',  label:'Feedback'},
-  {id:'og',        label:'OG'},
+  {id:'',                label:'No Role'},
+  {id:'owner',           label:'Owner'},
+  {id:'tester',          label:'Tester'},
+  {id:'beginner_tester', label:'Beginner Tester'},
+  {id:'bugfinder',       label:'Bug Finder'},
+  {id:'feedback',        label:'Feedback'},
+  {id:'og',              label:'OG'},
 ];
 
 function getRoleBadge(uid){
@@ -5294,6 +5327,7 @@ function getRoleBadge(uid){
   const map={
     owner:    '<span class="role-owner">OWNER</span>',
     tester:   '<span class="role-tester">TESTER</span>',
+    beginner_tester:'<span class="role-beginner-tester">BEGINNER TESTER</span>',
     bugfinder:'<span class="role-bugfinder">BUG FINDER</span>',
     feedback: '<span class="role-feedback">FEEDBACK</span>',
     og:       '<span class="role-og">OG</span>',
@@ -6787,7 +6821,7 @@ window._N = {
   saveUserFont,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
-  adminSaveName, adminSaveUsername, adminSetPassword,
+  adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
   showImpersonationBanner, returnToOwner,
   adminRenameUser, adminChangePassword, adminDeleteAccount,
   renderAnnouncePanel,
