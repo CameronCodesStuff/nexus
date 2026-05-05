@@ -7209,13 +7209,10 @@ document.getElementById('orb').addEventListener('click',function(e){
  chkMs();updRdm();chkRb();
 });
 
-document.addEventListener('click',function(e){
- var bel=e.target.closest('[data-bld]');if(bel){buyBld(bel.dataset.bld);return;}
- var uel=e.target.closest('[data-upg]');if(uel){buyUpg(uel.dataset.upg);return;}
-});
+// click handled directly via onclick on each element
 
 function buyBld(id){var c=bco(id);if(G.en<c)return;G.en-=c;blds[id].cnt++;rBlds();rUpgs();chkMs();chkRb();}
-function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b||G.en<u.cost)return;G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();notif(u.n+' unlocked!');}
+function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.b||G.en<u.cost)return;G.en-=u.cost;u.b=true;G.ub[id]=1;u.eff();rUpgs();rBlds();notif(u.n+' unlocked!');}
 
 var atab='click';
 function stab(t,el){atab=t;document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});el.classList.add('on');rUpgs();}
@@ -7226,7 +7223,7 @@ function rUpgs(){
   var ca=G.en>=u.cost;
   var d=document.createElement('div');
   d.className='upg'+(u.b?' bought':ca?'':' locked');
-  d.dataset.upg=u.id;
+  if(!u.b&amp;&amp;ca){var _uid=u.id;d.onclick=function(){buyUpg(_uid);};}
   d.innerHTML='<div class=&quot;ui&quot;>'+u.i+'</div><div class=&quot;un&quot;>'+u.n+'</div>'+(u.b?'':'<div class=&quot;uc&quot;>'+fmt(u.cost)+'</div>')+'<div class=&quot;ud&quot;>'+u.d+'</div>';
   g.appendChild(d);
  });
@@ -7239,7 +7236,8 @@ function rBlds(){
   var locked=!ca&amp;&amp;cnt===0&amp;&amp;G.en<b.bc*0.5;
   var m=(G.bm[b.id]||1)*G.gcm*(1+G.sb);
   var d=document.createElement('div');
-  d.className='bld'+(locked?' locked':'');d.dataset.bld=b.id;
+  d.className='bld'+(locked?' locked':'');
+  if(!locked){var _id=b.id;d.onclick=function(){buyBld(_id);};}
   d.innerHTML='<div class=&quot;bi&quot;>'+b.i+'</div><div><div class=&quot;bn&quot;>'+b.n+'</div><div class=&quot;bd&quot;>'+(b.bps*m).toFixed(1)+'/s</div><div class=&quot;bc&quot;>'+fmt(c)+'</div></div><div class=&quot;bcount&quot;>'+cnt+'</div>';
   l.appendChild(d);
  });
@@ -7316,10 +7314,10 @@ renderAll();
 document.getElementById('rb-btn').style.cssText='background:linear-gradient(135deg,#9933ff,#ff4090);border:none;color:#fff;font-size:9px;font-weight:bold;padding:5px 10px;border-radius:6px;cursor:pointer;opacity:0.4;letter-spacing:1px';
 &lt;/script&gt;
 </body>
-</html>id="lightbox" onclick="if(event.target===this)closeLightbox()">
-  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
-  <img id="lightbox-img" src="" alt="">
-  <button id="lightbox-dl" onclick="dlLightbox()">⬇ DOWNLOAD</button>
+</html>id=&quot;lightbox&quot; onclick=&quot;if(event.target===this)closeLightbox()&quot;>
+  <button id=&quot;lightbox-close&quot; onclick=&quot;closeLightbox()&quot;>✕</button>
+  <img id=&quot;lightbox-img&quot; src=&quot;&quot; alt=&quot;&quot;>
+  <button id=&quot;lightbox-dl&quot; onclick=&quot;dlLightbox()&quot;>⬇ DOWNLOAD</button>
 </div>
 </body>
 </html>
