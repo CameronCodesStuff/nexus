@@ -735,9 +735,11 @@
             <button onclick="N.openModal('help-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">❓ Help</button>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
             <button onclick="N.openModal('changelog-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">📋 Update Log</button>
+
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
-            <button onclick="N.openFlapGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐦 Nexus Flap</button>
             <button onclick="N.openModal('typegame-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⌨️ Type & Earn</button>
+            <button onclick="N.openFlapGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐦 Nexus Flap</button>
+            <button onclick="N.openNexusGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⬡ Nexus Energy</button>
 
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -6654,6 +6656,35 @@ window.addEventListener('message',async function(e){
   }
 });
 
+// ── NEXUS ENERGY GAME ────────────────────────────
+function openNexusGame(){
+  const overlay=document.getElementById('nexus-game-overlay');
+  if(!overlay) return;
+  // Reload iframe for fresh game
+  const iframe=document.getElementById('nexus-game-iframe');
+  if(iframe){const s=iframe.srcdoc;iframe.srcdoc='';setTimeout(()=>{iframe.srcdoc=s;},10);}
+  overlay.style.display='block';
+}
+
+window.addEventListener('message',async function(e){
+  if(!e.data) return;
+  if(e.data.type==='closeNexusGame'){
+    document.getElementById('nexus-game-overlay').style.display='none';
+  }
+  if(e.data.type==='nexusGameRedeem'&&cu&&cud){
+    const amount=e.data.amount||0;
+    if(amount<=0) return;
+    try{
+      const newCount=(cud.msgCount||0)+amount;
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+      cud={...cud,msgCount:newCount};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+      renderProfile();
+      toast('⬡ +'+amount+' messages redeemed from Nexus Energy!','success');
+    }catch(err){toast('Could not save messages.','danger');}
+  }
+});
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -6704,6 +6735,7 @@ window._N = {
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
   openFlapGame, closeFlapGame,
+  openNexusGame,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
@@ -6974,9 +7006,421 @@ iStars();reset();loop();
 <div id=&quot;sc&quot; style=&quot;display:none&quot;>+0</div>
 </body></html>"
       style="width:360px;height:540px;border:1px solid rgba(68,102,255,0.25);border-radius:8px;display:block;box-shadow:0 0 20px rgba(68,102,255,0.1);"
-      scrolling="no" sandbox="allow-scripts allow-same-origin">
+      scrolling="no" sandbox="allow-scripts">
     </iframe>
   </div>
+</div>
+
+<!-- NEXUS ENERGY GAME -->
+<div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
+  <iframe id="nexus-game-iframe"
+    srcdoc="<!DOCTYPE html>
+<html><head><meta charset='UTF-8'>
+<link href='https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&amp;family=Rajdhani:wght@300;400;600&amp;display=swap' rel='stylesheet'>
+<style>
+:root{--bg:#050508;--bg2:#08080f;--bg3:#0d0d18;--panel:#060610;--border:rgba(68,102,255,0.25);--accent:#4466ff;--accent2:#00d4ff;--accent3:#00ff88;--gold:#ffcc44;--text:#c8c8e8;--textdim:#5a5a7a;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:Rajdhani,sans-serif;font-size:15px;min-height:100vh;overflow-x:hidden;user-select:none;}
+.layout{display:grid;grid-template-columns:300px 1fr 280px;grid-template-rows:auto 1fr;min-height:100vh;}
+header{grid-column:1/-1;padding:10px 20px;background:#060610;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;}
+header h1{font-family:Orbitron,monospace;font-size:16px;font-weight:900;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:3px;}
+.hstats{display:flex;gap:20px;margin-left:auto;align-items:center;}
+.sblk{display:flex;flex-direction:column;align-items:flex-end;}
+.slbl{font-size:9px;color:var(--textdim);letter-spacing:1px;text-transform:uppercase;}
+.sval{font-family:Orbitron,monospace;font-size:12px;color:var(--gold);}
+.close-btn{padding:6px 14px;background:rgba(255,51,85,0.15);border:1px solid rgba(255,51,85,0.4);border-radius:7px;color:#ff3355;font-family:Orbitron,monospace;font-size:10px;font-weight:700;cursor:pointer;}
+.close-btn:hover{background:rgba(255,51,85,0.3);}
+.rb-btn{padding:6px 14px;background:linear-gradient(135deg,#9933ff,#ff4090);border:none;border-radius:7px;color:#fff;font-family:Orbitron,monospace;font-size:10px;font-weight:700;cursor:pointer;opacity:0.4;transition:all 0.2s;}
+.rb-btn.ready{opacity:1;animation:pulseRb 2s infinite;}
+@keyframes pulseRb{0%,100%{box-shadow:0 0 10px rgba(153,51,255,0.5);}50%{box-shadow:0 0 20px rgba(153,51,255,0.9);}}
+.lpanel{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:18px 12px;gap:12px;overflow-y:auto;}
+.click-area{position:relative;display:flex;align-items:center;justify-content:center;height:240px;width:240px;}
+.orb-ring{position:absolute;border-radius:50%;border:1px solid rgba(68,102,255,0.3);animation:spinRing 8s linear infinite;}
+.orb-ring:nth-child(1){width:180px;height:180px;}
+.orb-ring:nth-child(2){width:200px;height:200px;animation-duration:12s;animation-direction:reverse;border-color:rgba(0,212,255,0.2);}
+.orb-ring:nth-child(3){width:220px;height:220px;animation-duration:6s;border-color:rgba(0,255,136,0.15);}
+@keyframes spinRing{to{transform:rotate(360deg);}}
+.orb{width:130px;height:130px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#6688ff,#2233aa,#050515);box-shadow:0 0 30px rgba(68,102,255,0.6),0 0 60px rgba(68,102,255,0.3);cursor:pointer;transition:transform 0.08s;position:relative;z-index:2;}
+.orb:hover{box-shadow:0 0 40px rgba(68,102,255,0.9),0 0 80px rgba(68,102,255,0.4);}
+.orb:active{transform:scale(0.92);}
+.orb::after{content:'';position:absolute;top:18%;left:22%;width:35%;height:20%;background:rgba(255,255,255,0.15);border-radius:50%;transform:rotate(-30deg);}
+.cpc-box{text-align:center;background:rgba(68,102,255,0.08);border:1px solid var(--border);border-radius:10px;padding:7px 14px;width:100%;}
+.cpc-box .lbl{font-size:9px;color:var(--textdim);text-transform:uppercase;letter-spacing:1px;}
+.cpc-box .val{font-family:Orbitron,monospace;font-size:15px;color:var(--accent3);margin-top:2px;}
+.sec-title{font-family:Orbitron,monospace;font-size:9px;letter-spacing:2px;color:var(--textdim);text-transform:uppercase;margin-bottom:7px;padding-bottom:3px;border-bottom:1px solid var(--border);}
+.upg-section{width:100%;}
+.tabs{display:flex;gap:4px;width:100%;margin-bottom:8px;}
+.tab{flex:1;padding:4px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:10px;font-weight:600;color:var(--textdim);text-transform:uppercase;text-align:center;transition:all 0.2s;}
+.tab.active{border-color:var(--accent);color:var(--accent);background:rgba(68,102,255,0.1);}
+.upg-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.upg{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:6px;cursor:pointer;transition:all 0.2s;text-align:left;position:relative;overflow:hidden;}
+.upg:hover:not(.bought):not(.locked){border-color:var(--accent);box-shadow:0 0 10px rgba(68,102,255,0.4);}
+.upg.bought{border-color:var(--accent3);background:rgba(0,255,136,0.06);opacity:0.7;cursor:default;}
+.upg.locked{opacity:0.3;cursor:not-allowed;}
+.upg-icon{font-size:16px;}
+.upg-name{font-size:10px;font-weight:600;color:#ddd;margin-top:2px;}
+.upg-cost{font-family:Orbitron,monospace;font-size:8px;color:var(--gold);margin-top:1px;}
+.upg-desc{font-size:8px;color:var(--textdim);margin-top:1px;}
+.upg-tag{position:absolute;top:2px;right:2px;font-size:7px;background:var(--accent3);color:#000;padding:1px 3px;border-radius:3px;font-weight:700;}
+.mpanel{display:flex;flex-direction:column;align-items:center;padding:24px 18px;gap:14px;overflow-y:auto;}
+.cur-label{font-size:11px;color:var(--textdim);letter-spacing:2px;text-transform:uppercase;}
+.cur-amount{font-family:Orbitron,monospace;font-size:36px;font-weight:900;background:linear-gradient(135deg,#fff,var(--gold),#ffaa30);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;}
+.cps-disp{font-family:Orbitron,monospace;font-size:12px;color:var(--accent3);margin-top:3px;}
+.redeem-box{background:rgba(68,102,255,0.08);border:1px solid var(--border);border-radius:12px;padding:12px 18px;text-align:center;width:100%;max-width:400px;}
+.redeem-info{font-size:11px;color:var(--textdim);margin-bottom:6px;}
+.redeem-count{font-family:Orbitron,monospace;font-size:20px;color:var(--accent2);margin-bottom:8px;}
+.rdm-btn{padding:7px 18px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:7px;color:#fff;font-family:Orbitron,monospace;font-size:10px;font-weight:700;cursor:pointer;opacity:0.4;transition:all 0.2s;}
+.rdm-btn.ready{opacity:1;animation:pulseRd 2s infinite;}
+@keyframes pulseRd{0%,100%{box-shadow:0 0 10px rgba(68,102,255,0.5);}50%{box-shadow:0 0 20px rgba(68,102,255,0.9);}}
+.rdm-total{font-size:10px;color:var(--textdim);font-family:Orbitron,monospace;margin-top:5px;}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;width:100%;max-width:400px;}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px;text-align:center;}
+.sc-val{font-family:Orbitron,monospace;font-size:13px;color:var(--accent3);}
+.sc-lbl{font-size:9px;color:var(--textdim);margin-top:2px;text-transform:uppercase;letter-spacing:1px;}
+.ms-list{width:100%;max-width:400px;}
+.ms-bar{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:5px;}
+.ms-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.ms-name{font-size:11px;font-weight:600;}
+.ms-reward{font-size:9px;color:var(--gold);}
+.ms-track{height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;}
+.ms-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 0.5s ease;}
+.ms-pct{font-size:8px;color:var(--textdim);margin-top:2px;text-align:right;}
+.rpanel{background:var(--panel);border-left:1px solid var(--border);overflow-y:auto;padding:12px;}
+.bld{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:9px;margin-bottom:5px;cursor:pointer;transition:all 0.2s;display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center;position:relative;overflow:hidden;}
+.bld:hover:not(.locked){border-color:var(--accent);background:rgba(68,102,255,0.08);}
+.bld.locked{opacity:0.25;cursor:not-allowed;}
+.bld::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:0;transition:opacity 0.2s;}
+.bld:hover:not(.locked)::before{opacity:1;}
+.bld-icon{font-size:22px;}
+.bld-info{min-width:0;}
+.bld-name{font-weight:600;font-size:11px;color:#ddd;}
+.bld-desc{font-size:9px;color:var(--textdim);}
+.bld-cps{font-size:9px;color:var(--accent3);}
+.bld-right{text-align:right;}
+.bld-cost{font-family:Orbitron,monospace;font-size:10px;color:var(--gold);}
+.bld-count{font-family:Orbitron,monospace;font-size:18px;font-weight:700;color:var(--accent);}
+.float-num{position:fixed;pointer-events:none;font-family:Orbitron,monospace;font-size:15px;font-weight:700;color:var(--gold);animation:floatUp 1s ease-out forwards;z-index:9999;}
+@keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:1;}100%{transform:translateY(-70px) scale(0.6);opacity:0;}}
+.particle{position:fixed;pointer-events:none;width:5px;height:5px;border-radius:50%;animation:pBurst 0.6s ease-out forwards;z-index:9998;}
+@keyframes pBurst{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(0);opacity:0;}}
+.notif{position:fixed;top:14px;right:14px;background:var(--bg2);border:1px solid var(--accent3);border-radius:9px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--accent3);z-index:9000;animation:slideInOut 3s ease-out forwards;}
+@keyframes slideInOut{0%{transform:translateX(120%);opacity:0;}10%{transform:translateX(0);opacity:1;}75%{transform:translateX(0);opacity:1;}100%{transform:translateX(120%);opacity:0;}}
+.rb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;align-items:center;justify-content:center;}
+.rb-overlay.show{display:flex;}
+.rb-modal{background:var(--bg2);border:1px solid var(--accent);border-radius:18px;padding:32px;max-width:400px;text-align:center;}
+.rb-modal h2{font-family:Orbitron,monospace;font-size:20px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:12px;}
+.rb-modal p{color:var(--text);line-height:1.7;margin-bottom:8px;font-size:13px;}
+.rb-modal .reward{font-family:Orbitron,monospace;font-size:18px;color:var(--gold);margin:12px 0;}
+.modal-btns{display:flex;gap:12px;justify-content:center;margin-top:16px;}
+.mbtn{padding:9px 20px;border-radius:9px;border:none;cursor:pointer;font-family:Orbitron,monospace;font-size:11px;font-weight:700;transition:all 0.2s;}
+.mbtn.confirm{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+.mbtn.cancel{background:var(--bg3);color:var(--textdim);border:1px solid var(--border);}
+.mbtn:hover{transform:scale(1.04);}
+.pstars{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+.pstar{font-size:16px;filter:grayscale(1);}
+.pstar.earned{filter:grayscale(0) drop-shadow(0 0 5px gold);}
+</style>
+</head>
+<body>
+<div class='rb-overlay' id='rbOverlay'>
+  <div class='rb-modal'>
+    <h2>⬡ NEXUS REBIRTH ⬡</h2>
+    <p>Reset and gain permanent Nexus Shard bonuses!</p>
+    <div class='reward' id='rbReward'>+5% bonus</div>
+    <p style='font-size:11px;color:var(--textdim)'>All buildings/upgrades reset. Shards are permanent.</p>
+    <div class='modal-btns'>
+      <button class='mbtn cancel' id='rbCancel'>Cancel</button>
+      <button class='mbtn confirm' id='rbConfirm'>Rebirth ⬡</button>
+    </div>
+  </div>
+</div>
+<div class='layout'>
+  <header>
+    <h1>⬡ NEXUS ENERGY</h1>
+    <div class='hstats'>
+      <div class='sblk'><span class='slbl'>Total</span><span class='sval' id='hTotal'>0</span></div>
+      <div class='sblk'><span class='slbl'>Shards</span><span class='sval' id='hShards'>0</span></div>
+      <div class='sblk'><span class='slbl'>Rebirths</span><span class='sval' id='hRebirths'>0</span></div>
+      <div class='sblk'><span class='slbl'>Msgs</span><span class='sval' id='hMsgs'>0</span></div>
+      <button class='rb-btn' id='rbBtn'>⬡ REBIRTH</button>
+      <button class='close-btn' id='closeBtn'>&amp;#10005; CLOSE</button>
+    </div>
+  </header>
+  <div class='lpanel'>
+    <div class='click-area'>
+      <div class='orb-ring'></div><div class='orb-ring'></div><div class='orb-ring'></div>
+      <div class='orb' id='mainOrb'></div>
+    </div>
+    <div class='cpc-box'><div class='lbl'>Energy per Click</div><div class='val' id='cpcDisp'>1</div></div>
+    <div class='upg-section'>
+      <div class='sec-title'>Upgrades</div>
+      <div class='tabs'>
+        <div class='tab active' data-tab='click'>Click</div>
+        <div class='tab' data-tab='passive'>Passive</div>
+        <div class='tab' data-tab='special'>Special</div>
+      </div>
+      <div class='upg-grid' id='upgGrid'></div>
+    </div>
+  </div>
+  <div class='mpanel'>
+    <div style='text-align:center'>
+      <div class='cur-label'>⬡ Nexus Energy</div>
+      <div class='cur-amount' id='curAmt'>0</div>
+      <div class='cps-disp' id='cpsDisp'>0 / sec</div>
+    </div>
+    <div class='redeem-box'>
+      <div class='redeem-info'>1 Billion energy = 1 Message</div>
+      <div class='redeem-count' id='rdmCount'>0 messages available</div>
+      <button class='rdm-btn' id='rdmBtn'>⬡ REDEEM</button>
+      <div class='rdm-total' id='rdmTotal'>Total redeemed: 0</div>
+    </div>
+    <div class='pstars' id='pStars'></div>
+    <div class='stats-grid'>
+      <div class='sc'><div class='sc-val' id='scClicks'>0</div><div class='sc-lbl'>Clicks</div></div>
+      <div class='sc'><div class='sc-val' id='scBlds'>0</div><div class='sc-lbl'>Buildings</div></div>
+      <div class='sc'><div class='sc-val' id='scUpgs'>0</div><div class='sc-lbl'>Upgrades</div></div>
+    </div>
+    <div class='ms-list'>
+      <div class='sec-title'>Milestones</div>
+      <div id='msList'></div>
+    </div>
+  </div>
+  <div class='rpanel'>
+    <div class='sec-title' style='margin-bottom:9px'>Buildings</div>
+    <div id='bldList'></div>
+  </div>
+</div>
+<script>
+var fmt=function(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();};
+
+var BLDS=[
+  {id:'solar',name:'Solar Harvester',icon:'☀️',bc:10,bps:0.1,desc:'Solar energy'},
+  {id:'crystal',name:'Crystal Array',icon:'💎',bc:80,bps:0.5,desc:'Cosmic resonance'},
+  {id:'drone',name:'Nano Drone',icon:'🤖',bc:500,bps:3,desc:'Auto collector'},
+  {id:'portal',name:'Nexus Portal',icon:'🌀',bc:3000,bps:15,desc:'Dimensional tap'},
+  {id:'blackhole',name:'Micro Black Hole',icon:'🕳️',bc:15000,bps:80,desc:'Mass to energy'},
+  {id:'pulsar',name:'Pulsar Beacon',icon:'⚡',bc:80000,bps:350,desc:'Neutron pulses'},
+  {id:'dyson',name:'Dyson Sphere',icon:'🔆',bc:400000,bps:1500,desc:'Star envelope'},
+  {id:'galaxy',name:'Galaxy Farm',icon:'🌌',bc:2000000,bps:8000,desc:'Galaxy harvest'},
+  {id:'nebula',name:'Nebula Engine',icon:'🌠',bc:10000000,bps:40000,desc:'Nebula fuel'},
+  {id:'bigbang',name:'Big Bang Reactor',icon:'💥',bc:100000000,bps:300000,desc:'Creation energy'},
+  {id:'cosmos',name:'Cosmos Weaver',icon:'✨',bc:1000000000,bps:2000000,desc:'Universal constants'},
+  {id:'void',name:'Void Condenser',icon:'🌑',bc:10000000000,bps:20000000,desc:'From nothingness'}
+];
+
+var UPGS=[
+  {id:'c1',tab:'click',name:'Focused Beam',icon:'🔦',cost:50,desc:'Click x2',eff:function(){G.cm*=2;},bought:false},
+  {id:'c2',tab:'click',name:'Charged Strike',icon:'⚡',cost:300,desc:'Click x3',eff:function(){G.cm*=3;},bought:false},
+  {id:'c3',tab:'click',name:'Quantum Tap',icon:'🔬',cost:2000,desc:'Click x5',eff:function(){G.cm*=5;},bought:false},
+  {id:'c4',tab:'click',name:'Photon Burst',icon:'💫',cost:80000,desc:'Click x8',eff:function(){G.cm*=8;},bought:false},
+  {id:'c5',tab:'click',name:'Infinity Pulse',icon:'♾️',cost:500000,desc:'Click x10',eff:function(){G.cm*=10;},bought:false},
+  {id:'c6',tab:'click',name:'Nexus Core',icon:'⬡',cost:5000000,desc:'Click x20',eff:function(){G.cm*=20;},bought:false},
+  {id:'p1',tab:'passive',name:'Solar Boost',icon:'🌤️',cost:200,desc:'Harvesters x2',eff:function(){G.bm.solar=(G.bm.solar||1)*2;},bought:false},
+  {id:'p2',tab:'passive',name:'Crystal Tune',icon:'✨',cost:1500,desc:'Arrays x2',eff:function(){G.bm.crystal=(G.bm.crystal||1)*2;},bought:false},
+  {id:'p3',tab:'passive',name:'Drone AI',icon:'🧠',cost:8000,desc:'Drones x3',eff:function(){G.bm.drone=(G.bm.drone||1)*3;},bought:false},
+  {id:'p4',tab:'passive',name:'Portal Flux',icon:'🌀',cost:40000,desc:'Portals x2',eff:function(){G.bm.portal=(G.bm.portal||1)*2;},bought:false},
+  {id:'p5',tab:'passive',name:'Event Horizon',icon:'🕳️',cost:200000,desc:'Black Holes x2',eff:function(){G.bm.blackhole=(G.bm.blackhole||1)*2;},bought:false},
+  {id:'p6',tab:'passive',name:'Global Boost',icon:'🌍',cost:5000000,desc:'All blds x2',eff:function(){G.gcm*=2;},bought:false},
+  {id:'p7',tab:'passive',name:'Cosmic Harmony',icon:'🎵',cost:50000000,desc:'All blds x5',eff:function(){G.gcm*=5;},bought:false},
+  {id:'s1',tab:'special',name:'Lucky Star',icon:'⭐',cost:100,desc:'10% chance: 10x click',eff:function(){G.lc+=0.1;},bought:false},
+  {id:'s2',tab:'special',name:'Crit Matrix',icon:'💠',cost:2000,desc:'Crits deal 5x',eff:function(){G.critm=5;},bought:false},
+  {id:'s3',tab:'special',name:'Chain Link',icon:'🔗',cost:20000,desc:'Every 100 clicks: burst',eff:function(){G.chain=true;},bought:false},
+  {id:'s4',tab:'special',name:'Singularity',icon:'🌟',cost:50000000,desc:'All x3 permanent',eff:function(){G.gcm*=3;G.cm*=3;},bought:false}
+];
+
+var MS=[
+  {id:'m1',name:'First Signal',check:function(){return G.clicks>=10;},label:'10 clicks',reward:'x2 click',apply:function(){G.cm*=2;}},
+  {id:'m2',name:'Energy Awakened',check:function(){return G.total>=1000;},label:'1K energy',reward:'+5 CPS',apply:function(){G.bps+=5;}},
+  {id:'m3',name:'Builder',check:function(){return totBlds()>=10;},label:'10 buildings',reward:'x1.5 CPS',apply:function(){G.gcm*=1.5;}},
+  {id:'m4',name:'Nexus Hoarder',check:function(){return G.total>=1e6;},label:'1M energy',reward:'x2 click',apply:function(){G.cm*=2;}},
+  {id:'m5',name:'Stellar Empire',check:function(){return totBlds()>=50;},label:'50 buildings',reward:'x2 CPS',apply:function(){G.gcm*=2;}},
+  {id:'m6',name:'Galaxy Brain',check:function(){return G.total>=1e9;},label:'1B energy',reward:'+500 CPS',apply:function(){G.bps+=500;}},
+  {id:'m7',name:'Click Master',check:function(){return G.clicks>=10000;},label:'10K clicks',reward:'x5 click',apply:function(){G.cm*=5;}},
+  {id:'m8',name:'Void Touched',check:function(){return G.total>=1e12;},label:'1T energy',reward:'x3 all',apply:function(){G.gcm*=3;G.cm*=3;}}
+];
+
+var G={en:0,total:0,clicks:0,rebirths:0,shards:0,sb:0,cm:1,cb:0,gcm:1,bps:0,bm:{},lc:0,critm:2,chain:false,streak:0,lastClick:0,msCleared:{},ubought:{},totalRdm:0,rdmSpent:0};
+var blds={};
+BLDS.forEach(function(b){blds[b.id]={cnt:0};});
+
+function calcCps(){var c=G.bps;BLDS.forEach(function(b){c+=blds[b.id].cnt*b.bps*(G.bm[b.id]||1)*G.gcm;});return c*(1+G.sb);}
+function calcCpc(){return Math.max(1,G.cm*(1+G.sb)+G.cb);}
+function bldCost(id){var b=BLDS.find(function(x){return x.id===id;});return Math.ceil(b.bc*Math.pow(1.18,blds[id].cnt));}
+function totBlds(){return BLDS.reduce(function(s,b){return s+blds[b.id].cnt;},0);}
+function rdmAvail(){return Math.floor(G.total/1e9)-G.rdmSpent;}
+
+function doClick(e){
+  var cpc=calcCpc(),crit=false;
+  if(Math.random()<G.lc){cpc*=G.critm;crit=true;}
+  var now=Date.now();
+  if(G.chain&amp;&amp;now-G.lastClick<300){G.streak++;if(G.streak%100===0){var b=cpc*50;G.en+=b;G.total+=b;notif('⚡ Chain! +'+fmt(b));}}else{G.streak=0;}
+  G.lastClick=now;
+  G.en+=cpc;G.total+=cpc;G.clicks++;
+  floatNum(e.clientX,e.clientY,(crit?'💥 ':'+') +fmt(cpc),crit);
+  burst(e.clientX,e.clientY,crit?10:4);
+  if(crit){var o=document.getElementById('mainOrb');o.style.boxShadow='0 0 60px rgba(0,212,255,0.9)';setTimeout(function(){o.style.boxShadow='';},200);}
+  chkMs();updRdm();chkRb();
+}
+document.getElementById('mainOrb').addEventListener('click',doClick);
+
+function floatNum(x,y,t,c){var el=document.createElement('div');el.className='float-num';el.textContent=t;el.style.left=(x-20+Math.random()*40-20)+'px';el.style.top=(y-20)+'px';if(c){el.style.color='#00d4ff';el.style.fontSize='20px';}document.body.appendChild(el);setTimeout(function(){el.remove();},1000);}
+function burst(x,y,n){var cols=['#4466ff','#00d4ff','#00ff88','#ffcc44','#9933ff'];for(var i=0;i<n;i++){var p=document.createElement('div');p.className='particle';p.style.background=cols[Math.floor(Math.random()*cols.length)];p.style.left=x+'px';p.style.top=y+'px';var a=Math.random()*6.28,d=30+Math.random()*50;p.style.setProperty('--dx',Math.cos(a)*d+'px');p.style.setProperty('--dy',Math.sin(a)*d+'px');document.body.appendChild(p);setTimeout(function(){p.remove();},600);}}
+function notif(msg){var el=document.createElement('div');el.className='notif';el.textContent=msg;document.body.appendChild(el);setTimeout(function(){el.remove();},3000);}
+
+function buyBld(id){var c=bldCost(id);if(G.en<c)return;G.en-=c;blds[id].cnt++;rBlds();rUpgs();chkMs();chkRb();}
+function buyUpg(id){var u=UPGS.find(function(x){return x.id===id;});if(!u||u.bought||G.en<u.cost)return;G.en-=u.cost;u.bought=true;G.ubought[id]=1;u.eff();rUpgs();notif('⬡ '+u.name+' unlocked!');}
+
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-bld]');if(b){buyBld(b.dataset.bld);return;}
+  var u=e.target.closest('[data-upg]');if(u){buyUpg(u.dataset.upg);return;}
+  var t=e.target.closest('[data-tab]');if(t){switchTab(t.dataset.tab);return;}
+});
+
+var activeTab='click';
+function switchTab(tab){
+  activeTab=tab;
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===tab);});
+  rUpgs();
+}
+
+function rUpgs(){
+  var grid=document.getElementById('upgGrid');
+  var list=UPGS.filter(function(u){return u.tab===activeTab;});
+  var html='';
+  for(var i=0;i<list.length;i++){
+    var u=list[i];
+    var ca=G.en>=u.cost;
+    var cls=u.bought?'upg bought':(ca?'upg':'upg locked');
+    html+='<div class=&quot;'+cls+'&quot; data-upg=&quot;'+u.id+'&quot;>';
+    if(u.bought)html+='<div class=&quot;upg-tag&quot;>✓</div>';
+    html+='<div class=&quot;upg-icon&quot;>'+u.icon+'</div>';
+    html+='<div class=&quot;upg-name&quot;>'+u.name+'</div>';
+    if(!u.bought)html+='<div class=&quot;upg-cost&quot;>'+fmt(u.cost)+'</div>';
+    html+='<div class=&quot;upg-desc&quot;>'+u.desc+'</div>';
+    html+='</div>';
+  }
+  grid.innerHTML=html;
+}
+
+function rBlds(){
+  var list=document.getElementById('bldList');
+  var html='';
+  for(var i=0;i<BLDS.length;i++){
+    var b=BLDS[i];
+    var c=bldCost(b.id);
+    var cnt=blds[b.id].cnt;
+    var ca=G.en>=c;
+    var locked=!ca&amp;&amp;cnt===0&amp;&amp;G.en<b.bc*0.5;
+    var m=(G.bm[b.id]||1)*G.gcm*(1+G.sb);
+    html+='<div class=&quot;bld'+(locked?' locked':'')+'&quot; data-bld=&quot;'+b.id+'&quot;>';
+    html+='<div class=&quot;bld-icon&quot;>'+b.icon+'</div>';
+    html+='<div class=&quot;bld-info&quot;><div class=&quot;bld-name&quot;>'+b.name+'</div><div class=&quot;bld-desc&quot;>'+b.desc+'</div><div class=&quot;bld-cps&quot;>'+(b.bps*m).toFixed(1)+'/s</div></div>';
+    html+='<div class=&quot;bld-right&quot;><div class=&quot;bld-count&quot;>'+cnt+'</div><div class=&quot;bld-cost&quot;>'+fmt(c)+'</div></div>';
+    html+='</div>';
+  }
+  list.innerHTML=html;
+}
+
+function rMs(){
+  var el=document.getElementById('msList');
+  var html='';
+  for(var i=0;i<MS.length;i++){
+    var m=MS[i];
+    var done=!!G.msCleared[m.id];
+    var pct=0;
+    if(!done){
+      if(m.id==='m1'||m.id==='m7')pct=Math.min(1,G.clicks/(m.id==='m1'?10:10000));
+      else if(m.id==='m3'||m.id==='m5')pct=Math.min(1,totBlds()/(m.id==='m3'?10:50));
+      else{var goals={m2:1000,m4:1e6,m6:1e9,m8:1e12};pct=Math.min(1,G.total/(goals[m.id]||1));}
+    }else pct=1;
+    html+='<div class=&quot;ms-bar&quot; style=&quot;'+(done?'opacity:0.5;border-color:var(--accent3)':'')+'&quot;>';
+    html+='<div class=&quot;ms-hdr&quot;><span class=&quot;ms-name&quot;>'+(done?'✓ ':'')+m.name+'</span><span class=&quot;ms-reward&quot;>'+m.reward+'</span></div>';
+    html+='<div class=&quot;ms-track&quot;><div class=&quot;ms-fill&quot; style=&quot;width:'+(pct*100).toFixed(1)+'%&quot;></div></div>';
+    html+='<div class=&quot;ms-pct&quot;>'+m.label+' — '+(pct*100).toFixed(0)+'%</div>';
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+
+function chkMs(){
+  for(var i=0;i<MS.length;i++){
+    var m=MS[i];
+    if(!G.msCleared[m.id]&amp;&amp;m.check()){G.msCleared[m.id]=true;m.apply();notif('🏆 '+m.name+'! '+m.reward);}
+  }
+}
+
+function rPstars(){
+  var el=document.getElementById('pStars');
+  var h='';
+  var n=Math.max(5,G.rebirths+1);
+  for(var i=0;i<n;i++)h+='<div class=&quot;pstar'+(i<G.rebirths?' earned':'')+'&quot;>⭐</div>';
+  el.innerHTML=h;
+}
+
+function rStats(){
+  document.getElementById('scClicks').textContent=fmt(G.clicks);
+  document.getElementById('scBlds').textContent=fmt(totBlds());
+  document.getElementById('scUpgs').textContent=Object.keys(G.ubought).length;
+  document.getElementById('hTotal').textContent=fmt(G.total);
+  document.getElementById('hShards').textContent=G.shards;
+  document.getElementById('hRebirths').textContent=G.rebirths;
+  document.getElementById('hMsgs').textContent=G.totalRdm;
+}
+
+function updRdm(){
+  var avail=rdmAvail();
+  document.getElementById('rdmCount').textContent=avail+' message'+(avail!==1?'s':'')+' available';
+  var btn=document.getElementById('rdmBtn');
+  btn.classList.toggle('ready',avail>0);
+  btn.style.opacity=avail>0?'1':'0.4';
+}
+
+function doRedeem(){
+  var avail=rdmAvail();
+  if(avail<=0)return;
+  G.rdmSpent+=avail;G.totalRdm+=avail;
+  document.getElementById('rdmTotal').textContent='Total redeemed: '+G.totalRdm;
+  updRdm();
+  window.parent.postMessage({type:'nexusGameRedeem',amount:avail},'*');
+  notif('⬡ Redeemed '+avail+' message'+(avail!==1?'s':'')+'!');
+}
+
+function rbStardust(){return Math.floor(Math.pow(G.total/1e6,0.5));}
+function chkRb(){var sd=rbStardust();document.getElementById('rbBtn').classList.toggle('ready',sd>=1);}
+function openRb(){var sd=rbStardust();document.getElementById('rbReward').textContent='+'+sd+' Shards ('+(sd*5)+'% bonus)';document.getElementById('rbOverlay').classList.add('show');}
+function closeRb(){document.getElementById('rbOverlay').classList.remove('show');}
+function confirmRb(){
+  var sd=rbStardust();G.shards+=sd;G.sb=G.shards*0.05;G.rebirths++;
+  G.en=0;G.total=0;G.clicks=0;G.cm=1;G.cb=0;G.gcm=1;G.bps=0;G.bm={};G.lc=0;G.critm=2;G.chain=false;G.streak=0;G.msCleared={};G.ubought={};G.rdmSpent=0;
+  BLDS.forEach(function(b){blds[b.id].cnt=0;});
+  UPGS.forEach(function(u){u.bought=false;});
+  closeRb();renderAll();notif('⬡ Rebirth! +'+sd+' Shards! Bonus: '+(G.shards*5)+'%');
+}
+
+document.getElementById('rbBtn').addEventListener('click',openRb);
+document.getElementById('rbCancel').addEventListener('click',closeRb);
+document.getElementById('rbConfirm').addEventListener('click',confirmRb);
+document.getElementById('rdmBtn').addEventListener('click',doRedeem);
+document.getElementById('closeBtn').addEventListener('click',function(){window.parent.postMessage({type:'closeNexusGame'},'*');});
+
+function renderAll(){rBlds();rUpgs();rMs();rPstars();rStats();}
+
+setInterval(function(){
+  var cps=calcCps();
+  G.en+=cps/20;G.total+=cps/20;
+  document.getElementById('curAmt').textContent=fmt(G.en);
+  document.getElementById('cpsDisp').textContent=fmt(cps)+' / sec';
+  document.getElementById('cpcDisp').textContent=fmt(calcCpc());
+  chkMs();updRdm();chkRb();rStats();rMs();rBlds();
+},50);
+
+renderAll();
+&lt;/script&gt;
+</body></html>
+    style="width:100%;height:100%;border:none;display:block;"
+    scrolling="no"
+    sandbox="allow-scripts allow-same-origin">
+  </iframe>
 </div>
 
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
