@@ -737,6 +737,7 @@
             <button onclick="N.openModal('changelog-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">📋 Update Log</button>
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
             <button onclick="N.openModal('typegame-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⌨️ Type & Earn</button>
+            <button onclick="N.openModal('flap-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐦 Nexus Flap</button>
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
               <button onclick="N.openOwnerPortal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--danger);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(255,51,85,0.1)'" onmouseout="this.style.background='none'">👑 Owner Portal</button>
@@ -6609,6 +6610,378 @@ window.addEventListener('resize',()=>{
   }
 });
 
+// ── NEXUS FLAP GAME ─────────────────────────────
+let _flapState='idle', _flapScore=0, _flapBest=0, _flapFrame=0;
+let _flapBird, _flapPipes, _flapParticles, _flapStars, _flapRaf=null;
+let _flapInputCooldown=false, _flapScreenAnim=0, _flapEarned=0;
+let _flapActive=false;
+
+function flapInit(){
+  _flapActive=true;
+  const cv=document.getElementById('flap-canvas');
+  if(!cv) return;
+  _flapEarned=0;
+  document.getElementById('flap-earned').textContent='+0';
+  flapInitStars(cv.width,cv.height);
+  flapReset();
+  _flapState='idle';_flapScreenAnim=0;
+  if(_flapRaf){cancelAnimationFrame(_flapRaf);_flapRaf=null;}
+  const container=document.getElementById('flap-container');
+  // Wire controls
+  const newC=container.cloneNode(false);
+  newC.appendChild(cv);
+  container.parentNode.replaceChild(newC,container);
+  newC.addEventListener('click',flapHandleInput);
+  newC.addEventListener('touchstart',e=>{e.preventDefault();flapHandleInput();},{passive:false});
+  document.addEventListener('keydown',_flapKeyHandler);
+  _flapLoop();
+}
+
+function flapStop(){
+  _flapActive=false;
+  if(_flapRaf){cancelAnimationFrame(_flapRaf);_flapRaf=null;}
+  document.removeEventListener('keydown',_flapKeyHandler);
+  flapSaveEarned();
+}
+
+function _flapKeyHandler(e){
+  if(!_flapActive) return;
+  if(e.code==='Space'){e.preventDefault();flapHandleInput();}
+}
+
+function flapInitStars(W,H){
+  _flapStars=[];
+  for(let i=0;i<80;i++) _flapStars.push({
+    x:Math.random()*W,y:Math.random()*H*0.85,
+    r:Math.random()*1.4+0.3,tw:Math.random()*Math.PI*2,
+    tws:Math.random()*0.03+0.01,
+    c:['#fff','#4466ff','#00d4ff','#9933ff'][Math.floor(Math.random()*4)]
+  });
+}
+
+function flapReset(){
+  const cv=document.getElementById('flap-canvas');
+  if(!cv) return;
+  _flapFrame=0;_flapScore=0;
+  _flapBird={x:72,y:cv.height/2,vy:0,angle:0,trail:[],alive:true,_df:undefined};
+  _flapPipes=[];_flapParticles=[];
+}
+
+function flapSpawnPipe(){
+  const cv=document.getElementById('flap-canvas');
+  if(!cv) return;
+  const W=cv.width,H=cv.height,gap=150;
+  const topH=Math.random()*(H-180-gap)+70;
+  _flapPipes.push({x:W+20,topH,botY:topH+gap,scored:false,hue:200+Math.random()*80});
+}
+
+function flapFlap(){
+  if(_flapState==='playing'&&_flapBird.alive){
+    _flapBird.vy=-7;
+    flapSpawnParticles(_flapBird.x,_flapBird.y,'#4466ff',5);
+  }
+}
+
+function flapSpawnParticles(x,y,color,count){
+  for(let i=0;i<count;i++){
+    const a=Math.random()*Math.PI*2,spd=Math.random()*2.5+0.5;
+    _flapParticles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,
+      life:1,decay:Math.random()*0.04+0.025,color,r:Math.random()*3+1});
+  }
+}
+
+function flapCircHitsRect(cx,cy,cr,rx,ry,rw,rh){
+  const nx=Math.max(rx,Math.min(cx,rx+rw));
+  const ny=Math.max(ry,Math.min(cy,ry+rh));
+  const dx=cx-nx,dy=cy-ny;
+  return dx*dx+dy*dy<cr*cr;
+}
+
+function flapUpdate(){
+  if(_flapState!=='playing') return;
+  const cv=document.getElementById('flap-canvas');
+  if(!cv) return;
+  const W=cv.width,H=cv.height;
+  _flapFrame++;
+  _flapBird.vy+=0.4;
+  _flapBird.vy=Math.min(_flapBird.vy,11);
+  _flapBird.y+=_flapBird.vy;
+  _flapBird.angle=Math.max(-0.45,Math.min(Math.PI/2.2,_flapBird.vy*0.07));
+  const speed=2.6+_flapScore*0.03;
+  if(_flapFrame%95===0) flapSpawnPipe();
+  for(const p of _flapPipes){
+    p.x-=speed;
+    if(!p.scored&&p.x+52<_flapBird.x-10){
+      p.scored=true;_flapScore++;
+      // Award +2 messages per point
+      _flapEarned+=2;
+      document.getElementById('flap-earned').textContent='+'+_flapEarned;
+      flapSpawnParticles(_flapBird.x,_flapBird.y,'#ffcc00',10);
+      flapSpawnParticles(_flapBird.x,_flapBird.y,'#4466ff',7);
+    }
+    if(_flapBird.alive){
+      const bx=_flapBird.x,by=_flapBird.y,br=10;
+      const pw=48,capH=14,capW=58,capX=p.x-5;
+      if(flapCircHitsRect(bx,by,br,p.x,0,pw,p.topH-capH)||
+         flapCircHitsRect(bx,by,br,capX,p.topH-capH,capW,capH)||
+         flapCircHitsRect(bx,by,br,capX,p.botY,capW,capH)||
+         flapCircHitsRect(bx,by,br,p.x,p.botY+capH,pw,H-p.botY-capH)){
+        flapDie();
+      }
+    }
+  }
+  _flapPipes=_flapPipes.filter(p=>p.x>-80);
+  if(_flapBird.y+10>H-60){_flapBird.y=H-70;flapDie();}
+  if(_flapBird.y-10<0){_flapBird.y=10;_flapBird.vy=1;}
+}
+
+async function flapDie(){
+  if(!_flapBird.alive) return;
+  _flapBird.alive=false;
+  _flapBird._df=_flapFrame;
+  if(_flapScore>_flapBest) _flapBest=_flapScore;
+  flapSpawnParticles(_flapBird.x,_flapBird.y,'#ff3355',20);
+  flapSpawnParticles(_flapBird.x,_flapBird.y,'#ff8800',12);
+  flapSpawnParticles(_flapBird.x,_flapBird.y,'#fff',8);
+  // Save earned messages immediately on death
+  if(_flapEarned>0) await flapSaveEarned();
+  setTimeout(()=>{_flapState='dead';_flapScreenAnim=0;},700);
+}
+
+async function flapSaveEarned(){
+  if(_flapEarned<=0||!cu||!cud) return;
+  const earned=_flapEarned;
+  _flapEarned=0;
+  try{
+    const newCount=(cud.msgCount||0)+earned;
+    await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+    cud={...cud,msgCount:newCount};
+    uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+    renderProfile();
+    toast('🐦 +'+earned+' messages earned from Nexus Flap!','success');
+  }catch(e){toast('Could not save score.','danger');}
+}
+
+function flapDrawBg(ctx,W,H){
+  const bg=ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#020208');bg.addColorStop(0.5,'#050515');bg.addColorStop(1,'#080510');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  _flapStars.forEach(s=>{
+    s.tw+=s.tws;
+    const alpha=0.4+0.6*Math.abs(Math.sin(s.tw));
+    ctx.save();ctx.globalAlpha=alpha;
+    ctx.fillStyle=s.c;ctx.shadowColor=s.c;ctx.shadowBlur=s.r*4;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();ctx.restore();
+  });
+}
+
+function flapDrawGround(ctx,W,H){
+  const gY=H-55;
+  ctx.fillStyle='#030314';ctx.fillRect(0,gY+2,W,H-gY);
+  ctx.strokeStyle='#4466ff';ctx.lineWidth=2;
+  ctx.shadowColor='#4466ff';ctx.shadowBlur=12;
+  ctx.beginPath();ctx.moveTo(0,gY);ctx.lineTo(W,gY);ctx.stroke();
+  ctx.shadowBlur=0;
+}
+
+function flapDrawPipe(ctx,p,H){
+  const pw=48,capH=14,capW=58,capX=p.x-5,hue=p.hue;
+  ctx.save();
+  ctx.shadowColor=`hsl(${hue},100%,60%)`;ctx.shadowBlur=16;
+  function body(x,y,w,h){
+    if(h<=0) return;
+    const g=ctx.createLinearGradient(x,0,x+w,0);
+    g.addColorStop(0,`hsl(${hue},70%,6%)`);g.addColorStop(0.3,`hsl(${hue},80%,18%)`);
+    g.addColorStop(0.5,`hsl(${hue},90%,30%)`);g.addColorStop(0.7,`hsl(${hue},80%,18%)`);
+    g.addColorStop(1,`hsl(${hue},70%,6%)`);
+    ctx.fillStyle=g;ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle=`hsl(${hue},100%,65%)`;ctx.lineWidth=1.5;ctx.strokeRect(x+0.75,y,w-1.5,h);
+  }
+  body(p.x,0,pw,p.topH-capH);
+  body(capX,p.topH-capH,capW,capH);
+  body(capX,p.botY,capW,capH);
+  body(p.x,p.botY+capH,pw,H-p.botY-capH);
+  ctx.restore();
+}
+
+function flapDrawBird(ctx,W,H){
+  const b=_flapBird,sz=18;
+  b.trail.push({x:b.x,y:b.y,age:0});
+  if(b.trail.length>14) b.trail.shift();
+  b.trail.forEach(t=>{
+    t.age++;
+    ctx.save();ctx.globalAlpha=(1-t.age/14)*0.4;
+    ctx.fillStyle='#4466ff';ctx.shadowColor='#4466ff';ctx.shadowBlur=6;
+    ctx.beginPath();ctx.arc(t.x,t.y,Math.max(0,sz*0.35*(1-t.age/14)),0,Math.PI*2);ctx.fill();ctx.restore();
+  });
+  ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.angle);
+  // Glow
+  const og=ctx.createRadialGradient(0,0,sz*0.5,0,0,sz*1.8);
+  og.addColorStop(0,'rgba(68,102,255,0.3)');og.addColorStop(1,'transparent');
+  ctx.fillStyle=og;ctx.beginPath();ctx.arc(0,0,sz*1.8,0,Math.PI*2);ctx.fill();
+  // Body
+  const bg2=ctx.createRadialGradient(-3,-3,2,0,0,sz);
+  bg2.addColorStop(0,'#ffffff');bg2.addColorStop(0.25,'#88aaff');
+  bg2.addColorStop(0.6,'#4466ff');bg2.addColorStop(1,'#112');
+  ctx.fillStyle=bg2;ctx.shadowColor='#4466ff';ctx.shadowBlur=18;
+  ctx.beginPath();ctx.arc(0,0,sz*0.8,0,Math.PI*2);ctx.fill();
+  // NEXUS logo text on bird
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(0,212,255,0.7)';
+  ctx.font=`900 ${sz*0.28}px Orbitron,monospace`;ctx.textAlign='center';
+  ctx.fillText('N',0,sz*0.1);
+  // Wing
+  ctx.save();ctx.rotate(-0.3+Math.sin(_flapFrame*0.25)*0.4);
+  const wg=ctx.createLinearGradient(-sz,0,sz*0.3,sz*0.5);
+  wg.addColorStop(0,'rgba(68,102,255,0.7)');wg.addColorStop(1,'rgba(0,212,255,0.3)');
+  ctx.fillStyle=wg;ctx.shadowColor='#4466ff';ctx.shadowBlur=8;
+  ctx.beginPath();ctx.ellipse(-sz*0.3,sz*0.2,sz*0.6,sz*0.25,-0.3,0,Math.PI*2);ctx.fill();ctx.restore();
+  // Eye
+  ctx.fillStyle='#fff';ctx.shadowBlur=0;
+  ctx.beginPath();ctx.arc(sz*0.35,-sz*0.15,sz*0.2,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#001133';ctx.beginPath();ctx.arc(sz*0.4,-sz*0.12,sz*0.1,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#00d4ff';ctx.beginPath();ctx.arc(sz*0.38,-sz*0.14,sz*0.04,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+}
+
+function flapDrawParticles(ctx){
+  _flapParticles=_flapParticles.filter(p=>p.life>0);
+  _flapParticles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.08;p.life-=p.decay;
+    ctx.save();ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=8;
+    ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0,p.r*p.life),0,Math.PI*2);ctx.fill();ctx.restore();
+  });
+}
+
+function flapDrawScore(ctx,W){
+  ctx.save();
+  ctx.font='900 34px Orbitron,monospace';
+  ctx.textAlign='center';ctx.fillStyle='#fff';
+  ctx.shadowColor='#4466ff';ctx.shadowBlur=20;
+  ctx.fillText(_flapScore,W/2,48);ctx.restore();
+}
+
+function flapDrawIdle(ctx,W,H){
+  _flapScreenAnim+=0.04;
+  const pulse=0.82+0.18*Math.sin(_flapScreenAnim*2);
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';
+  ctx.shadowColor='#4466ff';ctx.shadowBlur=28*pulse;
+  ctx.font=`900 38px Orbitron,monospace`;
+  ctx.fillStyle=`rgba(68,102,255,${0.7+0.3*pulse})`;
+  ctx.fillText('NEXUS FLAP',W/2,H/2-58);
+  ctx.shadowBlur=6;ctx.font='400 9px Orbitron,monospace';
+  ctx.fillStyle='#00d4ff';
+  ctx.fillText('EVERY POINT = +2 MESSAGES',W/2,H/2-36);
+  if(Math.sin(_flapScreenAnim*3)>0){
+    ctx.shadowColor='#4466ff';ctx.shadowBlur=14;
+    ctx.font='700 13px Orbitron,monospace';ctx.fillStyle='#4466ff';
+    ctx.fillText('[ TAP TO FLY ]',W/2,H/2+18);
+  }
+  ctx.shadowBlur=0;ctx.font='400 9px Orbitron,monospace';
+  ctx.fillStyle='rgba(255,255,255,0.25)';
+  ctx.fillText('SPACE OR CLICK',W/2,H/2+42);
+  ctx.restore();
+}
+
+function flapDrawDead(ctx,W,H){
+  _flapScreenAnim+=0.05;
+  const ease=Math.min(1,_flapScreenAnim/1.2);
+  const slideY=(1-ease)*40;
+  ctx.save();
+  ctx.fillStyle=`rgba(0,0,0,${0.6*ease})`;ctx.fillRect(0,0,W,H);
+  const cw=260,ch=200,cx=(W-cw)/2,cy=H/2-ch/2-10+slideY;
+  ctx.globalAlpha=ease;
+  ctx.shadowColor='#4466ff';ctx.shadowBlur=20;
+  ctx.fillStyle='#08081a';
+  ctx.beginPath();ctx.roundRect(cx,cy,cw,ch,12);ctx.fill();
+  ctx.strokeStyle='rgba(68,102,255,0.7)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(cx,cy,cw,ch,12);ctx.stroke();
+  ctx.shadowBlur=0;
+  // Header
+  const hg=ctx.createLinearGradient(cx,cy,cx+cw,cy+42);
+  hg.addColorStop(0,'#4466ff');hg.addColorStop(1,'#00d4ff');
+  ctx.fillStyle=hg;
+  ctx.beginPath();ctx.roundRect(cx,cy,cw,42,[12,12,0,0]);ctx.fill();
+  ctx.font='900 15px Orbitron,monospace';ctx.textAlign='center';
+  ctx.fillStyle='#fff';ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=4;
+  ctx.fillText('GAME OVER',W/2,cy+28);ctx.shadowBlur=0;
+  // Labels
+  ctx.font='400 9px Orbitron,monospace';
+  ctx.fillStyle='rgba(68,102,255,0.5)';
+  ctx.fillText('SCORE',W/2-55,cy+66);
+  ctx.fillText('BEST',W/2+55,cy+66);
+  // Numbers
+  ctx.font='900 30px Orbitron,monospace';
+  ctx.fillStyle='#ffcc00';ctx.shadowColor='#ffcc00';ctx.shadowBlur=12;
+  ctx.fillText(_flapScore,W/2-55,cy+100);
+  const isNewBest=_flapScore>0&&_flapScore>=_flapBest;
+  ctx.fillStyle=isNewBest?'#00ff88':'#aaa';
+  ctx.shadowColor=isNewBest?'#00ff88':'#555';ctx.shadowBlur=isNewBest?12:4;
+  ctx.fillText(_flapBest,W/2+55,cy+100);ctx.shadowBlur=0;
+  if(isNewBest){
+    ctx.font='700 8px Orbitron,monospace';ctx.fillStyle='#00ff88';
+    ctx.shadowColor='#00ff88';ctx.shadowBlur=8;
+    ctx.fillText('NEW BEST!',W/2+55,cy+115);ctx.shadowBlur=0;
+  }
+  // Earned
+  ctx.font='700 11px Orbitron,monospace';ctx.fillStyle='#00d4ff';
+  ctx.shadowColor='#00d4ff';ctx.shadowBlur=8;
+  ctx.fillText('+'+(_flapScore*2)+' MESSAGES EARNED',W/2,cy+142);ctx.shadowBlur=0;
+  // Divider
+  ctx.strokeStyle='rgba(68,102,255,0.2)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(cx+20,cy+155);ctx.lineTo(cx+cw-20,cy+155);ctx.stroke();
+  // Restart
+  const ready=ease>=0.88;
+  const bp=ready?0.65+0.35*Math.sin(_flapScreenAnim*4):0;
+  ctx.font='700 11px Orbitron,monospace';
+  ctx.shadowColor='#4466ff';ctx.shadowBlur=ready?12*bp:0;
+  ctx.fillStyle=ready?`rgba(68,102,255,${bp})`:'rgba(68,102,255,0.15)';
+  ctx.fillText('[ TAP TO RESTART ]',W/2,cy+182);
+  ctx.shadowBlur=0;ctx.restore();
+}
+
+function flapDrawDeathFlash(ctx,W,H){
+  const t=Math.min(1,(_flapFrame-_flapBird._df)/18);
+  ctx.save();ctx.fillStyle=`rgba(255,51,85,${0.3*(1-t)})`;ctx.fillRect(0,0,W,H);ctx.restore();
+}
+
+function _flapLoop(){
+  if(!_flapActive) return;
+  const cv=document.getElementById('flap-canvas');
+  if(!cv){_flapActive=false;return;}
+  const ctx2=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx2.clearRect(0,0,W,H);
+  flapDrawBg(ctx2,W,H);
+  flapUpdate();
+  _flapPipes.forEach(p=>flapDrawPipe(ctx2,p,H));
+  flapDrawGround(ctx2,W,H);
+  if(_flapState!=='idle') flapDrawBird(ctx2,W,H);
+  flapDrawParticles(ctx2);
+  if(_flapState==='playing') flapDrawScore(ctx2,W);
+  if(!_flapBird.alive&&_flapBird._df!==undefined) flapDrawDeathFlash(ctx2,W,H);
+  if(_flapState==='idle') flapDrawIdle(ctx2,W,H);
+  if(_flapState==='dead') flapDrawDead(ctx2,W,H);
+  _flapRaf=requestAnimationFrame(_flapLoop);
+}
+
+function flapStartGame(){
+  flapReset();
+  _flapState='playing';_flapScreenAnim=0;
+  _flapInputCooldown=true;
+  setTimeout(()=>{_flapInputCooldown=false;},320);
+  setTimeout(flapSpawnPipe,1100);
+}
+
+function flapHandleInput(){
+  if(_flapInputCooldown) return;
+  if(_flapState==='idle'){flapStartGame();return;}
+  if(_flapState==='dead'&&_flapScreenAnim>=1.1){flapStartGame();return;}
+  if(_flapState==='playing') flapFlap();
+}
+
 // ── GLOBAL EVENTS ──────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
@@ -6658,11 +7031,13 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
+  flapInit, flapStop,
 };
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
 // Expose game fns globally for modal onclicks
 window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
+window.flapStop=flapStop;window.flapInit=flapInit;
 // Expose lightbox fns globally (used in HTML onclick attributes)
 window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
 
@@ -6757,6 +7132,28 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
 </style>
 
 <input id="tg-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position:fixed;top:-999px;left:-999px;opacity:0;">
+
+<!-- NEXUS FLAP MODAL -->
+<div class="modal-overlay" id="flap-modal" style="align-items:center;justify-content:center;">
+  <div style="background:#050508;border:1px solid rgba(68,102,255,0.3);border-radius:16px;padding:20px;position:relative;box-shadow:0 0 40px rgba(68,102,255,0.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:20px;">
+      <div>
+        <div style="font-family:'Orbitron',monospace;font-size:13px;letter-spacing:4px;background:linear-gradient(135deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">NEXUS FLAP</div>
+        <div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:#5a5a7a;letter-spacing:2px;margin-top:2px;">EVERY POINT = +2 MESSAGES</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="text-align:center;">
+          <div style="font-size:8px;color:#3a3a45;font-family:'JetBrains Mono',monospace;letter-spacing:2px;">EARNED</div>
+          <div id="flap-earned" style="font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:700;color:#00d4ff;">+0</div>
+        </div>
+        <button onclick="N.closeModal('flap-modal');flapStop()" style="background:none;border:1px solid rgba(100,100,255,0.2);border-radius:6px;color:#5a5a7a;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">✕</button>
+      </div>
+    </div>
+    <div id="flap-container" style="position:relative;width:360px;height:540px;border:1px solid rgba(68,102,255,0.25);border-radius:8px;overflow:hidden;cursor:pointer;user-select:none;box-shadow:0 0 20px rgba(68,102,255,0.1);">
+      <canvas id="flap-canvas" width="360" height="540" style="display:block;width:100%;height:100%;"></canvas>
+    </div>
+  </div>
+</div>
 
 <div id="lightbox" onclick="if(event.target===this)closeLightbox()">
   <button id="lightbox-close" onclick="closeLightbox()">✕</button>
