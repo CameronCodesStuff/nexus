@@ -6639,7 +6639,10 @@ function flapInit(){
   }
   document.removeEventListener('keydown',_flapKeyHandler);
   document.addEventListener('keydown',_flapKeyHandler);
-  _flapLoop();
+  // Ensure Orbitron font is loaded before starting loop
+  document.fonts.load("900 16px Orbitron").catch(()=>{}).finally(()=>{
+    _flapLoop();
+  });
 }
 
 function flapStop(){
@@ -6830,10 +6833,9 @@ function flapDrawBird(ctx,W,H){
   bg2.addColorStop(0.6,'#4466ff');bg2.addColorStop(1,'#112');
   ctx.fillStyle=bg2;ctx.shadowColor='#4466ff';ctx.shadowBlur=18;
   ctx.beginPath();ctx.arc(0,0,sz*0.8,0,Math.PI*2);ctx.fill();
-  // NEXUS logo text on bird
-  ctx.shadowBlur=0;ctx.fillStyle='rgba(0,212,255,0.7)';
-  ctx.font=`900 ${sz*0.28}px Orbitron,monospace`;ctx.textAlign='center';
-  ctx.fillText('N',0,sz*0.1);
+  // NEXUS logo - simple dot instead of text to avoid font issues
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(0,212,255,0.8)';
+  ctx.beginPath();ctx.arc(0,0,sz*0.15,0,Math.PI*2);ctx.fill();
   // Wing
   ctx.save();ctx.rotate(-0.3+Math.sin(_flapFrame*0.25)*0.4);
   const wg=ctx.createLinearGradient(-sz,0,sz*0.3,sz*0.5);
@@ -6873,7 +6875,7 @@ function flapDrawIdle(ctx,W,H){
   ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,W,H);
   ctx.textAlign='center';
   ctx.shadowColor='#4466ff';ctx.shadowBlur=28*pulse;
-  ctx.font=`900 38px Orbitron,monospace`;
+  ctx.font='900 36px Orbitron,monospace';
   ctx.fillStyle=`rgba(68,102,255,${0.7+0.3*pulse})`;
   ctx.fillText('NEXUS FLAP',W/2,H/2-58);
   ctx.shadowBlur=6;ctx.font='400 9px Orbitron,monospace';
@@ -6890,6 +6892,17 @@ function flapDrawIdle(ctx,W,H){
   ctx.restore();
 }
 
+function flapRR(ctx,x,y,w,h,r){
+  // roundRect polyfill for older browsers
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
 function flapDrawDead(ctx,W,H){
   _flapScreenAnim+=0.05;
   const ease=Math.min(1,_flapScreenAnim/1.2);
@@ -6900,15 +6913,15 @@ function flapDrawDead(ctx,W,H){
   ctx.globalAlpha=ease;
   ctx.shadowColor='#4466ff';ctx.shadowBlur=20;
   ctx.fillStyle='#08081a';
-  ctx.beginPath();ctx.roundRect(cx,cy,cw,ch,12);ctx.fill();
+  flapRR(ctx,cx,cy,cw,ch,12);ctx.fill();
   ctx.strokeStyle='rgba(68,102,255,0.7)';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.roundRect(cx,cy,cw,ch,12);ctx.stroke();
+  flapRR(ctx,cx,cy,cw,ch,12);ctx.stroke();
   ctx.shadowBlur=0;
   // Header
   const hg=ctx.createLinearGradient(cx,cy,cx+cw,cy+42);
   hg.addColorStop(0,'#4466ff');hg.addColorStop(1,'#00d4ff');
   ctx.fillStyle=hg;
-  ctx.beginPath();ctx.roundRect(cx,cy,cw,42,[12,12,0,0]);ctx.fill();
+  flapRR(ctx,cx,cy,cw,42,12);ctx.fill();
   ctx.font='900 15px Orbitron,monospace';ctx.textAlign='center';
   ctx.fillStyle='#fff';ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=4;
   ctx.fillText('GAME OVER',W/2,cy+28);ctx.shadowBlur=0;
