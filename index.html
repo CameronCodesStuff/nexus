@@ -3683,6 +3683,11 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
 
   const pc = new RTCPeerConnection(ICE_SERVERS);
   peerConns[remoteUid] = pc;
+  // Clean up any stale signals between us and this peer from previous connections
+  getDocs(query(collection(db,'calls',callId,'signals'),
+    where('from','==',cu.uid),where('to','==',remoteUid)))
+    .then(snap=>snap.docs.forEach(d=>deleteDoc(d.ref).catch(()=>{})))
+    .catch(()=>{});
 
   // Queue ICE candidates until remote description is set
   let icePending = [];
@@ -3763,20 +3768,33 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
       const sig=ch.doc.data();
       try{
         if(sig.type==='offer'){
-          await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
-          remoteSet=true;
-          await drainIce();
-          const answer=await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await addDoc(collection(db,'calls',callId,'signals'),{
-            from:cu.uid, to:remoteUid, type:'answer',
-            payload:{type:answer.type,sdp:answer.sdp}, ts:serverTimestamp()
-          });
+          // Perfect negotiation: if collision (we also sent an offer), polite peer rolls back
+          const offerCollision = pc.signalingState !== 'stable' && isInitiator;
+          const isPolite = cu.uid < remoteUid; // smaller UID = polite
+          if(offerCollision && !isPolite){
+            // Impolite peer ignores the incoming offer — our offer wins
+          } else {
+            if(offerCollision){
+              // Polite peer rolls back and accepts incoming offer
+              await pc.setLocalDescription({type:'rollback'}).catch(()=>{});
+            }
+            await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+            remoteSet=true;
+            await drainIce();
+            const answer=await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await addDoc(collection(db,'calls',callId,'signals'),{
+              from:cu.uid, to:remoteUid, type:'answer',
+              payload:{type:answer.type,sdp:answer.sdp}, ts:serverTimestamp()
+            });
+          }
         } else if(sig.type==='answer'){
           if(pc.signalingState==='have-local-offer'){
             await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
             remoteSet=true;
             await drainIce();
+          } else {
+            // Ignore answer in wrong state (collision resolved by polite/impolite)
           }
         } else if(sig.type==='ice'){
           if(remoteSet){
@@ -3905,7 +3923,15 @@ function updateVideoGrid(){
   const grid=document.getElementById('video-grid');
   if(!grid) return;
   const n=grid.children.length;
-  grid.className='video-grid'+(n>=2?' two-col':'');
+  grid.className='video-grid'+(n===2?' two-col':n>=3?' two-col':'');
+  // Ensure grid fills the call body properly
+  if(n>=3){
+    grid.style.gridTemplateColumns='repeat(2,1fr)';
+  } else if(n===2){
+    grid.style.gridTemplateColumns='1fr 1fr';
+  } else {
+    grid.style.gridTemplateColumns='1fr';
+  }
 }
 
 function endCall(endForEveryone=false){
@@ -6637,6 +6663,8 @@ window._N = {
 Object.assign(window.N, window._N);
 // Expose game fns globally for modal onclicks
 window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
+// Expose lightbox fns globally (used in HTML onclick attributes)
+window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
 
 </script>
 <!-- TTT MODAL -->
