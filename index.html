@@ -3517,40 +3517,7 @@ function startCallTimer(){
   },1000);
 }
 
-function updateCallJoinButton(chatId, callId, status){
-  // Only update if this is the currently open chat
-  if(chatId !== acid) return;
-  const audioBtn = document.querySelector('.icon-btn[title="Audio Call"]');
-  const videoBtn = document.querySelector('.icon-btn[title="Video Call"]');
-  if(!audioBtn || !videoBtn) return;
-  if(callId && !activeCallId){
-    // Active call in this chat — show green join indicator on call buttons
-    const isRinging = status === 'ringing';
-    audioBtn.style.color = 'var(--success)';
-    audioBtn.style.background = 'rgba(0,255,136,0.15)';
-    audioBtn.style.border = '1px solid var(--success)';
-    audioBtn.title = isRinging ? 'Join Call (ringing)' : 'Join Active Call';
-    videoBtn.style.color = 'var(--success)';
-    videoBtn.style.background = 'rgba(0,255,136,0.15)';
-    videoBtn.style.border = '1px solid var(--success)';
-    videoBtn.title = isRinging ? 'Join Call (ringing)' : 'Join Active Call';
-    // Override onclick to join existing call instead of starting new one
-    audioBtn.onclick = ()=>N.answerCall(callId);
-    videoBtn.onclick = ()=>N.answerCall(callId);
-  } else {
-    // No active call — reset to normal
-    audioBtn.style.color = '';
-    audioBtn.style.background = '';
-    audioBtn.style.border = '';
-    audioBtn.title = 'Audio Call';
-    videoBtn.style.color = '';
-    videoBtn.style.background = '';
-    videoBtn.style.border = '';
-    videoBtn.title = 'Video Call';
-    audioBtn.onclick = ()=>N.startCall('audio');
-    videoBtn.onclick = ()=>N.startCall('video');
-  }
-}
+function updateCallJoinButton(chatId, callId, status){ /* removed */ }
 
 function listenForIncomingCalls(){
   if(incomingCallUnsub) incomingCallUnsub();
@@ -3754,7 +3721,8 @@ function watchCallDoc(callId){
         knownMembers.add(uid);
         // Only create if no existing working connection
         if(!peerConns[uid]||peerConns[uid].connectionState==='failed'||peerConns[uid].connectionState==='closed'){
-          createPeerConnection(uid, true, callId, data.mode);
+          // Small delay so answerer has time to set up their signal listener
+          setTimeout(()=>createPeerConnection(uid, true, callId, data.mode), 800);
         }
       }
     });
