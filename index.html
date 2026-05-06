@@ -3479,8 +3479,8 @@ const ICE_SERVERS = {
     },
   ],
   iceCandidatePoolSize:10,
-  bundlePolicy:'max-bundle',
-  rtcpMuxPolicy:'require',
+  bundlePolicy:'max-compat',
+  rtcpMuxPolicy:'negotiate',
 };
 
 let incomingCallUnsub = null;// listener for incoming calls (declared early)
@@ -3763,7 +3763,7 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
       setTimeout(async()=>{
         if(pc.connectionState==='disconnected'||pc.connectionState==='failed'){
           try{
-            const offer=await pc.createOffer({iceRestart:true});
+            const offer=await pc.createOffer();
             await pc.setLocalDescription(offer);
             if(activeCallId){
               await addDoc(collection(db,'calls',activeCallId,'signals'),{
