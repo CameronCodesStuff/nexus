@@ -6934,16 +6934,26 @@ function openDriftGame(){
   const overlay=document.getElementById('drift-game-overlay');
   if(!overlay) return;
   overlay.style.display='flex';
-  // Load drift game into iframe if not already loaded
   const iframe=document.getElementById('drift-game-iframe');
   if(iframe && !iframe._loaded){
     iframe._loaded=true;
     iframe.srcdoc=window._DRIFT_SRCDOC||'';
+    iframe.addEventListener('load',()=>{
+      try{
+        const s=iframe.contentDocument.createElement('script');
+        s.textContent="window.addEventListener('message',function(e){if(e.data&&e.data.type==='requestDriftScore'){try{window.parent.postMessage({type:'driftScore',score:score},'*');}catch(ex){}}});";
+        iframe.contentDocument.body.appendChild(s);
+      }catch(e2){}
+    },{once:true});
   }
 }
 function closeDriftGame(){
-  const overlay=document.getElementById('drift-game-overlay');
-  if(overlay) overlay.style.display='none';
+  const iframe=document.getElementById('drift-game-iframe');
+  try{if(iframe&&iframe.contentWindow)iframe.contentWindow.postMessage({type:'requestDriftScore'},'*');}catch(e){}
+  setTimeout(()=>{
+    const overlay=document.getElementById('drift-game-overlay');
+    if(overlay)overlay.style.display='none';
+  },200);
 }
 function openNexusGame(){
   const overlay=document.getElementById('nexus-game-overlay');
