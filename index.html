@@ -7229,62 +7229,60 @@ iStars();reset();loop();
 
 <!-- Games Hub Modal -->
 <div id="games-hub-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('games-hub-modal')">
-  <div class="modal-box" style="width:480px;max-width:95vw;">
-    <div class="modal-header">
-      <span class="modal-title">🎮 Games</span>
-      <button class="modal-close" onclick="N.closeModal('games-hub-modal')">✕</button>
-    </div>
-    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  <div class="modal" style="width:520px;">
+    <div class="modal-title">🎮 GAMES</div>
+    <button class="modal-close" onclick="N.closeModal('games-hub-modal')">✕</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px;">
 
       <!-- Type & Earn -->
       <div class="game-card" onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')">
-        <div class="game-thumb" style="background:linear-gradient(135deg,#0d0d18,#1a1a2e);">
-          <div style="font-size:28px;margin-bottom:4px;">⌨️</div>
-          <div style="font-size:9px;letter-spacing:2px;color:#4466ff;font-family:var(--font-mono);">TYPE & EARN</div>
-          <div style="font-size:8px;color:#5a5a7a;margin-top:2px;">earn messages</div>
+        <div class="game-thumb">
+          <div class="game-thumb-icon">⌨️</div>
+          <div class="game-thumb-label" style="color:var(--accent);">TYPE & EARN</div>
+          <div class="game-thumb-tag">earns messages</div>
         </div>
-        <div class="game-card-info">
+        <div class="game-card-body">
           <div class="game-card-name">Type &amp; Earn</div>
-          <div class="game-card-desc">Type words to earn messages. 15s / 30s / 60s / 120s modes.</div>
+          <div class="game-card-desc">Type words as fast as you can. Each correct word earns +1 message. 15s–120s modes.</div>
         </div>
       </div>
 
       <!-- Nexus Flap -->
       <div class="game-card" onclick="N.closeModal('games-hub-modal');N.openFlapGame()">
-        <div class="game-thumb" style="background:linear-gradient(135deg,#050515,#0a1a30);">
-          <div style="font-size:28px;margin-bottom:4px;">🐦</div>
-          <div style="font-size:9px;letter-spacing:2px;color:#00d4ff;font-family:var(--font-mono);">NEXUS FLAP</div>
-          <div style="font-size:8px;color:#5a5a7a;margin-top:2px;">earn messages</div>
+        <div class="game-thumb">
+          <div class="game-thumb-icon">🐦</div>
+          <div class="game-thumb-label" style="color:var(--accent2);">NEXUS FLAP</div>
+          <div class="game-thumb-tag">earns messages</div>
         </div>
-        <div class="game-card-info">
+        <div class="game-card-body">
           <div class="game-card-name">Nexus Flap</div>
-          <div class="game-card-desc">Flappy bird — every point earns +2 messages. Speed increases.</div>
+          <div class="game-card-desc">Flap through pipes — each point earns +2 messages. Gets faster as you score.</div>
         </div>
       </div>
 
       <!-- Nexus Energy -->
       <div class="game-card" onclick="N.closeModal('games-hub-modal');N.openNexusGame()">
-        <div class="game-thumb" style="background:linear-gradient(135deg,#050508,#060620);">
-          <div style="font-size:28px;margin-bottom:4px;">⬡</div>
-          <div style="font-size:9px;letter-spacing:2px;color:#4466ff;font-family:var(--font-mono);">NEXUS ENERGY</div>
-          <div style="font-size:8px;color:#5a5a7a;margin-top:2px;">earn messages</div>
+        <div class="game-thumb">
+          <div class="game-thumb-icon">⬡</div>
+          <div class="game-thumb-label" style="color:var(--accent);">NEXUS ENERGY</div>
+          <div class="game-thumb-tag">earns messages</div>
         </div>
-        <div class="game-card-info">
+        <div class="game-card-body">
           <div class="game-card-name">Nexus Energy</div>
-          <div class="game-card-desc">Cosmic clicker — collect energy &amp; redeem for messages.</div>
+          <div class="game-card-desc">Cosmic clicker — build up energy and redeem it for messages. 50B = 1 msg.</div>
         </div>
       </div>
 
       <!-- Drift King -->
       <div class="game-card" onclick="N.closeModal('games-hub-modal');N.openDriftGame()">
-        <div class="game-thumb" style="background:linear-gradient(135deg,#0d0d0f,#1a0a00);">
-          <div style="font-size:28px;margin-bottom:4px;">🚗</div>
-          <div style="font-size:9px;letter-spacing:2px;color:#ff4500;font-family:var(--font-mono);">DRIFT KING</div>
-          <div style="font-size:8px;color:#5a5a7a;margin-top:2px;">no messages earned</div>
+        <div class="game-thumb">
+          <div class="game-thumb-icon">🚗</div>
+          <div class="game-thumb-label" style="color:#ff4500;">DRIFT KING</div>
+          <div class="game-thumb-tag" style="color:var(--text-dim);">just for fun</div>
         </div>
-        <div class="game-card-info">
+        <div class="game-card-body">
           <div class="game-card-name">Drift King</div>
-          <div class="game-card-desc">Arcade drift racer. Open plate or circuit. Just for fun.</div>
+          <div class="game-card-desc">Arcade drift racer — open plate or circuit track. No messages earned.</div>
         </div>
       </div>
 
@@ -7382,12 +7380,16 @@ html,body{width:100%;height:100%;background:#050508;color:#c8c8e8;font-family:mo
 .float{position:fixed;pointer-events:none;font-size:14px;font-weight:bold;color:#ffcc44;animation:fu 1s ease-out forwards;z-index:9999}
 @keyframes fu{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-60px) scale(0.7);opacity:0}}
 
-.game-card{background:var(--surface,#0d0d18);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 0.15s,transform 0.1s,box-shadow 0.15s;}
-.game-card:hover{border-color:rgba(68,102,255,0.5);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.4);}
-.game-thumb{height:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-bottom:1px solid var(--border);}
-.game-card-info{padding:10px 12px;}
-.game-card-name{font-size:12px;font-weight:bold;color:var(--text);font-family:var(--font-mono);margin-bottom:3px;}
-.game-card-desc{font-size:10px;color:var(--text-dim,#5a5a7a);line-height:1.4;}
+.game-card{background:var(--bg2,var(--bg));border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color 0.18s,transform 0.12s,box-shadow 0.18s;}
+.game-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,0.5);}
+.game-card:active{transform:translateY(-1px);}
+.game-thumb{height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-bottom:1px solid var(--border);background:linear-gradient(160deg,var(--surface,var(--bg)),var(--bg));}
+.game-thumb-icon{font-size:32px;line-height:1;}
+.game-thumb-label{font-size:9px;letter-spacing:2.5px;font-family:var(--font-display,var(--font-mono));font-weight:bold;}
+.game-thumb-tag{font-size:8px;letter-spacing:1px;color:var(--accent);opacity:0.7;font-family:var(--font-mono);}
+.game-card-body{padding:12px 14px 14px;}
+.game-card-name{font-size:12px;font-weight:bold;color:var(--text);font-family:var(--font-mono);letter-spacing:1px;margin-bottom:5px;}
+.game-card-desc{font-size:10px;color:var(--text-secondary,var(--text-dim,#6a6a8a));line-height:1.5;}
 </style>
 </head>
 <body>
