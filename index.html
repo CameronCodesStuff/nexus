@@ -984,6 +984,7 @@
       <div class="lb-tab" id="lb-tab-energy" onclick="N.lbTab('energy')">NEXUS ENERGY</div>
       <div class="lb-tab" id="lb-tab-flap" onclick="N.lbTab('flap')">NEXUS FLAP</div>
       <div class="lb-tab" id="lb-tab-wpm" onclick="N.lbTab('wpm')">TYPING WPM</div>
+      <div class="lb-tab" id="lb-tab-drift" onclick="N.lbTab('drift')">DRIFT KING</div>
     </div>
     <div id="lb-content"></div>
   </div>
@@ -6391,6 +6392,7 @@ function lbTab(tab){
   document.getElementById('lb-tab-energy')?.classList.toggle('active',tab==='energy');
   document.getElementById('lb-tab-flap')?.classList.toggle('active',tab==='flap');
   document.getElementById('lb-tab-wpm')?.classList.toggle('active',tab==='wpm');
+  document.getElementById('lb-tab-drift')?.classList.toggle('active',tab==='drift');
   renderLeaderboard(tab);
 }
 
@@ -6410,8 +6412,10 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.nexusEnergy||0)>0).sort((a,b)=>(b.nexusEnergy||0)-(a.nexusEnergy||0)).slice(0,20);
     } else if(tab==='flap'){
       users=users.filter(u=>(u.flapBest||0)>0).sort((a,b)=>(b.flapBest||0)-(a.flapBest||0)).slice(0,20);
-    } else {
+    } else if(tab==='wpm'){
       users=users.filter(u=>(u.bestWpm||0)>0).sort((a,b)=>(b.bestWpm||0)-(a.bestWpm||0)).slice(0,20);
+    } else {
+      users=users.filter(u=>(u.driftBest||0)>0).sort((a,b)=>(b.driftBest||0)-(a.driftBest||0)).slice(0,20);
     }
     if(!users.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No data yet.</div>';return;}
     el.innerHTML='';
@@ -6438,8 +6442,10 @@ async function renderLeaderboard(tab){
         statVal=ne;statLabel=fmtEnergy(ne)+' energy';
       } else if(tab==='flap'){
         statVal=u.flapBest||0;statLabel=statVal+' points';
-      } else {
+      } else if(tab==='wpm'){
         statVal=u.bestWpm||0;statLabel=statVal+' WPM';
+      } else {
+        statVal=u.driftBest||0;statLabel=(u.driftBest||0).toLocaleString()+' pts';
       }
       row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
       row.appendChild(avEl);
@@ -6470,6 +6476,11 @@ async function renderLeaderboard(tab){
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#f0c060;letter-spacing:1px;';
         badge.textContent='⌨️ '+(u.bestWpm||0)+' WPM';
+        row.appendChild(badge);
+      } else if(tab==='drift'){
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#ff6622;letter-spacing:1px;';
+        badge.textContent='🚗 '+(u.driftBest||0).toLocaleString();
         row.appendChild(badge);
       }
       el.appendChild(row);
@@ -6969,6 +6980,17 @@ window.addEventListener('message',async function(e){
         await updateDoc(doc(db,'users',cu.uid),{nexusEnergy:totalEnergy});
         cud={...cud,nexusEnergy:totalEnergy};
         uCache[cu.uid]={...uCache[cu.uid],nexusEnergy:totalEnergy};
+      }catch{}
+    }
+  }
+  if(e.data.type==='driftScore'&&cu&&cud){
+    const ds=e.data.score||0;
+    if(ds>(cud.driftBest||0)){
+      try{
+        await updateDoc(doc(db,'users',cu.uid),{driftBest:ds});
+        cud={...cud,driftBest:ds};
+        uCache[cu.uid]={...uCache[cu.uid],driftBest:ds};
+        toast('🚗 New drift record: '+ds.toLocaleString()+'!','success');
       }catch{}
     }
   }
