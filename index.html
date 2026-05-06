@@ -744,7 +744,11 @@
             <button onclick="N.openModal('changelog-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">📋 Update Log</button>
 
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
-            <button onclick="N.openGamesHub();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎮 Games</button>
+            <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
+            <button onclick="N.openModal('typegame-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⌨️ Type &amp; Earn</button>
+            <button onclick="N.openFlapGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐦 Nexus Flap</button>
+            <button onclick="N.openNexusGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⬡ Nexus Energy</button>
+            <button onclick="N.openDriftGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🚗 Drift King</button>
 
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -7324,54 +7328,46 @@ iStars();reset();loop();
 
 <!-- Games Hub Modal -->
 <div id="games-hub-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('games-hub-modal')">
-  <div class="modal" style="width:540px;">
+  <div class="modal" style="width:480px;">
     <div class="modal-title">🎮 GAMES</div>
     <button class="modal-close" onclick="N.closeModal('games-hub-modal')">✕</button>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
 
-      <!-- Type & Earn -->
-      <button class="game-btn" onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,rgba(68,102,255,0.2),rgba(68,102,255,0.05));">⌨️</div>
-        <div class="game-btn-content">
-          <div class="game-btn-title">Type &amp; Earn</div>
-          <div class="game-btn-desc">Type words to earn messages. 15s–120s modes.</div>
-          <div class="game-btn-tag" style="color:var(--accent);">✦ EARNS MESSAGES</div>
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">⌨️</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Type &amp; Earn</span>
+          <span class="game-btn-desc">Type words to earn messages · 15s to 120s modes</span>
         </div>
-        <div class="game-btn-arrow">›</div>
-      </button>
+        <span class="game-btn-badge">MSGS</span>
+      </div>
 
-      <!-- Nexus Flap -->
-      <button class="game-btn" onclick="N.closeModal('games-hub-modal');N.openFlapGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,212,255,0.05));">🐦</div>
-        <div class="game-btn-content">
-          <div class="game-btn-title">Nexus Flap</div>
-          <div class="game-btn-desc">Flap through pipes. Gets faster as you score.</div>
-          <div class="game-btn-tag" style="color:var(--accent2);">✦ EARNS MESSAGES</div>
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openFlapGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#00aaff,#0044cc);">🐦</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Nexus Flap</span>
+          <span class="game-btn-desc">Flap through pipes · each point earns +2 messages</span>
         </div>
-        <div class="game-btn-arrow">›</div>
-      </button>
+        <span class="game-btn-badge">MSGS</span>
+      </div>
 
-      <!-- Nexus Energy -->
-      <button class="game-btn" onclick="N.closeModal('games-hub-modal');N.openNexusGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,rgba(68,102,255,0.2),rgba(0,212,255,0.05));">⬡</div>
-        <div class="game-btn-content">
-          <div class="game-btn-title">Nexus Energy</div>
-          <div class="game-btn-desc">Cosmic clicker — redeem energy for messages.</div>
-          <div class="game-btn-tag" style="color:var(--accent);">✦ EARNS MESSAGES</div>
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openNexusGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#4466ff,#9933ff);">⬡</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Nexus Energy</span>
+          <span class="game-btn-desc">Cosmic clicker · redeem energy for messages</span>
         </div>
-        <div class="game-btn-arrow">›</div>
-      </button>
+        <span class="game-btn-badge">MSGS</span>
+      </div>
 
-      <!-- Drift King -->
-      <button class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriftGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,rgba(255,69,0,0.2),rgba(255,69,0,0.05));">🚗</div>
-        <div class="game-btn-content">
-          <div class="game-btn-title">Drift King</div>
-          <div class="game-btn-desc">Arcade drift racer. Open plate or circuit.</div>
-          <div class="game-btn-tag" style="color:var(--text-dim);">◌ JUST FOR FUN</div>
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriftGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff4500,#ff8800);">🚗</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Drift King</span>
+          <span class="game-btn-desc">Arcade drift racer · open plate or circuit track</span>
         </div>
-        <div class="game-btn-arrow">›</div>
-      </button>
+        <span class="game-btn-badge" style="background:rgba(255,255,255,0.06);color:var(--text-dim);">FUN</span>
+      </div>
 
     </div>
   </div>
@@ -7467,17 +7463,14 @@ html,body{width:100%;height:100%;background:#050508;color:#c8c8e8;font-family:mo
 .float{position:fixed;pointer-events:none;font-size:14px;font-weight:bold;color:#ffcc44;animation:fu 1s ease-out forwards;z-index:9999}
 @keyframes fu{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-60px) scale(0.7);opacity:0}}
 
-.game-btn{display:flex;align-items:center;gap:12px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:border-color 0.15s,transform 0.12s,box-shadow 0.15s,background 0.15s;text-align:left;color:var(--text);}
-.game-btn:hover{border-color:var(--accent) !important;background:#1e1e38 !important;transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.5),0 0 0 1px rgba(68,102,255,0.3);}
-.game-btn:active{transform:translateY(-1px);}
-.game-btn-icon{width:52px;height:52px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;transition:transform 0.15s;}
-.game-btn:hover .game-btn-icon{transform:scale(1.1);}
-.game-btn-content{flex:1;min-width:0;}
-.game-btn-title{font-size:13px;font-weight:bold;font-family:var(--font-mono);letter-spacing:0.5px;margin-bottom:4px;color:var(--text);}
-.game-btn-desc{font-size:10px;color:var(--text-dim);line-height:1.4;margin-bottom:5px;}
-.game-btn-tag{font-size:8px;letter-spacing:2px;font-family:var(--font-mono);font-weight:bold;}
-.game-btn-arrow{font-size:20px;color:rgba(255,255,255,0.15);transition:color 0.15s,transform 0.15s;flex-shrink:0;line-height:1;}
-.game-btn:hover .game-btn-arrow{color:var(--accent);transform:translateX(4px);}
+.game-btn{display:flex;flex-direction:row;align-items:center;gap:14px;width:100%;background:rgba(68,102,255,0.06);border:1px solid var(--border);border-radius:10px;padding:12px 14px;cursor:pointer;transition:background 0.15s,border-color 0.15s,transform 0.1s;user-select:none;box-sizing:border-box;}
+.game-btn:hover{background:rgba(68,102,255,0.14);border-color:var(--accent);transform:translateX(3px);}
+.game-btn:active{transform:translateX(1px);background:rgba(68,102,255,0.1);}
+.game-btn-icon{width:44px;height:44px;min-width:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.game-btn-info{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0;}
+.game-btn-name{font-size:13px;font-weight:700;color:var(--text);font-family:var(--font-mono);letter-spacing:0.3px;}
+.game-btn-desc{font-size:10px;color:var(--text-dim);line-height:1.3;}
+.game-btn-badge{font-size:8px;font-family:var(--font-mono);font-weight:700;letter-spacing:2px;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:3px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
 </style>
 </head>
 <body>
