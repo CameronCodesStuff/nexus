@@ -3776,19 +3776,17 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
 
   // Handle remote stream
   const remoteStream = new MediaStream();
+  let videoAttached = false;
   pc.ontrack = e=>{
     console.log('[CALL] ontrack fired remoteUid='+remoteUid+' track.kind='+e.track.kind+' streams='+e.streams.length);
-    // Add track to our assembled stream
-    if(!remoteStream.getTracks().includes(e.track)){
-      remoteStream.addTrack(e.track);
+    // Use e.streams[0] directly — this is what the browser assembled
+    const stream = (e.streams && e.streams[0]) ? e.streams[0] : remoteStream;
+    if(!remoteStream.getTracks().includes(e.track)) remoteStream.addTrack(e.track);
+    // Attach on video track (wait for video track specifically)
+    if(e.track.kind === 'video' || !videoAttached){
+      videoAttached = true;
+      attachRemoteStream(remoteUid, stream, mode);
     }
-    // Also add from e.streams[0] if available (catches tracks we might have missed)
-    if(e.streams && e.streams[0]){
-      e.streams[0].getTracks().forEach(t=>{
-        if(!remoteStream.getTracks().includes(t)) remoteStream.addTrack(t);
-      });
-    }
-    attachRemoteStream(remoteUid, remoteStream, mode);
   };
 
   // ICE candidates → Firestore
@@ -3976,7 +3974,10 @@ function openCallUI(mode, isCaller){
       grid.appendChild(placeholder);
     });
     body.appendChild(grid);
-    setTimeout(()=>{const lv=document.getElementById('local-video');if(lv&&localStream)lv.srcObject=localStream;},50);
+    setTimeout(()=>{
+      const lv=document.getElementById('local-video');
+      if(lv&&localStream){lv.srcObject=localStream;lv.play().catch(()=>{});}
+    },100);
     updateVideoGrid();
   }
 }
@@ -4011,9 +4012,11 @@ function attachRemoteStream(uid, stream, mode){
     // Replace placeholder content with real video
     tile.innerHTML=`<video autoplay playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></video><div class="video-tile-label">${esc(nm)}</div>`;
     const vid=tile.querySelector('video');
-    vid.srcObject=stream;
-    // Force play (needed on some browsers)
-    vid.play().catch(()=>{});
+    // Set srcObject and retry play with small delay (browser needs element in DOM)
+    setTimeout(()=>{
+      vid.srcObject=stream;
+      vid.play().catch(e2=>console.warn('[CALL] play() failed:',e2));
+    }, 50);
   }
 }
 
