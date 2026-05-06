@@ -4465,6 +4465,9 @@ async function openCreditsModal(){
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
   const ownerCard=await makeCard('owner','FOUNDER · LEAD DEVELOPER','badge-creator','CREATOR');
   const testerCard=await makeCard('j_frosty','QUALITY ASSURANCE · TESTER','badge-tester','TESTER');
+  const btCard1=await makeCard('dhall666','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
+  const btCard2=await makeCard('god_slayer28','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
+  const btCard3=await makeCard('big_slayer069','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
   el.innerHTML=`
     <div class="credits-hero">
       <div class="credits-nexus-logo">NEXUS</div>
@@ -4475,6 +4478,10 @@ async function openCreditsModal(){
       ${ownerCard}
       <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star" style="animation-direction:reverse;">◈</span> TESTERS</div>
       ${testerCard}
+      <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star" style="animation-direction:reverse;">◈</span> BEGINNER TESTERS</div>
+      ${btCard1}
+      ${btCard2}
+      ${btCard3}
       <div style="margin-top:24px;text-align:center;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:2;">
         Built with Firebase · WebRTC · Pure HTML<br>
         <span style="color:var(--accent);">© 2025 NEXUS</span> · All rights reserved
