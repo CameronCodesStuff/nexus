@@ -240,7 +240,7 @@
   .call-body{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
   .video-grid{display:grid;gap:12px;width:100%;height:100%;padding:16px;grid-template-columns:1fr;}
   .video-grid.two-col{grid-template-columns:1fr 1fr;}
-  .video-tile{background:var(--bg3);border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+  .video-tile{background:var(--bg3);border-radius:12px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;min-height:200px;}
   .video-tile video{width:100%;height:100%;object-fit:cover;border-radius:12px;}
   .video-tile-label{position:absolute;bottom:12px;left:14px;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--font-mono);}
   .audio-call-display{display:flex;flex-direction:column;align-items:center;gap:20px;}
@@ -1961,6 +1961,21 @@ async function enterApp(){
   }
   applyMobileMode(mobileMode);
   checkAnnouncement();
+  // Clean up any stale call docs from previous sessions
+  try{
+    const staleQ=query(collection(db,'calls'),where('members','array-contains',cu.uid));
+    const staleDocs=await getDocs(staleQ);
+    const now=Date.now();
+    staleDocs.forEach(async d=>{
+      const data=d.data();
+      const age=data.createdAt?.toMillis?(now-data.createdAt.toMillis()):999999;
+      if(data.status==='ended'||data.status==='rejected'||age>120000){
+        const sigs=await getDocs(collection(db,'calls',d.id,'signals')).catch(()=>({docs:[]}));
+        await Promise.all(sigs.docs.map(s=>deleteDoc(s.ref).catch(()=>{})));
+        await deleteDoc(d.ref).catch(()=>{});
+      }
+    });
+  }catch{}
   // nexus energy persists across logins
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
@@ -3548,14 +3563,16 @@ function listenForIncomingCalls(){
     snap.docChanges().forEach(ch=>{
       const call={id:ch.doc.id,...ch.doc.data()};
       if(ch.type==='added'){
-        // Track call by chatId
-        if(call.status==='ringing'||call.status==='active'){
+        // Skip ended/rejected calls entirely
+        if(call.status==='ended'||call.status==='rejected') return;
+        // Only track truly live calls — must be recent (< 2 min) to avoid replaying old docs
+        const callAge = call.createdAt?.toMillis ? (Date.now()-call.createdAt.toMillis()) : 99999;
+        const isLive = callAge < 120000;
+        if((call.status==='ringing'||call.status==='active') && isLive){
           activeChatCalls[call.chatId]=call.id;
           updateCallJoinButton(call.chatId, call.id, call.status);
         }
-        // Show incoming banner for calls from others when not already in a call
-        // Ignore stale calls (older than 30 seconds) to prevent flash on login
-        const callAge = call.createdAt?.toMillis ? (Date.now()-call.createdAt.toMillis()) : 0;
+        // Show incoming banner: from others, not in call, < 30s old
         if(call.callerId !== cu.uid && !activeCallId && callAge < 30000){
           if(call.status==='ringing'||call.status==='active'){
             showIncomingCall(call);
@@ -3666,10 +3683,8 @@ async function startCall(mode){
   openCallUI(mode, true);
   startCallTimer();
 
-  // Create a peer connection for each remote member
-  for(const uid of otherMembers){
-    await createPeerConnection(uid, true, callRef.id, mode);
-  }
+  // Don't create PCs yet - wait for members to actually join (watchCallDoc handles it)
+  // This ensures offer is sent AFTER answerer has set up their signal listener
 
   // Watch for the call to be declined/ended by others
   watchCallDoc(callRef.id);
@@ -3710,13 +3725,11 @@ async function answerCall(callId){
   openCallUI(call.mode, false);
   startCallTimer();
 
-  // Connect to everyone in the call (caller + any other joiners)
-  // The caller is always the initiator; we are the answerer for each connection
-  const otherMembers = call.members.filter(m=>m!==cu.uid);
-  for(const uid of otherMembers){
-    // Only connect to caller as non-initiator; for other joiners we initiate
-    const isCaller = uid === call.callerId;
-    await createPeerConnection(uid, !isCaller, callId, call.mode);
+  // Set up signal listeners by creating PCs (non-initiator - just listen for offers)
+  // The caller's watchCallDoc will detect us joining and send offers to us
+  const callMembers = call.members.filter(m=>m!==cu.uid);
+  for(const uid of callMembers){
+    if(!peerConns[uid]) await createPeerConnection(uid, false, callId, call.mode);
   }
 
   watchCallDoc(callId);
@@ -3735,11 +3748,14 @@ function watchCallDoc(callId){
     const data=snap.data();
     if(data.status==='ended'||data.status==='rejected'){ endCall(); return; }
     const active=new Set(data.activeMembers||[]);
-    // New member joined — connect to them
+    // New member joined — connect to them (initiator sends offer)
     active.forEach(uid=>{
-      if(uid!==cu.uid&&!knownMembers.has(uid)&&!peerConns[uid]){
+      if(uid!==cu.uid&&!knownMembers.has(uid)){
         knownMembers.add(uid);
-        createPeerConnection(uid, true, callId, data.mode);
+        // Only create if no existing working connection
+        if(!peerConns[uid]||peerConns[uid].connectionState==='failed'||peerConns[uid].connectionState==='closed'){
+          createPeerConnection(uid, true, callId, data.mode);
+        }
       }
     });
     // Member left — close their peer connection and remove their audio tile
@@ -3783,16 +3799,20 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
   // Add local tracks
   if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
 
-  // Handle remote stream — use e.streams[0] directly when available (most reliable)
+  // Handle remote stream
   const remoteStream = new MediaStream();
   pc.ontrack = e=>{
-    // Prefer e.streams[0] (already assembled) over manual track collection
-    if(e.streams && e.streams[0]){
-      attachRemoteStream(remoteUid, e.streams[0], mode);
-    } else {
+    // Add track to our assembled stream
+    if(!remoteStream.getTracks().includes(e.track)){
       remoteStream.addTrack(e.track);
-      attachRemoteStream(remoteUid, remoteStream, mode);
     }
+    // Also add from e.streams[0] if available (catches tracks we might have missed)
+    if(e.streams && e.streams[0]){
+      e.streams[0].getTracks().forEach(t=>{
+        if(!remoteStream.getTracks().includes(t)) remoteStream.addTrack(t);
+      });
+    }
+    attachRemoteStream(remoteUid, remoteStream, mode);
   };
 
   // ICE candidates → Firestore
@@ -3962,10 +3982,20 @@ function openCallUI(mode, isCaller){
     // Video mode
     const grid=document.createElement('div');
     grid.className='video-grid';grid.id='video-grid';
+    // Local tile
     const localTile=document.createElement('div');
     localTile.className='video-tile';localTile.id='tile-local';
     localTile.innerHTML=`<video id="local-video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></video><div class="video-tile-label">You</div>`;
     grid.appendChild(localTile);
+    // Add placeholder tiles for remote peers so layout is correct immediately
+    const chat=aChats[acid]||{};
+    (chat.members||[]).filter(m=>m!==cu.uid).forEach(uid=>{
+      const nm=uCache[uid]?.displayName||'User';
+      const placeholder=document.createElement('div');
+      placeholder.className='video-tile';placeholder.id='tile-'+uid;
+      placeholder.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:100%;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;"><div style="font-size:40px;">${userEmoji(uid)}</div><div>${esc(nm)}</div><div style="font-size:10px;opacity:0.5;">Connecting…</div></div><div class="video-tile-label">${esc(nm)}</div>`;
+      grid.appendChild(placeholder);
+    });
     body.appendChild(grid);
     setTimeout(()=>{const lv=document.getElementById('local-video');if(lv&&localStream)lv.srcObject=localStream;},50);
     updateVideoGrid();
@@ -3989,18 +4019,22 @@ function attachRemoteStream(uid, stream, mode){
       tile.querySelector('video').srcObject=stream;
     }
   } else {
-    // Video mode — add or update tile per peer
+    // Video mode — update existing tile (created as placeholder in openCallUI) or add new one
     const grid=document.getElementById('video-grid');
     if(!grid) return;
     let tile=document.getElementById('tile-'+uid);
     if(!tile){
       tile=document.createElement('div');tile.className='video-tile';tile.id='tile-'+uid;
-      const nm=uCache[uid]?.displayName||'User';
-      tile.innerHTML=`<video autoplay playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></video><div class="video-tile-label">${esc(nm)}</div>`;
       grid.appendChild(tile);
       updateVideoGrid();
     }
-    tile.querySelector('video').srcObject=stream;
+    const nm=uCache[uid]?.displayName||'User';
+    // Replace placeholder content with real video
+    tile.innerHTML=`<video autoplay playsinline style="width:100%;height:100%;object-fit:cover;border-radius:12px;"></video><div class="video-tile-label">${esc(nm)}</div>`;
+    const vid=tile.querySelector('video');
+    vid.srcObject=stream;
+    // Force play (needed on some browsers)
+    vid.play().catch(()=>{});
   }
 }
 
@@ -4036,38 +4070,31 @@ function endCall(endForEveryone=false){
 
   if(activeCallId){
     const cid=activeCallId; activeCallId=null;
+    // Always fully delete the call doc and all signals immediately
+    const deleteCall=async()=>{
+      try{
+        const sigSnap=await getDocs(collection(db,'calls',cid,'signals'));
+        await Promise.all(sigSnap.docs.map(d=>deleteDoc(d.ref).catch(()=>{})));
+        await deleteDoc(doc(db,'calls',cid)).catch(()=>{});
+      }catch{}
+    };
     if(endForEveryone){
-      // Caller is ending the call for everyone — delete the doc
-      getDocs(collection(db,'calls',cid,'signals')).then(snap=>{
-        Promise.all(snap.docs.map(d=>deleteDoc(d.ref).catch(()=>{}))).then(()=>{
-          deleteDoc(doc(db,'calls',cid)).catch(()=>{});
-        });
-      }).catch(()=>{
-        updateDoc(doc(db,'calls',cid),{status:'ended'}).catch(()=>{});
-      });
+      // End for everyone - delete immediately
+      deleteCall();
     } else {
-      // Just remove ourselves from activeMembers — others stay in the call
-      updateDoc(doc(db,'calls',cid),{
-        activeMembers: arrayRemove(cu.uid)
-      }).then(async()=>{
-        // If no active members remain, clean up the doc
-        const snap=await getDoc(doc(db,'calls',cid)).catch(()=>null);
-        if(snap?.exists()){
-          const remaining=(snap.data().activeMembers||[]);
-          if(remaining.length===0){
-            getDocs(collection(db,'calls',cid,'signals')).then(s=>{
-              Promise.all(s.docs.map(d=>deleteDoc(d.ref).catch(()=>{}))).then(()=>{
-                deleteDoc(doc(db,'calls',cid)).catch(()=>{});
-              });
-            });
-          }
-        }
-      }).catch(()=>{});
+      // Leaving - remove from activeMembers, then check if anyone remains
+      updateDoc(doc(db,'calls',cid),{activeMembers:arrayRemove(cu.uid)})
+        .then(()=>getDoc(doc(db,'calls',cid)).catch(()=>null))
+        .then(snap=>{
+          const remaining=(snap?.data()?.activeMembers||[]);
+          if(remaining.length===0) deleteCall();
+          else getDocs(query(collection(db,'calls',cid,'signals'),where('from','==',cu.uid)))
+            .then(s=>s.docs.forEach(d=>deleteDoc(d.ref).catch(()=>{})));
+        }).catch(()=>deleteCall());
     }
-    // Clean up my own signals
-    getDocs(query(collection(db,'calls',cid,'signals'),where('from','==',cu.uid)))
-      .then(snap=>snap.docs.forEach(d=>deleteDoc(d.ref).catch(()=>{})))
-      .catch(()=>{});
+    // Reset green join button for this chat
+    if(acid) updateCallJoinButton(acid, null, null);
+    delete activeChatCalls[cid];
   }
 
   if(ctimer){clearInterval(ctimer);ctimer=null;}
