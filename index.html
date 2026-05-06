@@ -3501,6 +3501,41 @@ function startCallTimer(){
   },1000);
 }
 
+function updateCallJoinButton(chatId, callId, status){
+  // Only update if this is the currently open chat
+  if(chatId !== acid) return;
+  const audioBtn = document.querySelector('.icon-btn[title="Audio Call"]');
+  const videoBtn = document.querySelector('.icon-btn[title="Video Call"]');
+  if(!audioBtn || !videoBtn) return;
+  if(callId && !activeCallId){
+    // Active call in this chat — show green join indicator on call buttons
+    const isRinging = status === 'ringing';
+    audioBtn.style.color = 'var(--success)';
+    audioBtn.style.background = 'rgba(0,255,136,0.15)';
+    audioBtn.style.border = '1px solid var(--success)';
+    audioBtn.title = isRinging ? 'Join Call (ringing)' : 'Join Active Call';
+    videoBtn.style.color = 'var(--success)';
+    videoBtn.style.background = 'rgba(0,255,136,0.15)';
+    videoBtn.style.border = '1px solid var(--success)';
+    videoBtn.title = isRinging ? 'Join Call (ringing)' : 'Join Active Call';
+    // Override onclick to join existing call instead of starting new one
+    audioBtn.onclick = ()=>N.answerCall(callId);
+    videoBtn.onclick = ()=>N.answerCall(callId);
+  } else {
+    // No active call — reset to normal
+    audioBtn.style.color = '';
+    audioBtn.style.background = '';
+    audioBtn.style.border = '';
+    audioBtn.title = 'Audio Call';
+    videoBtn.style.color = '';
+    videoBtn.style.background = '';
+    videoBtn.style.border = '';
+    videoBtn.title = 'Video Call';
+    audioBtn.onclick = ()=>N.startCall('audio');
+    videoBtn.onclick = ()=>N.startCall('video');
+  }
+}
+
 function listenForIncomingCalls(){
   if(incomingCallUnsub) incomingCallUnsub();
   // Watch calls where I'm a member and status = 'ringing'
@@ -3510,18 +3545,31 @@ function listenForIncomingCalls(){
   );
   incomingCallUnsub = onSnapshot(q, snap=>{
     snap.docChanges().forEach(ch=>{
+      const call={id:ch.doc.id,...ch.doc.data()};
       if(ch.type==='added'){
-        const call={id:ch.doc.id,...ch.doc.data()};
-        // Show banner for ringing calls from others, or active calls we can join
-        if(call.callerId !== cu.uid && !activeCallId){
+        // Track call by chatId
+        if(call.status==='ringing'||call.status==='active'){
+          activeChatCalls[call.chatId]=call.id;
+          updateCallJoinButton(call.chatId, call.id, call.status);
+        }
+        // Show incoming banner for calls from others when not already in a call
+        // Ignore stale calls (older than 30 seconds) to prevent flash on login
+        const callAge = call.createdAt?.toMillis ? (Date.now()-call.createdAt.toMillis()) : 0;
+        if(call.callerId !== cu.uid && !activeCallId && callAge < 30000){
           if(call.status==='ringing'||call.status==='active'){
             showIncomingCall(call);
           }
         }
       }
       if(ch.type==='modified'){
-        // If a call we're being invited to becomes active (someone else answered), update banner
-        const call={id:ch.doc.id,...ch.doc.data()};
+        if(call.status==='ended'||call.status==='rejected'){
+          delete activeChatCalls[call.chatId];
+          updateCallJoinButton(call.chatId, null, null);
+        } else {
+          activeChatCalls[call.chatId]=call.id;
+          updateCallJoinButton(call.chatId, call.id, call.status);
+        }
+        // Update banner if call went active
         if(call.callerId!==cu.uid&&!activeCallId&&call.status==='active'){
           const banner=document.getElementById('incoming-call-banner');
           if(banner){
@@ -3529,6 +3577,10 @@ function listenForIncomingCalls(){
             if(statusEl) statusEl.textContent='📞 IN PROGRESS — join?';
           }
         }
+      }
+      if(ch.type==='removed'){
+        delete activeChatCalls[call.chatId];
+        updateCallJoinButton(call.chatId, null, null);
       }
     });
   });
@@ -3730,11 +3782,16 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
   // Add local tracks
   if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t, localStream));
 
-  // Handle remote stream
+  // Handle remote stream — use e.streams[0] directly when available (most reliable)
   const remoteStream = new MediaStream();
   pc.ontrack = e=>{
-    e.streams[0]?.getTracks().forEach(t=>remoteStream.addTrack(t));
-    attachRemoteStream(remoteUid, remoteStream, mode);
+    // Prefer e.streams[0] (already assembled) over manual track collection
+    if(e.streams && e.streams[0]){
+      attachRemoteStream(remoteUid, e.streams[0], mode);
+    } else {
+      remoteStream.addTrack(e.track);
+      attachRemoteStream(remoteUid, remoteStream, mode);
+    }
   };
 
   // ICE candidates → Firestore
