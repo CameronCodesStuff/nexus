@@ -3754,11 +3754,7 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
   console.log('[CALL] createPeerConnection remoteUid='+remoteUid+' isInitiator='+isInitiator);
   const pc = new RTCPeerConnection(ICE_SERVERS);
   peerConns[remoteUid] = pc;
-  // Clean up any stale signals between us and this peer from previous connections
-  getDocs(query(collection(db,'calls',callId,'signals'),
-    where('from','==',cu.uid),where('to','==',remoteUid)))
-    .then(snap=>snap.docs.forEach(d=>deleteDoc(d.ref).catch(()=>{})))
-    .catch(()=>{});
+  // Note: don't delete signals here — they may be needed by the remote peer's listener
 
   // Queue ICE candidates until remote description is set
   let icePending = [];
@@ -3807,6 +3803,20 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
       const st=document.getElementById('status-'+remoteUid);
       if(st) st.textContent='🟢 Connected';
       toast('Call connected!','success');
+      // Re-attach remote stream now that connection is established
+      // (ontrack may have fired before ICE was connected)
+      if(mode==='video'){
+        const receivers=pc.getReceivers();
+        const videoReceiver=receivers.find(r=>r.track&&r.track.kind==='video');
+        const audioReceiver=receivers.find(r=>r.track&&r.track.kind==='audio');
+        if(videoReceiver){
+          const reStream=new MediaStream();
+          if(videoReceiver.track) reStream.addTrack(videoReceiver.track);
+          if(audioReceiver?.track) reStream.addTrack(audioReceiver.track);
+          console.log('[CALL] re-attaching stream on connected, tracks='+reStream.getTracks().length);
+          attachRemoteStream(remoteUid, reStream, mode);
+        }
+      }
     }
     if(s==='disconnected'){
       // Try to restart ICE before giving up
