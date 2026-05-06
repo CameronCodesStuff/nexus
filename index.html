@@ -3463,37 +3463,23 @@ const ICE_SERVERS = {
     // Google STUN
     {urls:'stun:stun.l.google.com:19302'},
     {urls:'stun:stun1.l.google.com:19302'},
-    {urls:'stun:stun2.l.google.com:19302'},
-    {urls:'stun:stun3.l.google.com:19302'},
-    {urls:'stun:stun4.l.google.com:19302'},
-    // Additional public STUN servers for better NAT traversal
     {urls:'stun:stun.cloudflare.com:3478'},
-    {urls:'stun:stun.nextcloud.com:443'},
-    // Public TURN servers via Open Relay (metered.ca)
-    {
-      urls:'turn:openrelay.metered.ca:80',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
-    {
-      urls:'turn:openrelay.metered.ca:443',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
-    {
-      urls:'turn:openrelay.metered.ca:443?transport=tcp',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
-    {
-      urls:'turns:openrelay.metered.ca:443',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
+    // Metered.ca free TURN (UDP + TCP + TLS)
+    {urls:'turn:a.relay.metered.ca:80',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
+    {urls:'turn:a.relay.metered.ca:80?transport=tcp',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
+    {urls:'turn:a.relay.metered.ca:443',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
+    {urls:'turns:a.relay.metered.ca:443',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
+    // OpenRelay fallback
+    {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
+    // FreeTurn
+    {urls:'turn:freeturn.net:3478',username:'free',credential:'free'},
+    {urls:'turns:freeturn.net:5349',username:'free',credential:'free'},
   ],
   iceCandidatePoolSize:10,
   bundlePolicy:'max-compat',
   rtcpMuxPolicy:'negotiate',
+  iceTransportPolicy:'all',
 };
 
 let incomingCallUnsub = null;// listener for incoming calls (declared early)
@@ -3838,8 +3824,25 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
       },3000);
     }
     if(s==='failed'){
-      toast('Call connection lost.','danger');
-      endCall();
+      console.log('[CALL] ICE failed, attempting restart...');
+      (async()=>{
+        try{
+          const offer = await pc.createOffer({iceRestart:true});
+          await pc.setLocalDescription(offer);
+          if(activeCallId){
+            await addDoc(collection(db,'calls',activeCallId,'signals'),{
+              from:cu.uid, to:remoteUid, type:'offer',
+              payload:{type:offer.type,sdp:offer.sdp},
+              ts:serverTimestamp(), restart:true
+            });
+          }
+          toast('Reconnecting call…','');
+        }catch(e2){
+          console.warn('[CALL] ICE restart failed:',e2);
+          toast('Call connection failed.','danger');
+          endCall();
+        }
+      })();
     }
   };
 
