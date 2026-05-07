@@ -7106,16 +7106,29 @@ window._DRIFT_SRCDOC = decodeURIComponent(escape(atob("PCFET0NUWVBFIGh0bWw+Cjxod
 Object.assign(window.N, window._N);
 // Expose game fns globally for modal onclicks
 window._setBgCol=function(col){
+  const root=document.documentElement;
   if(col==='default'){
-    document.documentElement.style.removeProperty('--app-bg');
+    ['--bg','--bg2','--bg3','--panel','--app-bg'].forEach(v=>root.style.removeProperty(v));
     localStorage.removeItem('nexus_bg_colour');
   } else {
-    document.documentElement.style.setProperty('--app-bg',col);
+    // Parse hex to RGB
+    const r=parseInt(col.slice(1,3),16),g=parseInt(col.slice(3,5),16),b=parseInt(col.slice(5,7),16);
+    // Generate slightly lighter variants for bg2, bg3, panel
+    const mk=(dr,dg,db)=>'rgb('+Math.min(255,r+dr)+','+Math.min(255,g+dg)+','+Math.min(255,b+db)+')';
+    root.style.setProperty('--bg',col);
+    root.style.setProperty('--app-bg',col);
+    root.style.setProperty('--bg2',mk(5,5,8));
+    root.style.setProperty('--bg3',mk(10,10,18));
+    root.style.setProperty('--panel',mk(3,3,5));
     localStorage.setItem('nexus_bg_colour',col);
   }
-  // Re-render colour picker to update borders
   if(window._N&&window._N.renderSettings) setTimeout(()=>window._N.renderSettings(),50);
 };
+// Apply on load
+(function(){
+  const saved=localStorage.getItem('nexus_bg_colour');
+  if(saved&&saved!=='default') window._setBgCol(saved);
+})();
 window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
 // Expose lightbox fns globally (used in HTML onclick attributes)
 window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
