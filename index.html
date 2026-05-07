@@ -7004,14 +7004,17 @@ window.addEventListener('message',async function(e){
   if(e.data.type==='nexusSave'){
     // Save game state to localStorage
     try{localStorage.setItem('nexus_energy_save',JSON.stringify(e.data.state));}catch{}
-    // Save total energy to Firestore for leaderboard
+    // Only update Firestore leaderboard if this is a new high score
     if(cu&&cud&&e.data.state){
       const totalEnergy=e.data.state.total||0;
-      try{
-        await updateDoc(doc(db,'users',cu.uid),{nexusEnergy:totalEnergy});
-        cud={...cud,nexusEnergy:totalEnergy};
-        uCache[cu.uid]={...uCache[cu.uid],nexusEnergy:totalEnergy};
-      }catch{}
+      const prevBest=cud.nexusEnergy||0;
+      if(totalEnergy>prevBest){
+        try{
+          await updateDoc(doc(db,'users',cu.uid),{nexusEnergy:totalEnergy});
+          cud={...cud,nexusEnergy:totalEnergy};
+          uCache[cu.uid]={...uCache[cu.uid],nexusEnergy:totalEnergy};
+        }catch{}
+      }
     }
   }
   if(e.data.type==='driftScore'&&cu&&cud){
