@@ -2627,7 +2627,8 @@ function buildUsersList(){
   entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;">${avatarHtml(uid,'42px')}${isOnline(u)?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button>`;
+    const _uNick=getNickname(uid);
+    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;cursor:pointer;" onclick="N.openProfileModal('${uid}')">${avatarHtml(uid,'42px')}${isOnline(u)?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info" style="cursor:pointer;" onclick="N.openProfileModal('${uid}')"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(_uNick||(u.displayName||uid))}${_uNick?` <span style="font-size:9px;opacity:0.4;font-style:italic;">(${esc(u.displayName||uid)})</span>`:''} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><div style="display:flex;gap:6px;"><button class="btn-small" onclick="N.openProfileModal('${uid}')">PROFILE</button><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button></div>`;
     list.appendChild(el);
   });
 }
