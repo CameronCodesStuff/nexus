@@ -4313,10 +4313,18 @@ async function doLeaveGroup(){
 
 
 // ── PROFILE MODAL ──────────────────────────────
+
+function getNickname(uid){try{return localStorage.getItem('nexus_nick_'+uid)||'';}catch{return '';}}
+function setNickname(uid,nick){try{if(nick)localStorage.setItem('nexus_nick_'+uid,nick);else localStorage.removeItem('nexus_nick_'+uid);}catch{}}
+window._setNick=function(uid,nick){
+  setNickname(uid,nick.trim());
+  renderSidebar();
+  if(acid) renderMsgs(acid);
+};
 function openProfileModal(uid){
   const u=uCache[uid]||{};
   const rank=getRank(u.msgCount||0);
-  const _nick=getNickname?getNickname(uid):'';  const nm=_nick||(u.displayName||'User');
+  const _nick=getNickname(uid);  const nm=_nick||(u.displayName||'User');
   const isMe=uid===cu.uid;
   const bio=u.bio||'';
   const emoji=userEmoji(uid);
