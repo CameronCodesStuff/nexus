@@ -4316,7 +4316,7 @@ async function doLeaveGroup(){
 function openProfileModal(uid){
   const u=uCache[uid]||{};
   const rank=getRank(u.msgCount||0);
-  const nm=u.displayName||'User';
+  const _nick=getNickname?getNickname(uid):'';  const nm=_nick||(u.displayName||'User');
   const isMe=uid===cu.uid;
   const bio=u.bio||'';
   const emoji=userEmoji(uid);
