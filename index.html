@@ -552,6 +552,8 @@
     100%{color:#4466ff;border-color:rgba(68,102,255,0.8);background:rgba(68,102,255,0.15);text-shadow:0 0 8px rgba(68,102,255,0.6);}
   }
   .role-beginner-tester{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;border:1px solid rgba(68,102,255,0.8);font-weight:900;vertical-align:middle;margin-left:8px;animation:btester-anim 2s linear infinite;}
+  @keyframes referral-anim{0%{color:#cc0000;border-color:rgba(180,0,0,0.8);background:rgba(140,0,0,0.15);text-shadow:0 0 8px rgba(180,0,0,0.6);}50%{color:#880000;border-color:rgba(100,0,0,0.8);background:rgba(80,0,0,0.2);text-shadow:0 0 12px rgba(120,0,0,0.8);}100%{color:#cc0000;border-color:rgba(180,0,0,0.8);background:rgba(140,0,0,0.15);text-shadow:0 0 8px rgba(180,0,0,0.6);}}
+  .role-referral{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;border:1px solid rgba(180,0,0,0.8);font-weight:900;vertical-align:middle;margin-left:8px;animation:referral-anim 2s ease-in-out infinite;}
   @keyframes owner-pulse{0%,100%{transform:scale(1);filter:brightness(1);}50%{transform:scale(1.08);filter:brightness(1.5);}}
   .role-owner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite,owner-pulse 2s ease infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);-webkit-text-fill-color:initial;}
 
@@ -619,7 +621,7 @@
   .time-rainbow{background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:role-rainbow 2s linear infinite;font-weight:700;}
   /* Leaderboard */
   .lb-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;}
-  .lb-tab{flex:1;padding:10px;text-align:center;cursor:pointer;font-family:var(--font-display);font-size:10px;letter-spacing:2px;color:var(--text-dim);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.2s;}
+  .lb-tab{flex:1;padding:8px 4px;text-align:center;cursor:pointer;font-family:var(--font-display);font-size:9px;letter-spacing:1px;color:var(--text-dim);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.2s;}
   .lb-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
   .lb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:6px;transition:border-color 0.2s;}
   .lb-row:hover{border-color:rgba(68,102,255,0.3);}
@@ -678,6 +680,7 @@
         <input type="text" id="reg-user" placeholder="Username (letters, numbers, underscores)" autocomplete="off">
         <input type="password" id="reg-pass" placeholder="Password (min 6 chars)">
         <input type="password" id="reg-pass2" placeholder="Confirm password">
+        <input type="text" id="reg-referral" placeholder="Referral code (optional)" autocomplete="off" style="text-transform:uppercase;margin-top:4px;">
         <div class="auth-error" id="reg-error"></div>
         <button class="btn-primary" onclick="N.showTnC()">CONTINUE ›</button>
         <div class="auth-info">No email required. Your username is your identity.</div>
@@ -980,7 +983,7 @@
 
 <!-- LEADERBOARD MODAL -->
 <div class="modal-overlay" id="lb-modal">
-  <div class="modal" style="width:480px;">
+  <div class="modal" style="width:660px;max-width:96vw;">
     <div class="modal-title">🏅 LEADERBOARD</div>
     <button class="modal-close" onclick="N.closeModal('lb-modal')">✕</button>
     <div class="lb-tabs">
@@ -990,6 +993,7 @@
       <div class="lb-tab" id="lb-tab-flap" onclick="N.lbTab('flap')">NEXUS FLAP</div>
       <div class="lb-tab" id="lb-tab-wpm" onclick="N.lbTab('wpm')">TYPING WPM</div>
       <div class="lb-tab" id="lb-tab-drift" onclick="N.lbTab('drift')">DRIFT KING</div>
+      <div class="lb-tab" id="lb-tab-referrals" onclick="N.lbTab('referrals')">REFERRALS</div>
     </div>
     <div id="lb-content"></div>
   </div>
@@ -1115,7 +1119,7 @@ import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
   addDoc, updateDoc, deleteDoc, onSnapshot, query, where,
   orderBy, limitToLast, startAfter, endBefore, limit,
-  serverTimestamp, arrayUnion, arrayRemove
+  serverTimestamp, arrayUnion, arrayRemove, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── STARFIELD ──────────────────────────────────
@@ -1861,25 +1865,49 @@ function switchTab(tab){
 
 async function doRegister(){
   const un=$('reg-user').value.trim(),pw=$('reg-pass').value,pw2=$('reg-pass2').value;
+  const refCode=(document.getElementById('reg-referral')?.value||'').trim().toUpperCase();
   const err=$('reg-error-2')||$('reg-error');
   const tncCheck=document.getElementById('tnc-check');
   if(tncCheck&&!tncCheck.checked){err.textContent='You must agree to the Terms & Conditions.';return;}
   err.textContent='Checking username…';
   const unLower=un.toLowerCase();
   try{
-    // Check the dedicated usernames collection (case-insensitive, unique)
+    // Validate referral code if provided
+    let referredByUid=null;
+    if(refCode){
+      const refSnap=await getDoc(doc(db,'referrals',refCode)).catch(()=>null);
+      if(!refSnap?.exists()){err.textContent='Invalid referral code. Leave blank if none.';return;}
+      referredByUid=refSnap.data().uid;
+    }
+    // Check username taken
     const unameSnap=await getDoc(doc(db,'usernames',unLower));
     if(unameSnap.exists()){err.textContent='Username already taken. Choose another.';return;}
     err.textContent='Creating account…';
     const cred=await createUserWithEmailAndPassword(auth,toEmail(un),pw);
     await updateProfile(cred.user,{displayName:un});
-    // Reserve the username atomically
     await setDoc(doc(db,'usernames',unLower),{uid:cred.user.uid,createdAt:serverTimestamp()});
+    // Save new user with referral info
     await setDoc(doc(db,'users',cred.user.uid),{
       uid:cred.user.uid, displayName:un, username:unLower,
-      msgCount:0, online:true, createdAt:serverTimestamp()
+      msgCount:0, online:true, createdAt:serverTimestamp(),
+      referredBy:referredByUid||null,
+      referralMinutes:0,
+      referralCount:0
     });
-    err.textContent='';toast('Welcome to NEXUS!','success');
+    // Store pending reward for referrer - they claim it on their next login
+    if(referredByUid){
+      try{
+        await addDoc(collection(db,'referral_rewards'),{
+          forUid: referredByUid,
+          fromUsername: un,
+          reward: 'referral',
+          msgs: 500,
+          createdAt: serverTimestamp(),
+          claimed: false
+        });
+      }catch(e){console.warn('Referral reward queue failed:',e);}
+    }
+    err.textContent='';toast('Welcome to NEXUS!'+(refCode?' Referral code applied!':''),'success');
     const ls=document.getElementById('loading-screen');if(ls){ls.style.display='flex';ls.style.opacity='1';}
   }catch(e){
     const m=e.message||'';
@@ -1996,6 +2024,44 @@ async function enterApp(){
   applyMobileMode(mobileMode);
   checkAnnouncement();
   checkPopup();
+  // Claim any pending referral rewards
+  claimReferralRewards();
+  // Retroactive check: if has referrals but missing role
+  checkReferralRole();
+  // Generate referral code if user doesn't have one
+  // Generate deterministic referral code from UID (same every time)
+  (async()=>{
+    const uid=cu.uid;
+    let h=0;for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))>>>0;
+    const ltrs='ABCDEFGHJKLMNPQRSTUVWXYZ',digs='23456789';
+    const h1=(h^(h>>>7))>>>0,h2=(h1^(h1>>>13))>>>0,h3=(h2^(h2>>>17))>>>0;
+    const code=ltrs[h%ltrs.length]+ltrs[h1%ltrs.length]+ltrs[h2%ltrs.length]+digs[h%digs.length]+digs[h1%digs.length]+ltrs[h3%ltrs.length]+ltrs[(h2^h3)%ltrs.length];
+    // Always update cud with the code immediately
+    cud={...cud,referralCode:code};
+    uCache[uid]={...uCache[uid],referralCode:code};
+    // Save to Firestore
+    try{
+      await updateDoc(doc(db,'users',uid),{referralCode:code});
+      await setDoc(doc(db,'referrals',code),{uid,createdAt:serverTimestamp()},{merge:true});
+    }catch{}
+    // Re-render settings if open so code shows
+    if(window._N&&window._N.renderSettings) window._N.renderSettings();
+
+    // Watch referrer's own doc for referralCount changes (updated on registration)
+    onSnapshot(doc(db,'users',uid),snap=>{
+      if(!snap.exists()) return;
+      const d=snap.data();
+      // Update referral count in cud
+      if(d.referralCount!==undefined&&d.referralCount!==cud.referralCount){
+        cud={...cud,referralCount:d.referralCount,roles:d.roles||cud.roles||[]};
+        uCache[uid]={...uCache[uid],referralCount:d.referralCount,roles:d.roles||[]};
+        if(window._N&&window._N.renderSettings) window._N.renderSettings();
+        if(window._N&&window._N.renderSidebar) renderSidebar();
+      }
+    });
+
+    // Rewards are instant - no minute tracking needed
+  })();
   // Clean up any stale call docs from previous sessions
   try{
     const staleQ=query(collection(db,'calls'),where('members','array-contains',cu.uid));
@@ -2774,6 +2840,69 @@ function renderSettings(){
   const mc=cud?.msgCount||0, rank=getRank(mc);
   const myEmoji=userEmoji(cu?.uid||'');
   const nm=cud?.displayName||'User';
+
+  // ── REFERRAL CODE ──
+  let refSection=document.getElementById('settings-referral');
+  if(!refSection){
+    const modal=document.querySelector('#settings-modal .modal');
+    if(modal){
+      refSection=document.createElement('div');
+      refSection.id='settings-referral';
+      modal.insertBefore(refSection,modal.firstChild);
+    }
+  }
+  if(refSection){
+    // If no code yet, trigger generation
+    if(!cud?.referralCode&&cu){
+      (async()=>{
+        try{
+          const ltrs='ABCDEFGHJKLMNPQRSTUVWXYZ';
+          const digs='0123456789';
+          const rl=()=>ltrs[Math.floor(Math.random()*ltrs.length)];
+          const rd=()=>digs[Math.floor(Math.random()*digs.length)];
+          const code=rl()+rl()+rl()+rd()+rd()+rl()+rl();
+          await updateDoc(doc(db,'users',cu.uid),{referralCode:code});
+          await setDoc(doc(db,'referrals',code),{uid:cu.uid,createdAt:serverTimestamp()});
+          cud={...cud,referralCode:code};
+          if(window._N&&window._N.renderSettings) window._N.renderSettings();
+        }catch{}
+      })();
+    }
+    const myCode=cud?.referralCode||'Generating…';
+    refSection.innerHTML='';
+    const _rTitle=document.createElement('div');_rTitle.className='settings-section-title';_rTitle.textContent='REFERRAL';refSection.appendChild(_rTitle);
+    const _rBox=document.createElement('div');
+    _rBox.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:4px;';
+    const _rLbl=document.createElement('div');_rLbl.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:1px;margin-bottom:8px;';_rLbl.textContent='YOUR REFERRAL CODE';
+    const _rRow=document.createElement('div');_rRow.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:10px;';
+    const _rCode=document.createElement('div');_rCode.style.cssText='font-family:var(--font-display,var(--font-mono));font-size:22px;font-weight:bold;color:var(--accent);letter-spacing:4px;';_rCode.textContent=myCode;
+    const _rCopy=document.createElement('button');_rCopy.textContent='COPY';_rCopy.style.cssText='background:rgba(68,102,255,0.15);border:1px solid var(--accent);color:var(--accent);font-family:var(--font-mono);font-size:9px;letter-spacing:2px;padding:4px 10px;border-radius:6px;cursor:pointer;';
+    _rCopy.addEventListener('click',()=>{navigator.clipboard.writeText(myCode).then(()=>{_rCopy.textContent='COPIED!';setTimeout(()=>{_rCopy.textContent='COPY';},1500);}).catch(()=>{});});
+    _rRow.appendChild(_rCode);_rRow.appendChild(_rCopy);
+    const refCount=cud?.referralCount||0;
+    const hasRefRole=(cud?.roles||[]).includes('referral');
+    const _rStats=document.createElement('div');_rStats.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;';
+    const _rCount=document.createElement('div');_rCount.style.cssText='font-size:11px;font-family:var(--font-mono);color:var(--text-dim);';
+    _rCount.innerHTML='<span style="color:var(--accent);font-weight:bold;font-size:16px;">'+refCount+'</span> friend'+(refCount!==1?'s':'')+' referred';
+    _rStats.appendChild(_rCount);
+    if(refCount>0){
+      const _roleStatus=document.createElement('div');
+      _roleStatus.style.cssText='font-size:9px;font-family:var(--font-mono);padding:3px 8px;border-radius:10px;border:1px solid '+(hasRefRole?'rgba(180,0,0,0.5)':'var(--border)')+';color:'+(hasRefRole?'#cc0000':'var(--text-dim)')+';';
+      _roleStatus.textContent=hasRefRole?'REFERRAL ROLE ✓':'REFERRAL ROLE PENDING';
+      _rStats.appendChild(_roleStatus);
+      if(!hasRefRole){
+        const _claimBtn=document.createElement('button');
+        _claimBtn.textContent='CLAIM ROLE';
+        _claimBtn.style.cssText='background:rgba(180,0,0,0.15);border:1px solid rgba(180,0,0,0.4);color:#cc0000;font-family:var(--font-mono);font-size:9px;letter-spacing:1px;padding:3px 8px;border-radius:6px;cursor:pointer;';
+        _claimBtn.addEventListener('click',()=>{claimReferralRewards();checkReferralRole();});
+        _rStats.appendChild(_claimBtn);
+      }
+    }
+    _rBox.appendChild(_rStats);
+    const _rInfo=document.createElement('div');_rInfo.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.5;';_rInfo.textContent='Share this code with friends. When they sign up using your code you instantly get the REFERRAL badge and +500 messages.';
+    _rBox.appendChild(_rLbl);_rBox.appendChild(_rRow);_rBox.appendChild(_rInfo);
+    refSection.appendChild(_rBox);
+  }
 
   // ── FONT PICKER ──
   let fontSection=document.getElementById('settings-font-section');
@@ -4958,8 +5087,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','tester','beginner_tester','bugfinder','feedback','og','easter'];
-const ROLE_LABELS={owner:'Owner',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',og:'OG',easter:'Easter Egg 🐣'};
+const ROLE_OPTS=['owner','tester','beginner_tester','bugfinder','feedback','og','easter','referral'];
+const ROLE_LABELS={owner:'Owner',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -5657,6 +5786,66 @@ function hideAnnouncement(){
   document.getElementById('announce-banner')?.classList.remove('active');
 }
 
+async function claimReferralRewards(){
+  if(!cu||!cud) return;
+  try{
+    const q=query(collection(db,'referral_rewards'),
+      where('forUid','==',cu.uid),
+      where('claimed','==',false));
+    const snap=await getDocs(q);
+    if(snap.empty) return;
+    // Process each unclaimed reward
+    for(const rewardDoc of snap.docs){
+      const reward=rewardDoc.data();
+      try{
+        // Apply role and messages to THIS user's own doc
+        const mySnap=await getDoc(doc(db,'users',cu.uid));
+        if(mySnap.exists()){
+          const myData=mySnap.data();
+          const myRoles=myData.roles||[];
+          const newRoles=myRoles.includes('referral')?myRoles:[...myRoles,'referral'];
+          const newMsgCount=(myData.msgCount||0)+(reward.msgs||500);
+          const newRefCount=(myData.referralCount||0)+1;
+          await updateDoc(doc(db,'users',cu.uid),{
+            roles: newRoles,
+            role: newRoles[0]||null,
+            msgCount: newMsgCount,
+            referralCount: newRefCount
+          });
+          // Update local cud
+          cud={...cud,roles:newRoles,role:newRoles[0]||null,msgCount:newMsgCount,referralCount:newRefCount};
+          uCache[cu.uid]={...uCache[cu.uid],roles:newRoles,msgCount:newMsgCount,referralCount:newRefCount};
+          // Mark reward as claimed
+          await updateDoc(rewardDoc.ref,{claimed:true});
+          toast('🎉 Referral reward claimed! +'+( reward.msgs||500)+' messages & REFERRAL role! ('+( reward.fromUsername||'Someone')+' used your code)','success');
+          renderSidebar();
+        }
+      }catch(e){console.warn('Claim failed:',e);}
+    }
+  }catch(e){console.warn('Referral rewards check failed:',e);}
+}
+
+// Also check if user has referrals but missing role (retroactive fix)
+async function checkReferralRole(){
+  if(!cu||!cud) return;
+  try{
+    const myRoles=cud.roles||[];
+    const myRefCount=cud.referralCount||0;
+    // If they have referrals but no role, check reward queue
+    if(myRefCount>0&&!myRoles.includes('referral')){
+      const newRoles=[...myRoles,'referral'];
+      await updateDoc(doc(db,'users',cu.uid),{
+        roles:newRoles,
+        role:newRoles[0]||null
+      });
+      cud={...cud,roles:newRoles,role:newRoles[0]||null};
+      uCache[cu.uid]={...uCache[cu.uid],roles:newRoles};
+      toast('🎉 REFERRAL role granted! You have '+myRefCount+' referral'+(myRefCount!==1?'s':'')+'!','success');
+      renderSidebar();
+    }
+  }catch{}
+}
+
 function checkAnnouncement(){
   // Live listener — banner appears/disappears for all users instantly
   try{
@@ -5749,6 +5938,7 @@ function getRoleBadge(uid){
     feedback: '<span class="role-feedback">FEEDBACK</span>',
     og:       '<span class="role-og">OG</span>',
     easter:   '<span class="role-easter">🐣 EASTER EGG</span>',
+    referral: '<span class="role-referral">REFERRAL</span>',
   };
   return roles.map(r=>map[r]||'').join('');
 }
@@ -6691,6 +6881,7 @@ function lbTab(tab){
   document.getElementById('lb-tab-flap')?.classList.toggle('active',tab==='flap');
   document.getElementById('lb-tab-wpm')?.classList.toggle('active',tab==='wpm');
   document.getElementById('lb-tab-drift')?.classList.toggle('active',tab==='drift');
+  document.getElementById('lb-tab-referrals')?.classList.toggle('active',tab==='referrals');
   renderLeaderboard(tab);
 }
 
@@ -6712,8 +6903,10 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.flapBest||0)>0).sort((a,b)=>(b.flapBest||0)-(a.flapBest||0)).slice(0,20);
     } else if(tab==='wpm'){
       users=users.filter(u=>(u.bestWpm||0)>0).sort((a,b)=>(b.bestWpm||0)-(a.bestWpm||0)).slice(0,20);
-    } else {
+    } else if(tab==='drift'){
       users=users.filter(u=>(u.driftBest||0)>0).sort((a,b)=>(b.driftBest||0)-(a.driftBest||0)).slice(0,20);
+    } else {
+      users=users.filter(u=>(u.referralCount||0)>0).sort((a,b)=>(b.referralCount||0)-(a.referralCount||0)).slice(0,20);
     }
     if(!users.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No data yet.</div>';return;}
     el.innerHTML='';
@@ -6779,6 +6972,11 @@ async function renderLeaderboard(tab){
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#ff6622;letter-spacing:1px;';
         badge.textContent='🚗 '+(u.driftBest||0).toLocaleString();
+        row.appendChild(badge);
+      } else if(tab==='referrals'){
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#cc0000;letter-spacing:1px;';
+        badge.textContent='👥 '+(u.referralCount||0)+' referral'+(( u.referralCount||0)!==1?'s':'');
         row.appendChild(badge);
       }
       el.appendChild(row);
