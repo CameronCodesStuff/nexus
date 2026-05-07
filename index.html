@@ -21,7 +21,7 @@
   [data-theme="crimson"]{--bg:#0a0003;--bg2:#100005;--bg3:#160007;--panel:#080003;--border:rgba(255,30,60,0.18);--accent:#ff1a3c;--accent2:#ff6688;--glow:rgba(255,26,60,0.4);}
   [data-theme="arctic"]{--bg:#010810;--bg2:#020d18;--bg3:#031220;--panel:#010610;--border:rgba(100,220,255,0.18);--accent:#00c8ff;--accent2:#88eeff;--glow:rgba(0,200,255,0.4);}
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--app-bg,var(--bg));color:var(--text);font-family:var(--font-body);font-size:15px;}
   #starfield{position:fixed;inset:0;pointer-events:none;z-index:0;}
   .screen{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;}
   .screen.active{display:flex;}
@@ -2760,7 +2760,42 @@ function renderSettings(){
     fontSection.innerHTML=fHTML;
   }
 
-  // ── BACKGROUND EFFECT PICKER ──
+  // ── BACKGROUND COLOUR PICKER ──
+  let bgColSection=document.getElementById('settings-bg-colour');
+  if(!bgColSection){
+    const modal=document.querySelector('#settings-modal .modal');
+    bgColSection=document.createElement('div');bgColSection.id='settings-bg-colour';
+    // Insert before effect section
+    const effSec=document.getElementById('settings-bg-effect');
+    if(effSec) modal.insertBefore(bgColSection,effSec);
+    else modal.appendChild(bgColSection);
+  }
+  const savedBgCol=localStorage.getItem('nexus_bg_colour')||'default';
+  const bgPresets=[
+    {id:'default',label:'Default',color:'var(--bg)'},
+    {id:'#000000',label:'Black',color:'#000000'},
+    {id:'#0a0015',label:'Deep Purple',color:'#0a0015'},
+    {id:'#00001a',label:'Navy',color:'#00001a'},
+    {id:'#001a00',label:'Forest',color:'#001a00'},
+    {id:'#1a0000',label:'Dark Red',color:'#1a0000'},
+    {id:'#1a000d',label:'Dark Pink',color:'#1a000d'},
+    {id:'#0d0d0d',label:'Dark Grey',color:'#0d0d0d'},
+  ];
+  // Build swatches using DOM (avoids quote escaping issues)
+  const customVal=savedBgCol.startsWith('#')&&savedBgCol.length===7?savedBgCol:'#050508';
+  bgColSection.innerHTML='<div class="settings-section-title">BACKGROUND COLOUR</div><div id="bg-swatch-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div><div style="display:flex;align-items:center;gap:10px;"><label style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:2px;">CUSTOM</label><input type="color" id="bg-colour-custom" value="'+customVal+'" style="width:40px;height:30px;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;padding:2px;"><button id="bg-reset-btn" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-mono);font-size:9px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;">RESET</button></div>';
+  const swatchRow=bgColSection.querySelector('#bg-swatch-row');
+  bgPresets.forEach(p=>{
+    const sw=document.createElement('div');
+    sw.title=p.label;
+    sw.style.cssText='width:40px;height:40px;border-radius:8px;cursor:pointer;transition:border-color 0.15s;border:2px solid '+(savedBgCol===p.id?'var(--accent)':'rgba(255,255,255,0.12)')+';background:'+(p.color==='var(--bg)'?'var(--bg)':p.color)+';';
+    sw.addEventListener('click',()=>window._setBgCol(p.id));
+    swatchRow.appendChild(sw);
+  });
+  bgColSection.querySelector('#bg-colour-custom').addEventListener('input',e=>window._setBgCol(e.target.value));
+  bgColSection.querySelector('#bg-reset-btn').addEventListener('click',()=>window._setBgCol('default'));
+
+    // ── BACKGROUND EFFECT PICKER ──
   let effectSection=document.getElementById('settings-effect-section');
   if(!effectSection){
     const modal=document.querySelector('#settings-modal .modal');
@@ -6496,64 +6531,50 @@ const TG_WORDS=[
   "he","as","you","do","at","this","but","his","by","from","they","we","say","her",
   "she","or","an","will","my","one","all","would","there","their","what","so",
   "up","out","if","about","who","get","which","go","me","when","make","can","like",
-  "time","no","just","him","know","take","people","into","year","your","good","some",
-  "could","them","see","other","than","then","now","look","only","come","its","over",
-  "think","also","back","after","use","two","how","our","work","first","well","way",
-  "even","new","want","because","any","these","give","day","most","us","great","between",
-  "need","large","often","hand","high","place","hold","turn","without","follow","act",
-  "ask","men","change","went","light","kind","off","play","spell","air","away","animal",
-  "house","point","page","letter","mother","answer","found","study","still","learn",
-  "plant","cover","food","sun","four","between","state","keep","eye","never","last",
-  "let","thought","city","tree","cross","farm","hard","start","might","story","saw",
-  "far","sea","draw","left","late","run","while","press","close","night","real","life",
-  "few","north","open","seem","together","next","white","children","begin","got","walk",
-  "example","ease","paper","group","always","music","those","both","mark","book","carry",
-  "took","science","eat","room","friend","began","idea","fish","mountain","stop","once",
-  "base","hear","horse","cut","sure","watch","color","face","wood","main","enough",
-  "plain","girl","usual","young","ready","above","ever","red","list","though","feel",
-  "talk","bird","soon","body","dog","family","direct","pose","leave","song","measure",
-  "door","product","black","short","numeral","class","wind","question","happen","complete",
-  "ship","area","half","rock","order","fire","south","problem","piece","told","knew",
-  "pass","since","top","whole","king","space","heard","best","hour","better","true",
-  "during","hundred","five","remember","step","early","hold","west","ground","interest",
-  "reach","fast","verb","sing","listen","six","table","travel","less","morning","ten",
-  "simple","several","vowel","toward","power","town","fine","drive","stood","contain",
-  "front","teach","week","final","gave","green","oh","quick","develop","ocean","warm",
-  "free","minute","strong","special","behind","clear","tail","produce","fact","street",
-  "inch","multiply","nothing","course","stay","wheel","full","force","blue","object",
-  "decide","surface","deep","moon","island","foot","system","busy","test","record",
-  "boat","common","gold","possible","plane","stead","dry","wonder","laugh","thousand",
-  "ran","check","game","shape","equate","miss","brought","heat","snow","tire","bring",
-  "yes","distant","fill","east","paint","language","among","grand","ball","yet","wave",
-  "drop","heart","am","present","heavy","dance","engine","position","arm","wide","sail",
-  "material","size","vary","settle","speak","weight","general","ice","matter","circle",
-  "pair","include","divide","syllable","felt","perhaps","pick","sudden","count","square",
-  "reason","length","represent","art","subject","region","energy","hunt","probable",
-  "bed","brother","egg","ride","cell","believe","fraction","forest","sit","race","window",
-  "store","summer","train","sleep","prove","lone","leg","exercise","wall","catch","mount",
-  "wish","sky","board","joy","winter","sat","written","wild","instrument","kept","glass",
-  "grass","cow","job","edge","sign","visit","past","soft","fun","bright","gas","weather",
-  "month","million","bear","finish","happy","hope","flower","clothe","strange","gone",
-  "trade","melody","trip","office","receive","row","mouth","exact","symbol","die","least",
-  "trouble","shout","except","wrote","seed","tone","join","suggest","clean","break",
-  "lady","yard","rise","bad","blow","oil","blood","touch","grew","cent","mix","team",
-  "wire","cost","lost","brown","wear","garden","equal","sent","choose","fell","fit",
-  "flow","fair","bank","collect","save","control","decimal","gentle","woman","captain",
-  "practice","separate","difficult","doctor","please","protect","noon","whose","locate",
-  "ring","character","insect","caught","period","indicate","radio","spoke","atom","human",
-  "history","effect","electric","expect","crop","modern","element","hit","student","corner",
-  "party","supply","bone","rail","imagine","provide","agree","thus","capital","chair",
-  "danger","fruit","rich","thick","soldier","process","operate","guess","necessary",
-  "sharp","wing","create","neighbor","wash","bat","rather","crowd","corn","compare",
-  "poem","string","bell","depend","meat","rub","tube","famous","dollar","stream","fear",
-  "sight","thin","triangle","planet","hurry","chief","colony","clock","mine","tie","enter",
-  "major","fresh","search","send","yellow","gun","allow","print","dead","spot","desert",
-  "suit","current","lift","rose","continue","block","chart","hat","sell","success","company",
-  "subtract","event","particular","deal","swim","term","opposite","wife","shoe","shoulder",
-  "spread","arrange","camp","invent","cotton","born","determine","quart","nine","truck",
-  "noise","level","chance","gather","shop","stretch","throw","shine","property","column",
-  "molecule","select","wrong","gray","repeat","require","broad","prepare","salt","nose",
-  "plural","anger","claim","tone","nut","please","wonder","shell","knew","forest","probably"
+  "time","no","just","him","know","take","into","year","good","some","could","them",
+  "see","than","then","now","look","only","come","its","over","think","also","back",
+  "after","use","two","how","our","work","first","well","way","even","new","want",
+  "because","any","these","give","day","most","us","great","need","large","often",
+  "hand","high","place","turn","act","men","change","light","kind","play","air",
+  "away","animal","house","point","page","found","still","learn","plant","cover",
+  "food","sun","four","state","keep","eye","never","last","let","city","tree",
+  "farm","hard","start","story","far","sea","draw","left","late","run","while",
+  "close","night","real","life","few","open","next","white","begin","got","walk",
+  "paper","group","always","music","those","both","mark","book","carry","took",
+  "eat","room","friend","idea","fish","stop","once","hear","horse","cut","sure",
+  "watch","face","wood","main","enough","girl","young","ready","above","red","list",
+  "feel","talk","bird","soon","body","dog","family","song","door","ship","area",
+  "half","rock","fire","south","piece","told","knew","pass","since","top","whole",
+  "space","best","hour","true","during","step","ground","reach","fast","sing",
+  "table","travel","less","morning","simple","vowel","power","town","drive","front",
+  "teach","week","gave","green","quick","ocean","warm","free","minute","strong",
+  "behind","clear","produce","street","inch","nothing","course","stay","full",
+  "force","blue","decide","deep","moon","foot","busy","test","record","boat",
+  "gold","plane","dry","wonder","laugh","check","game","shape","miss","brought",
+  "heat","snow","bring","yes","fill","east","paint","among","grand","ball","wave",
+  "drop","heart","present","heavy","dance","engine","arm","wide","sail","size",
+  "vary","speak","weight","ice","matter","circle","pair","include","length","art",
+  "subject","region","energy","hunt","bed","brother","egg","ride","cell","believe",
+  "forest","sit","race","window","store","summer","train","sleep","prove","leg",
+  "wall","catch","wish","sky","board","winter","sat","glass","grass","cow","job",
+  "edge","sign","visit","past","soft","fun","bright","month","bear","finish","happy",
+  "hope","flower","gone","trade","trip","office","receive","mouth","exact","die",
+  "least","trouble","shout","wrote","seed","clean","break","lady","yard","rise",
+  "oil","blood","touch","grew","cent","team","wire","cost","lost","brown","wear",
+  "garden","equal","sent","choose","fell","flow","fair","bank","save","control",
+  "gentle","captain","practice","doctor","please","protect","ring","radio","human",
+  "history","effect","expect","modern","element","hit","student","corner","party",
+  "supply","bone","imagine","agree","capital","chair","danger","fruit","rich","thick",
+  "soldier","process","guess","sharp","wing","create","neighbor","wash","crowd",
+  "corn","poem","string","bell","depend","meat","tube","famous","dollar","stream",
+  "fear","sight","thin","planet","hurry","chief","clock","mine","tie","enter",
+  "major","fresh","search","send","yellow","gun","allow","print","dead","spot",
+  "suit","current","lift","rose","continue","block","chart","hat","sell","company",
+  "event","deal","swim","term","wife","shoe","shoulder","spread","camp","cotton",
+  "noise","level","chance","gather","shop","throw","shine","column","select","wrong",
+  "gray","repeat","require","broad","salt","nose","anger","claim","shell","forest",
+  "floor","coast","silver","nose","drink","occur","support","speech","nature","range",
+  "steam","section","lake","chance","store","cloud","grass","loud","cover","drive"
 ];
 
 let tgWords=[], tgTyped=[], tgWordIdx=0, tgLetterIdx=0;
@@ -7084,6 +7105,17 @@ window._DRIFT_SRCDOC = decodeURIComponent(escape(atob("PCFET0NUWVBFIGh0bWw+Cjxod
 // Also copy onto N directly in case Proxy isn't supported
 Object.assign(window.N, window._N);
 // Expose game fns globally for modal onclicks
+window._setBgCol=function(col){
+  if(col==='default'){
+    document.documentElement.style.removeProperty('--app-bg');
+    localStorage.removeItem('nexus_bg_colour');
+  } else {
+    document.documentElement.style.setProperty('--app-bg',col);
+    localStorage.setItem('nexus_bg_colour',col);
+  }
+  // Re-render colour picker to update borders
+  if(window._N&&window._N.renderSettings) setTimeout(()=>window._N.renderSettings(),50);
+};
 window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
 // Expose lightbox fns globally (used in HTML onclick attributes)
 window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
