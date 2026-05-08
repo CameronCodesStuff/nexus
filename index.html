@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="theme-color" content="#4466ff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NEXUS">
+<link rel="manifest" href='data:application/manifest+json;base64,eyJuYW1lIjogIk5FWFVTIENoYXQiLCAic2hvcnRfbmFtZSI6ICJORVhVUyIsICJkZXNjcmlwdGlvbiI6ICJORVhVUyBcdTIwMTQgdGhlIG5leHQgZ2VuZXJhdGlvbiBjaGF0IGFwcCIsICJzdGFydF91cmwiOiAiLiIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjMDUwNTA4IiwgInRoZW1lX2NvbG9yIjogIiM0NDY2ZmYiLCAib3JpZW50YXRpb24iOiAicG9ydHJhaXQtcHJpbWFyeSIsICJpY29ucyI6IFt7InNyYyI6ICJkYXRhOmltYWdlL3N2Zyt4bWwsPHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA1MTIgNTEyJz48cmVjdCB3aWR0aD0nNTEyJyBoZWlnaHQ9JzUxMicgcng9JzgwJyBmaWxsPSclMjMwNTA1MDgnLz48dGV4dCB4PScyNTYnIHk9JzM2MCcgZm9udC1zaXplPSczMjAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyUyMzQ0NjZmZicgZm9udC1mYW1pbHk9J21vbm9zcGFjZSc+TjwvdGV4dD48L3N2Zz4iLCAic2l6ZXMiOiAiNTEyeDUxMiIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwiLCAicHVycG9zZSI6ICJhbnkgbWFza2FibGUifV19'>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="https://avatars.githubusercontent.com/u/151978475?v=4" type="image/png" />
 <title>NEXUS — Chat</title>
@@ -2899,7 +2905,7 @@ function renderSettings(){
       }
     }
     _rBox.appendChild(_rStats);
-    const _rInfo=document.createElement('div');_rInfo.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.5;';_rInfo.textContent='Share this code with friends. When they sign up using your code you instantly get the REFERRAL badge and +500 messages. You may need to refresh you page to claim.';
+    const _rInfo=document.createElement('div');_rInfo.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.5;';_rInfo.textContent='Share this code with friends. When they sign up using your code you instantly get the REFERRAL badge and +500 messages.';
     _rBox.appendChild(_rLbl);_rBox.appendChild(_rRow);_rBox.appendChild(_rInfo);
     refSection.appendChild(_rBox);
   }
@@ -8415,6 +8421,36 @@ renderAll();
 &lt;/script&gt;
 
 
+
+<script>
+// Register service worker for PWA installability
+if('serviceWorker' in navigator){
+  // Create SW as a blob since we're a single HTML file
+  const swCode = `
+const CACHE = 'nexus-v1';
+const SHELL = [location.href || '/'];
+self.addEventListener('install', e=>{
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));
+});
+self.addEventListener('activate', e=>{
+  e.waitUntil(clients.claim());
+});
+self.addEventListener('fetch', e=>{
+  // Network first, fall back to cache for navigation
+  if(e.request.mode==='navigate'){
+    e.respondWith(
+      fetch(e.request).catch(()=>caches.match(e.request))
+    );
+  }
+});
+`;
+  const blob = new Blob([swCode], {type:'text/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, {scope:'./'}).then(reg=>{
+    console.log('[PWA] Service worker registered');
+  }).catch(err=>console.log('[PWA] SW registration failed:',err));
+}
+</script>
 </body>
 </html>"
     style="width:100%;height:100%;border:none;display:block;"
