@@ -6935,8 +6935,10 @@ async function renderLeaderboard(tab){
         statVal=u.flapBest||0;statLabel=statVal+' points';
       } else if(tab==='wpm'){
         statVal=u.bestWpm||0;statLabel=statVal+' WPM';
-      } else {
+      } else if(tab==='drift'){
         statVal=u.driftBest||0;statLabel=(u.driftBest||0).toLocaleString()+' pts';
+      } else {
+        statVal=u.referralCount||0;statLabel=statVal+' referral'+(statVal!==1?'s':'');
       }
       row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
       row.appendChild(avEl);
