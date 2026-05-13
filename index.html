@@ -622,6 +622,8 @@
   .time-grey{color:#555;}
   .time-light{color:#6a8a9a;}
   .time-bright{color:#00ccff;text-shadow:0 0 8px rgba(0,204,255,0.5);}
+  @keyframes time-red-pulse{0%,100%{color:#ff3333;text-shadow:0 0 10px rgba(255,50,50,0.4);}50%{color:#ff6666;text-shadow:0 0 16px rgba(255,80,80,0.7);}}
+  .time-red{color:#ff3333;text-shadow:0 0 10px rgba(255,50,50,0.5);font-weight:700;animation:time-red-pulse 2s ease-in-out infinite;}
   @keyframes gold-glow{0%,100%{text-shadow:0 0 8px #ffaa00,0 0 20px #ffcc00;}50%{text-shadow:0 0 16px #ffdd00,0 0 32px #ffaa00;}}
   .time-gold{color:#ffcc00;animation:gold-glow 2s ease infinite;font-weight:700;}
   .time-rainbow{background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:role-rainbow 2s linear infinite;font-weight:700;}
