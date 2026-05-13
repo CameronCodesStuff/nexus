@@ -8448,32 +8448,11 @@ renderAll();
 
 
 <script>
-// Register service worker for PWA installability
-if('serviceWorker' in navigator){
-  // Create SW as a blob since we're a single HTML file
-  const swCode = `
-const CACHE = 'nexus-v1';
-const SHELL = [location.href || '/'];
-self.addEventListener('install', e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));
-});
-self.addEventListener('activate', e=>{
-  e.waitUntil(clients.claim());
-});
-self.addEventListener('fetch', e=>{
-  // Network first, fall back to cache for navigation
-  if(e.request.mode==='navigate'){
-    e.respondWith(
-      fetch(e.request).catch(()=>caches.match(e.request))
-    );
-  }
-});
-`;
-  const blob = new Blob([swCode], {type:'text/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl, {scope:'./'}).then(reg=>{
-    console.log('[PWA] Service worker registered');
-  }).catch(err=>console.log('[PWA] SW registration failed:',err));
+// Only register service worker when served over HTTPS (not file:// or srcdoc)
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  const swCode = `const CACHE='nexus-v1';self.addEventListener('install',e=>{e.waitUntil(self.skipWaiting());});self.addEventListener('activate',e=>{e.waitUntil(clients.claim());});self.addEventListener('fetch',e=>{if(e.request.mode==='navigate')e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));});`;
+  const blob = new Blob([swCode],{type:'text/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(blob),{scope:'./'}).catch(()=>{});
 }
 </script>
 </body>
