@@ -2247,7 +2247,7 @@ function renderSidebar(){
     const myReadTs=chat.readBy?.[cu.uid];
     const myReadMs=myReadTs?.seconds?myReadTs.seconds*1000:(myReadTs?.toMillis?myReadTs.toMillis():0);
     const chatLastMs=chat.lastTs?.seconds?chat.lastTs.seconds*1000:0;
-    const const _lSender=chat.lastSenderUid;
+    const _lSender=chat.lastSenderUid;
     hasUnread=acid!==chat.id&&chatLastMs>myReadMs&&chat.lastMessage&&(!_lSender||_lSender!==cu.uid);
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
