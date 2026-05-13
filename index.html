@@ -870,7 +870,7 @@
             </div>
             <div class="input-field-wrap">
               <textarea class="msg-input" id="msg-input" placeholder="Send a message…" rows="1"
-                onkeydown="N.handleInputKey(event)" oninput="N.autoResize(this)"></textarea>
+                onkeydown="N.handleInputKey(event)" oninput="N.autoResize(this);window.sendTyping&&window.sendTyping()"></textarea>
               <button class="emoji-toggle" onclick="N.toggleEmojiPicker()">😊</button>
             </div>
             <button class="send-btn" onclick="N.sendMessage()">➤</button>
@@ -2240,7 +2240,8 @@ function renderSidebar(){
     const myReadTs=chat.readBy?.[cu.uid];
     const myReadMs=myReadTs?.seconds?myReadTs.seconds*1000:(myReadTs?.toMillis?myReadTs.toMillis():0);
     const chatLastMs=chat.lastTs?.seconds?chat.lastTs.seconds*1000:0;
-    const hasUnread=acid!==chat.id&&chatLastMs>myReadMs&&chat.lastMessage&&chat.members?.find(m=>m!==cu.uid);
+    const const _lSender=chat.lastSenderUid;
+    hasUnread=acid!==chat.id&&chatLastMs>myReadMs&&chat.lastMessage&&(!_lSender||_lSender!==cu.uid);
     const el=document.createElement('div');el.className='feed-item'+(acid===chat.id?' active':'');el.onclick=()=>openChat(chat.id);
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
@@ -2295,6 +2296,18 @@ function openChat(cid){
   markRead(cid);
   // Auto-close sidebar on mobile after selecting a chat
   if(mobileMode) closeSidebar();
+  // Subscribe to typing indicator for this chat
+  if(window._typingUnsub) window._typingUnsub();
+  window._typingUnsub=onSnapshot(doc(db,'chats',cid),snap=>{
+    if(!snap.exists()||acid!==cid) return;
+    const typing=snap.data().typing||{};
+    const now=Date.now();
+    const typers=Object.entries(typing)
+      .filter(([uid,ts])=>uid!==cu.uid&&ts&&(now-ts)<4000)
+      .map(([uid])=>uCache[uid]?.displayName||'Someone');
+    const el=document.getElementById('typing-indicator');
+    if(el) el.textContent=typers.length?typers.join(', ')+(typers.length>1?' are':' is')+' typing…':'';
+  });
 }
 
 // ── MESSAGES ───────────────────────────────────
@@ -2329,7 +2342,7 @@ function subMsgs(cid){
     if(!msgPageMap[cid]) msgPageMap[cid]={};
     msgPageMap[cid].oldestDoc=snap.docs[0]||null;
     msgPageMap[cid].hasMore=snap.docs.length>=MSG_PAGE_SIZE;
-    if(acid===cid) renderMsgs(cid);
+    if(acid===cid){ renderMsgs(cid); markRead(cid); }
   });
 }
 
@@ -2718,7 +2731,7 @@ function buildUsersList(){
     list.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);text-align:center;padding:20px;">No users found.</div>';
     return;
   }
-  entries.sort((a,b)=>(b[1].online?1:0)-(a[1].online?1:0)).forEach(([uid,u])=>{
+  entries.sort((a,b)=>{const ao=isOnline(a[1])?1:0,bo=isOnline(b[1])?1:0;return bo-ao||(a[1].username||'').localeCompare(b[1].username||'');}).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
     el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;cursor:pointer;" onclick="N.openProfileModal('${uid}')">${avatarHtml(uid,'42px')}${isOnline(u)?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info" style="cursor:pointer;" onclick="N.openProfileModal('${uid}')"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><div style="display:flex;gap:6px;"><button class="btn-small" onclick="N.openProfileModal('${uid}')">PROFILE</button><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button></div>`;
@@ -5646,31 +5659,32 @@ async function adminDeleteAccount(uid, name){
 }
 
 async function adminQuickLogin(uid, username, displayName){
-  // Requires a password to have been set via SET button, or stored in _ownerSetPw
   try{
     const usnap=await getDoc(doc(db,'users',uid));
     const udata=usnap.data()||{};
     const uname=username||udata.username;
-    const storedPw=udata._ownerSetPw;
     if(!uname){toast('User has no username.','danger');return;}
-
-    if(!storedPw){
-      // No password set — show instructions
-      toast('Set a password for this user first using the PASS field, then click LOGIN AS.','');
-      return;
-    }
-
-    if(!confirm('Sign in as @'+uname+'?\n\nYou will be logged out of the owner account. Use the "↩ Back to Owner" button to return.')) return;
-
-    // Save owner credentials in sessionStorage so we can return
+    if(!confirm('Sign in as @'+uname+'?\n\nYou will be logged out. Use the "↩ Back to Owner" button to return.')) return;
+    // Generate a temporary password and set it for this user
+    const tempPw='NEXUS_OWNER_'+Math.random().toString(36).slice(2,10).toUpperCase();
+    // Store temp pw in user doc so we can retrieve it if needed
+    await updateDoc(doc(db,'users',uid),{_ownerTempPw:tempPw,_tempPwExpiry:Date.now()+300000});
+    // Save owner session info
     sessionStorage.setItem('nexus_owner_pw', btoa('owner_session'));
     sessionStorage.setItem('nexus_owner_name', cud?.displayName||'Owner');
     sessionStorage.setItem('nexus_impersonating', uname);
-
+    // Update the password in Firebase Auth via admin endpoint
+    // Since we can't use Admin SDK client-side, use the updatePassword flow:
+    // We need the user to be signed in. Workaround: use the stored _ownerSetPw if exists,
+    // otherwise prompt the owner to first set a password.
+    const pw=udata._ownerSetPw||udata._ownerTempPw;
+    if(!pw){
+      // No stored password - set a known one first via the PASS field method
+      toast('No stored password. Use the PASS field to set one for @'+uname+' first.','');
+      return;
+    }
     const email=uname+'@nexus.local';
-    await signInWithEmailAndPassword(auth, email, storedPw);
-    // enterApp will fire and show the app as this user
-    // The impersonation banner will be shown
+    await signInWithEmailAndPassword(auth, email, pw);
     toast('Signed in as @'+uname,'success');
   }catch(e){
     toast('Login failed: '+e.message,'danger');
@@ -7577,7 +7591,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openGamesHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openGamesHub, openFlapGame, closeFlapGame, doLoginCloaked, sendTyping,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, openDriftGame, closeDriftGame,
 };
@@ -7665,6 +7679,14 @@ window._setBgCol=async function(col){
   const savedTxt=localStorage.getItem('nexus_text_colour');
   if(savedTxt) document.documentElement.style.setProperty('--text',savedTxt);
 })();
+window.sendTyping=function(){
+  if(!cu||!acid) return;
+  updateDoc(doc(db,'chats',acid),{['typing.'+cu.uid]:Date.now()}).catch(()=>{});
+  clearTimeout(window._typingTimer);
+  window._typingTimer=setTimeout(()=>{
+    updateDoc(doc(db,'chats',acid),{['typing.'+cu.uid]:0}).catch(()=>{});
+  },3000);
+};
 window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
 // Expose lightbox fns globally (used in HTML onclick attributes)
 window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
