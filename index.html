@@ -6861,11 +6861,11 @@ function stopTimeTracking(){
 }
 
 function getTimeClass(mins){
-  if(!mins||mins<10)   return 'time-grey';
-  if(mins<60)          return 'time-light';
-  if(mins<6000)        return 'time-bright';  // under 100 hours
-  if(mins<60000)       return 'time-gold';    // 100-999 hours
-  return 'time-rainbow';                        // 1000+ hours
+  if(!mins||mins<60)   return 'time-grey';     // under 1 hour
+  if(mins<600)         return 'time-bright';   // 1-9 hours: cyan
+  if(mins<6000)        return 'time-red';      // 10-99 hours: red
+  if(mins<60000)       return 'time-gold';     // 100-999 hours: gold
+  return 'time-rainbow';                        // 1000+ hours: rainbow
 }
 
 function fmtTime(mins){
