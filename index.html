@@ -2113,8 +2113,11 @@ async function enterApp(){
   }
   // Show impersonation banner if owner is signed in as someone else
   const impAs=sessionStorage.getItem('nexus_impersonating');
+  const _impBanner=document.getElementById('impersonate-banner');
   if(impAs){
     showImpersonationBanner(impAs);
+  } else if(_impBanner){
+    _impBanner.style.display='none';
   }
 }
 
@@ -5688,8 +5691,9 @@ async function adminQuickLogin(uid, username, displayName){
     }
     if(!confirm('Sign in as @'+uname+'?')) return;
     sessionStorage.setItem('nexus_owner_pw',btoa('owner_session'));
-    sessionStorage.setItem('nexus_owner_name',cud?.displayName||'Owner');
+    sessionStorage.setItem('nexus_owner_name',cud?.username||cud?.displayName||'Owner');
     sessionStorage.setItem('nexus_impersonating',uname);
+    acid=null;mCache={};aChats={};
     await signInWithEmailAndPassword(auth,uname+'@nexus.local',storedPw);
     toast('Signed in as @'+uname,'success');
   }catch(e){
@@ -6244,13 +6248,29 @@ function showImpersonationBanner(username){
 }
 
 async function returnToOwner(){
+  const ownerName=sessionStorage.getItem('nexus_owner_name')||'';
   sessionStorage.removeItem('nexus_impersonating');
   sessionStorage.removeItem('nexus_owner_pw');
-  // Sign out the impersonated account and sign back in as owner
-  // Owner must log back in manually since we can't store their password
-  await signOut(auth).catch(()=>{});
-  toast('Signed out. Please log back in as the owner.','success');
+  sessionStorage.removeItem('nexus_owner_name');
+  const b=document.getElementById('impersonate-banner');
+  if(b) b.style.display='none';
+  try{
+    if(!ownerName){await signOut(auth).catch(()=>{});return;}
+    const ownerSnap=await getDoc(doc(db,'usernames',ownerName.toLowerCase()));
+    if(!ownerSnap.exists()){await signOut(auth).catch(()=>{});return;}
+    const ownerUid=ownerSnap.data().uid;
+    const ownerUserSnap=await getDoc(doc(db,'users',ownerUid));
+    const ownerPw=ownerUserSnap.data()?._ownerSetPw;
+    if(!ownerPw){await signOut(auth).catch(()=>{});toast('Signed out. Please log back in.','');return;}
+    acid=null;mCache={};aChats={};
+    await signInWithEmailAndPassword(auth,ownerName.toLowerCase()+'@nexus.local',ownerPw);
+    toast('Back as '+ownerName,'success');
+  }catch(e){
+    await signOut(auth).catch(()=>{});
+    toast('Signed out. Please log back in.','');
+  }
 }
+
 
 // ── USER STATUS ──────────────────────────────────
 let currentStatus = localStorage.getItem('nexus_status')||'online';
