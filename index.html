@@ -5612,13 +5612,36 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
   if(!newPw||newPw.length<6){toast('Password must be 6+ chars.','danger');return;}
   if(!username){toast('User has no username.','danger');return;}
   try{
-    // Store the new password in a secure Firestore field
-    // The user's next login will pick it up, OR the owner uses it to LOGIN AS
+    const ownerUser=auth.currentUser;
+    const ownerEmail=ownerUser?.email;
+    // Save owner's credentials so we can sign back in
+    const ownerPwSnap=await getDoc(doc(db,'users',ownerUser.uid));
+    const ownerPw=ownerPwSnap.data()?._ownerSetPw;
+    if(!ownerPw){toast('Owner account has no stored password. Log out and back in first.','danger');return;}
+    // Get the target user's current stored password (to sign in as them)
+    const targetSnap=await getDoc(doc(db,'users',uid));
+    const targetPw=targetSnap.data()?._ownerSetPw;
+    if(!targetPw){
+      // No way to sign in as them - just store new pw in Firestore for future
+      await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
+      toast('Saved to Firestore. @'+username+' must log out and back in once to activate.','');
+      if(onSuccess) onSuccess();
+      return;
+    }
+    // Sign in as target user temporarily
+    const targetEmail=username+'@nexus.local';
+    const targetCred=await signInWithEmailAndPassword(auth,targetEmail,targetPw);
+    // Update their Firebase Auth password
+    await updatePassword(targetCred.user,newPw);
+    // Store new pw in Firestore
     await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
-    toast('Password set. Use LOGIN AS to sign in with it.','success');
+    // Sign back in as owner
+    await signInWithEmailAndPassword(auth,ownerEmail,ownerPw);
+    toast('Password updated for @'+username+'. LOGIN AS will now work.','success');
     if(onSuccess) onSuccess();
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
+
 
 async function adminRenameUser(uid, currentName){
   // Legacy wrapper
@@ -5673,29 +5696,25 @@ async function adminQuickLogin(uid, username, displayName){
     const udata=usnap.data()||{};
     const uname=username||udata.username;
     if(!uname){toast('User has no username.','danger');return;}
-    if(!confirm('Sign in as @'+uname+'?')) return;
-    toast('Setting up access for @'+uname+'...','');
-    // Use Firebase Identity Toolkit REST API to set a temp password
-    const tempPw='Nx!'+Math.random().toString(36).slice(2,10)+'@1';
-    const apiKey='AIzaSyC4dZmrdojLHExMy1eM2cuYL_mc93QObxk';
-    const resp=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:update?key='+apiKey,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({localId:uid,password:tempPw,returnSecureToken:false})
-    });
-    if(!resp.ok){
-      const errData=await resp.json().catch(()=>({}));
-      toast('Could not set access: '+(errData.error?.message||'check Firebase rules'),'danger');
+    // Check if we have a stored password (set at registration or via PASS field)
+    const storedPw=udata._ownerSetPw;
+    if(!storedPw){
+      // No stored pw - prompt owner to set one via the PASS field first
+      toast('No stored password for @'+uname+'. Use the PASS field to set a password, then LOGIN AS will work.','');
       return;
     }
-    await updateDoc(doc(db,'users',uid),{_ownerSetPw:tempPw}).catch(()=>{});
+    if(!confirm('Sign in as @'+uname+'?')) return;
     sessionStorage.setItem('nexus_owner_pw',btoa('owner_session'));
     sessionStorage.setItem('nexus_owner_name',cud?.displayName||'Owner');
     sessionStorage.setItem('nexus_impersonating',uname);
-    await signInWithEmailAndPassword(auth,uname+'@nexus.local',tempPw);
+    await signInWithEmailAndPassword(auth,uname+'@nexus.local',storedPw);
     toast('Signed in as @'+uname,'success');
   }catch(e){
-    toast('Login failed: '+e.message,'danger');
+    if(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'){
+      toast('Stored password is outdated. Use the PASS field to update it.','danger');
+    } else {
+      toast('Login failed: '+e.message,'danger');
+    }
   }
 }
 
