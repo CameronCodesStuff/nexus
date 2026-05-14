@@ -5,9 +5,29 @@
 <meta name="theme-color" content="#4466ff">
 <script>
 if('serviceWorker' in navigator && location.protocol==='https:'){
-  var _swc="const CACHE='nexus-v1';self.addEventListener('install',function(e){e.waitUntil(self.skipWaiting());});self.addEventListener('activate',function(e){e.waitUntil(clients.claim());});self.addEventListener('fetch',function(e){if(e.request.mode==='navigate')e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));});";
+  var _swc="const CACHE='nexus-v1';"
+    +"self.addEventListener('install',function(e){e.waitUntil(self.skipWaiting());});"
+    +"self.addEventListener('activate',function(e){e.waitUntil(clients.claim());});"
+    +"self.addEventListener('fetch',function(e){if(e.request.mode==='navigate')e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));});"
+    +"self.addEventListener('notificationclick',function(e){"
+    +"  var chatId=e.notification.data&&e.notification.data.chatId;"
+    +"  e.notification.close();"
+    +"  e.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(function(list){"
+    +"    for(var i=0;i<list.length;i++){var c=list[i];if(c.url&&c.focus){c.focus();if(chatId)c.postMessage({type:'openChat',chatId:chatId});return;}}"
+    +"    if(clients.openWindow){return clients.openWindow('/');}"
+    +"  }));"
+    +"});";
   var _swb=new Blob([_swc],{type:'text/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(_swb),{scope:'./'}).catch(function(){});
+  window._swReg=null;
+  navigator.serviceWorker.register(URL.createObjectURL(_swb),{scope:'./'})
+    .then(function(r){window._swReg=r;})
+    .catch(function(){});
+  // Listen for messages from SW (e.g. openChat on notification click)
+  navigator.serviceWorker.addEventListener('message',function(e){
+    if(e.data&&e.data.type==='openChat'&&window._N&&window._N.openChat){
+      window._N.openChat(e.data.chatId);
+    }
+  });
 }
 </script>
 <meta name="mobile-web-app-capable" content="yes">
@@ -3557,14 +3577,32 @@ async function requestNotifPermissionSilently(){
 function sendMsgNotification(chatId, senderName, text){
   if(!notifEnabled()) return;
   if(!('Notification' in window)||Notification.permission!=='granted') return;
-  if(document.visibilityState==='visible'&&acid===chatId) return; // already looking at it
+  // Don't notify if user is actively looking at this chat in this tab
+  if(!document.hidden && acid===chatId) return;
   const chat=aChats[chatId];
-  const chatName=chat?.type==='group'?(chat.name||'Group'):senderName;
+  const chatName=chat?.type==='group'?(chat.name||'Group chat'):senderName;
   const body=text?.length>80?text.slice(0,80)+'…':text||'New message';
-  try{
-    const n=new Notification(chatName,{body,icon:'https://avatars.githubusercontent.com/u/151978475?v=4',tag:'nexus-msg-'+chatId,renotify:true,silent:false});
-    n.onclick=()=>{window.focus();if(window._N?.openChat) window._N.openChat(chatId);n.close();};
-  }catch(e){}
+  const opts={
+    body,
+    icon:'https://avatars.githubusercontent.com/u/151978475?v=4',
+    tag:'nexus-msg-'+chatId,
+    renotify:true,
+    data:{chatId}
+  };
+  // Prefer SW showNotification — works even when tab is not focused
+  if(window._swReg){
+    window._swReg.showNotification(chatName,opts).catch(()=>{
+      // SW not ready yet, fall back
+      try{const n=new Notification(chatName,opts);n.onclick=()=>{window.focus();if(window._N?.openChat)window._N.openChat(chatId);n.close();};}catch(e){}
+    });
+  } else if(navigator.serviceWorker?.controller){
+    navigator.serviceWorker.ready.then(reg=>{
+      reg.showNotification(chatName,opts).catch(()=>{});
+    });
+  } else {
+    // Plain fallback (works when tab is open, may not fire on other tabs)
+    try{const n=new Notification(chatName,opts);n.onclick=()=>{window.focus();if(window._N?.openChat)window._N.openChat(chatId);n.close();};}catch(e){}
+  }
 }
 
 async function saveBanner(presetId){
