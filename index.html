@@ -736,7 +736,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
 <div id="app-screen-inner" style="display:flex;flex-direction:column;flex:1;min-height:0;width:100%;">
 <div id="impersonate-banner" style="display:none;background:linear-gradient(90deg,#ff3355,#ff6600);padding:8px 20px;display:none;align-items:center;justify-content:center;gap:12px;font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:#fff;flex-shrink:0;z-index:101;">
-  <span>👑 OWNER VIEW — signed in as <strong id="impersonate-name"></strong></span>
+  <span>👑 OWNER VIEW MODE — browsing as <strong id="impersonate-name"></strong> (read-only, no data will be changed)</span>
   <button onclick="N.returnToOwner()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.4);color:#fff;border-radius:6px;padding:4px 12px;font-family:var(--font-display);font-size:10px;letter-spacing:1px;cursor:pointer;">↩ BACK TO OWNER</button>
 </div>
 <div id="announce-banner">
@@ -2033,15 +2033,19 @@ async function enterApp(){
   $('auth-screen').classList.remove('active');
   $('app-screen').classList.add('active');
 
+  const impersonating = !!(cud && cud._impersonated);
+
   renderProfile();
   updateMyStatusDot();
-  syncAchCache(); // hydrate + retroactively grant based on existing data
+  if(!impersonating) syncAchCache();
   const snap=await getDocs(collection(db,'users'));
   snap.forEach(d=>{uCache[d.id]=d.data();});
   setupChatsListener();
-  setupPresence();
-  listenForIncomingCalls();
-  listenForInboxChanges();
+  if(!impersonating){
+    setupPresence();
+    listenForIncomingCalls();
+    listenForInboxChanges();
+  }
   // Auto-detect mobile if screen width is phone-sized
   if(window.innerWidth<=600&&!localStorage.getItem('nexus_mobile')){
     mobileMode=true;
@@ -2049,71 +2053,61 @@ async function enterApp(){
   applyMobileMode(mobileMode);
   checkAnnouncement();
   checkPopup();
-  // Claim any pending referral rewards
-  claimReferralRewards();
-
-  // Retroactive check: if has referrals but missing role
-  checkReferralRole();
-  // Generate referral code if user doesn't have one
-  // Generate deterministic referral code from UID (same every time)
-  (async()=>{
-    const uid=cu.uid;
-    let h=0;for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))>>>0;
-    const ltrs='ABCDEFGHJKLMNPQRSTUVWXYZ',digs='23456789';
-    const h1=(h^(h>>>7))>>>0,h2=(h1^(h1>>>13))>>>0,h3=(h2^(h2>>>17))>>>0;
-    const code=ltrs[h%ltrs.length]+ltrs[h1%ltrs.length]+ltrs[h2%ltrs.length]+digs[h%digs.length]+digs[h1%digs.length]+ltrs[h3%ltrs.length]+ltrs[(h2^h3)%ltrs.length];
-    // Always update cud with the code immediately
-    cud={...cud,referralCode:code};
-    uCache[uid]={...uCache[uid],referralCode:code};
-    // Save to Firestore
+  if(!impersonating){
+    claimReferralRewards();
+    checkReferralRole();
+    // Generate referral code if user doesn't have one
+    (async()=>{
+      const uid=cu.uid;
+      let h=0;for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))>>>0;
+      const ltrs='ABCDEFGHJKLMNPQRSTUVWXYZ',digs='23456789';
+      const h1=(h^(h>>>7))>>>0,h2=(h1^(h1>>>13))>>>0,h3=(h2^(h2>>>17))>>>0;
+      const code=ltrs[h%ltrs.length]+ltrs[h1%ltrs.length]+ltrs[h2%ltrs.length]+digs[h%digs.length]+digs[h1%digs.length]+ltrs[h3%ltrs.length]+ltrs[(h2^h3)%ltrs.length];
+      cud={...cud,referralCode:code};
+      uCache[uid]={...uCache[uid],referralCode:code};
+      try{
+        await updateDoc(doc(db,'users',uid),{referralCode:code});
+        await setDoc(doc(db,'referrals',code),{uid,createdAt:serverTimestamp()},{merge:true});
+      }catch{}
+      if(window._N&&window._N.renderSettings) window._N.renderSettings();
+      onSnapshot(doc(db,'users',uid),snap=>{
+        if(!snap.exists()) return;
+        const d=snap.data();
+        if(d.referralCount!==undefined&&d.referralCount!==cud.referralCount){
+          cud={...cud,referralCount:d.referralCount,roles:d.roles||cud.roles||[]};
+          uCache[uid]={...uCache[uid],referralCount:d.referralCount,roles:d.roles||[]};
+          if(window._N&&window._N.renderSettings) window._N.renderSettings();
+          if(window._N&&window._N.renderSidebar) renderSidebar();
+        }
+      });
+    })();
+    // Clean up any stale call docs from previous sessions
     try{
-      await updateDoc(doc(db,'users',uid),{referralCode:code});
-      await setDoc(doc(db,'referrals',code),{uid,createdAt:serverTimestamp()},{merge:true});
+      const staleQ=query(collection(db,'calls'),where('members','array-contains',cu.uid));
+      const staleDocs=await getDocs(staleQ);
+      const now=Date.now();
+      staleDocs.forEach(async d=>{
+        const data=d.data();
+        const age=data.createdAt?.toMillis?(now-data.createdAt.toMillis()):999999;
+        if(data.status==='ended'||data.status==='rejected'||age>120000){
+          const sigs=await getDocs(collection(db,'calls',d.id,'signals')).catch(()=>({docs:[]}));
+          await Promise.all(sigs.docs.map(s=>deleteDoc(s.ref).catch(()=>{})));
+          await deleteDoc(d.ref).catch(()=>{});
+        }
+      });
     }catch{}
-    // Re-render settings if open so code shows
-    if(window._N&&window._N.renderSettings) window._N.renderSettings();
-
-    // Watch referrer's own doc for referralCount changes (updated on registration)
-    onSnapshot(doc(db,'users',uid),snap=>{
-      if(!snap.exists()) return;
-      const d=snap.data();
-      // Update referral count in cud
-      if(d.referralCount!==undefined&&d.referralCount!==cud.referralCount){
-        cud={...cud,referralCount:d.referralCount,roles:d.roles||cud.roles||[]};
-        uCache[uid]={...uCache[uid],referralCount:d.referralCount,roles:d.roles||[]};
-        if(window._N&&window._N.renderSettings) window._N.renderSettings();
-        if(window._N&&window._N.renderSidebar) renderSidebar();
-      }
-    });
-
-    // Rewards are instant - no minute tracking needed
-  })();
-  // Clean up any stale call docs from previous sessions
-  try{
-    const staleQ=query(collection(db,'calls'),where('members','array-contains',cu.uid));
-    const staleDocs=await getDocs(staleQ);
-    const now=Date.now();
-    staleDocs.forEach(async d=>{
-      const data=d.data();
-      const age=data.createdAt?.toMillis?(now-data.createdAt.toMillis()):999999;
-      if(data.status==='ended'||data.status==='rejected'||age>120000){
-        const sigs=await getDocs(collection(db,'calls',d.id,'signals')).catch(()=>({docs:[]}));
-        await Promise.all(sigs.docs.map(s=>deleteDoc(s.ref).catch(()=>{})));
-        await deleteDoc(d.ref).catch(()=>{});
-      }
-    });
-  }catch{}
+    startTimeTracking();
+  }
   // nexus energy persists across logins
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
-  startTimeTracking();
   // Dismiss loading screen
   const ls=document.getElementById('loading-screen');
   if(ls){
     ls.classList.add('fade-out');
     setTimeout(()=>{ls.style.display='none';ls.classList.remove('fade-out');},450);
   }
-  // Show impersonation banner if owner is signed in as someone else
+  // Show impersonation banner if owner is viewing as someone else
   const impAs=sessionStorage.getItem('nexus_impersonating');
   const _impBanner=document.getElementById('impersonate-banner');
   if(impAs){
@@ -2195,7 +2189,9 @@ function renderProfile(){
 let usersUnsub = null;
 function setupChatsListener(){
   if(acunsub)acunsub();
-  const q=query(collection(db,'chats'),where('members','array-contains',cu.uid));
+  // In impersonate mode, load the target user's chats (cud.uid = target uid)
+  const listenUid = (cud && cud._impersonated && cud.uid) ? cud.uid : cu.uid;
+  const q=query(collection(db,'chats'),where('members','array-contains',listenUid));
   let _retroDone=false;
   acunsub=onSnapshot(q,snap=>{
     snap.docChanges().forEach(ch=>{
@@ -2203,7 +2199,6 @@ function setupChatsListener(){
       else{
         const prev=aChats[ch.doc.id];
         const next={id:ch.doc.id,...ch.doc.data()};
-        // If a hidden chat gets a new message, un-hide it
         if(hiddenChats.has(ch.doc.id)&&prev&&next.lastTs?.seconds&&(!prev.lastTs?.seconds||next.lastTs.seconds>prev.lastTs.seconds)){
           hiddenChats.delete(ch.doc.id);
           saveHiddenChats();
@@ -2212,7 +2207,6 @@ function setupChatsListener(){
       }
     });
     renderSidebar();
-    // After first chats load, run retro check (aChats now populated)
     if(!_retroDone){_retroDone=true;setTimeout(retroCheckAchs,500);}
   });
   // Live listener for all users so online dots stay current
@@ -2220,14 +2214,13 @@ function setupChatsListener(){
   usersUnsub=onSnapshot(collection(db,'users'),snap=>{
     snap.docChanges().forEach(ch=>{
       uCache[ch.doc.id]={...ch.doc.data()};
-      // Sync own user's live data into cud (e.g. after profile update from another tab)
-      if(ch.doc.id===cu?.uid&&cud){
+      // Sync own user's live data into cud — but not during impersonation
+      if(!cud?._impersonated && ch.doc.id===cu?.uid&&cud){
         const d=ch.doc.data();
         cud={...cud,...d};
       }
     });
     renderSidebar();
-    // Refresh open chat header online status
     if(acid) refreshChatHeader();
   });
 }
@@ -5763,28 +5756,34 @@ async function adminQuickLogin(uid, username, displayName){
   try{
     const usnap=await getDoc(doc(db,'users',uid));
     const udata=usnap.data()||{};
-    const uname=username||udata.username;
-    if(!uname){toast('User has no username.','danger');return;}
-    // Check if we have a stored password (set at registration or via PASS field)
-    const storedPw=udata._ownerSetPw;
-    if(!storedPw){
-      // No stored pw - prompt owner to set one via the PASS field first
-      toast('No stored password for @'+uname+'. Use the PASS field to set a password, then LOGIN AS will work.','');
-      return;
-    }
-    if(!confirm('Sign in as @'+uname+'?')) return;
-    sessionStorage.setItem('nexus_owner_pw',btoa('owner_session'));
-    sessionStorage.setItem('nexus_owner_name',cud?.username||cud?.displayName||'Owner');
-    sessionStorage.setItem('nexus_impersonating',uname);
-    acid=null;mCache={};aChats={};
-    await signInWithEmailAndPassword(auth,uname+'@nexus.local',storedPw);
-    toast('Signed in as @'+uname,'success');
+    const uname=username||udata.username||uid;
+    if(!confirm('View app as @'+uname+'?\n\nYou will stay signed in as yourself — this is a read-only view of their account. No actions will affect their data.')) return;
+
+    // Store owner's real identity so we can restore it
+    sessionStorage.setItem('nexus_owner_uid', cu.uid);
+    sessionStorage.setItem('nexus_owner_name', cud?.username||cud?.displayName||'Owner');
+    sessionStorage.setItem('nexus_impersonating', uname);
+
+    // Overlay the target user's data onto cu/cud WITHOUT signing out of Firebase
+    const realCu = cu;   // keep real Firebase user
+    const realCud = cud; // keep owner's real profile data
+
+    // Patch cud to show target user's profile in the UI
+    cud = {...udata, _impersonated: true, _realUid: realCu.uid, _realCud: realCud};
+    // Patch cu.uid so sidebar/avatar lookups use target uid, but keep real auth
+    // We achieve this by storing real cu separately
+    window._nexusRealCu = realCu;
+    window._nexusRealCud = realCud;
+
+    // Reload chats/sidebar as if we are that user, but using owner's Firebase auth
+    acid=null; mCache={}; aChats={};
+    showImpersonationBanner(uname);
+
+    // Re-enter app with patched cud (no Firebase sign-in change)
+    await enterApp();
+    toast('Viewing app as @'+uname+' (read-only)','success');
   }catch(e){
-    if(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'){
-      toast('Stored password is outdated. Use the PASS field to update it.','danger');
-    } else {
-      toast('Login failed: '+e.message,'danger');
-    }
+    toast('Failed: '+e.message,'danger');
   }
 }
 
@@ -6331,26 +6330,26 @@ function showImpersonationBanner(username){
 }
 
 async function returnToOwner(){
-  const ownerName=sessionStorage.getItem('nexus_owner_name')||'';
   sessionStorage.removeItem('nexus_impersonating');
   sessionStorage.removeItem('nexus_owner_pw');
+  const ownerName=sessionStorage.getItem('nexus_owner_name')||'';
   sessionStorage.removeItem('nexus_owner_name');
+  sessionStorage.removeItem('nexus_owner_uid');
   const b=document.getElementById('impersonate-banner');
   if(b) b.style.display='none';
-  try{
-    if(!ownerName){await signOut(auth).catch(()=>{});return;}
-    const ownerSnap=await getDoc(doc(db,'usernames',ownerName.toLowerCase()));
-    if(!ownerSnap.exists()){await signOut(auth).catch(()=>{});return;}
-    const ownerUid=ownerSnap.data().uid;
-    const ownerUserSnap=await getDoc(doc(db,'users',ownerUid));
-    const ownerPw=ownerUserSnap.data()?._ownerSetPw;
-    if(!ownerPw){await signOut(auth).catch(()=>{});toast('Signed out. Please log back in.','');return;}
-    acid=null;mCache={};aChats={};
-    await signInWithEmailAndPassword(auth,ownerName.toLowerCase()+'@nexus.local',ownerPw);
-    toast('Back as '+ownerName,'success');
-  }catch(e){
-    await signOut(auth).catch(()=>{});
-    toast('Signed out. Please log back in.','');
+
+  // Restore real owner cu/cud from what we saved
+  if(window._nexusRealCu && window._nexusRealCud){
+    cu = window._nexusRealCu;
+    cud = window._nexusRealCud;
+    window._nexusRealCu = null;
+    window._nexusRealCud = null;
+    acid=null; mCache={}; aChats={};
+    await enterApp();
+    toast('Back as '+(ownerName||cud?.displayName||'Owner'),'success');
+  } else {
+    // Fallback: reload the page (Firebase is still the owner's session)
+    window.location.reload();
   }
 }
 
