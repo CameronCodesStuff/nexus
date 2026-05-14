@@ -7190,25 +7190,8 @@ function tgOnInput(){
     tgStarted=true;tgStartTime=Date.now();
     tgInterval=setInterval(tgTick,200);
   }
-  if(val.endsWith(' ')){
-    const typed=val.trim();
-    if(!typed.length){inp.value='';return;}
-    if(tgLastAdvancedIdx===tgWordIdx){inp.value='';return;} // already advanced this word
-    tgLastAdvancedIdx=tgWordIdx;
-    tgTyped[tgWordIdx]=typed;
-    const correct=typed===tgWords[tgWordIdx];
-    if(correct){
-      tgCorrectWords++;
-      tgEarned++;
-      document.getElementById('tg-earned').textContent='+'+tgEarned;
-    }
-    tgWordIdx++;inp.value='';
-    if(tgWordIdx>=tgWords.length-80){
-      tgWords=tgWords.concat(tgGenWords(150));
-      tgTyped=tgTyped.concat(Array(150).fill(''));
-    }
-    tgUpdateStats();tgRender();return;
-  }
+  // tgKeyDown handles space/word-advance via preventDefault; strip any stray space
+  if(val.endsWith(' ')){inp.value=val.trimEnd();return;}
   tgTyped[tgWordIdx]=val;
   tgUpdateStats();tgRender();
 }
@@ -7226,7 +7209,7 @@ function tgKeyDown(e){
       tgStarted=true;tgStartTime=Date.now();
       tgInterval=setInterval(tgTick,200);
     }
-    if(tgLastAdvancedIdx===tgWordIdx){return;} // already advanced this word (e.g. via oninput)
+    if(tgLastAdvancedIdx===tgWordIdx){return;} // spam-guard: same word already advanced
     tgLastAdvancedIdx=tgWordIdx;
     tgTyped[tgWordIdx]=val;
     const correct=val===tgWords[tgWordIdx];
@@ -7240,6 +7223,7 @@ function tgKeyDown(e){
     const inp=document.getElementById('tg-input');if(!inp)return;
     if(inp.value===''&&tgWordIdx>0){
       e.preventDefault();tgWordIdx--;
+      tgLastAdvancedIdx=tgWordIdx-1; // allow re-advancing the word we went back to
       inp.value=tgTyped[tgWordIdx];tgRender();
     }
   }
