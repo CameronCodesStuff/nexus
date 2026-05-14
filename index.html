@@ -7222,9 +7222,19 @@ function tgKeyDown(e){
   if(e.key==='Backspace'){
     const inp=document.getElementById('tg-input');if(!inp)return;
     if(inp.value===''&&tgWordIdx>0){
-      e.preventDefault();tgWordIdx--;
-      tgLastAdvancedIdx=tgWordIdx-1; // allow re-advancing the word we went back to
-      inp.value=tgTyped[tgWordIdx];tgRender();
+      e.preventDefault();
+      tgWordIdx--;
+      // Undo the score for the word we're going back to, if it was correct
+      if(tgTyped[tgWordIdx]===tgWords[tgWordIdx]){
+        tgCorrectWords=Math.max(0,tgCorrectWords-1);
+        tgEarned=Math.max(0,tgEarned-1);
+        document.getElementById('tg-earned').textContent='+'+tgEarned;
+      }
+      // Reset this word so it must be re-typed fresh (no re-advance exploit)
+      tgTyped[tgWordIdx]='';
+      tgLastAdvancedIdx=tgWordIdx-1; // guard stays behind current idx so space works
+      inp.value='';
+      tgRender();
     }
   }
 }
