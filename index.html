@@ -7097,6 +7097,7 @@ let tgWords=[], tgTyped=[], tgWordIdx=0, tgLetterIdx=0;
 let tgStarted=false, tgFinished=false, tgStartTime=null;
 let tgInterval=null, tgModeSecs=60, tgTimeLeft=60;
 let tgEarned=0, tgCorrectWords=0;
+let tgLastAdvancedIdx=-1; // prevents double-counting from dual space handlers
 
 function tgRandWord(){ return TG_WORDS[Math.floor(Math.random()*TG_WORDS.length)]; }
 function tgGenWords(n=80){ return Array.from({length:n},tgRandWord); }
@@ -7107,7 +7108,7 @@ function tgInit(){
   tgTyped=tgWords.map(()=>'');
   tgWordIdx=0;tgLetterIdx=0;
   tgStarted=false;tgFinished=false;tgStartTime=null;
-  tgEarned=0;tgCorrectWords=0;
+  tgLastAdvancedIdx=-1;
   clearInterval(tgInterval);tgInterval=null;
   tgTimeLeft=tgModeSecs;
   document.getElementById('tg-timer').textContent=tgModeSecs;
@@ -7192,6 +7193,8 @@ function tgOnInput(){
   if(val.endsWith(' ')){
     const typed=val.trim();
     if(!typed.length){inp.value='';return;}
+    if(tgLastAdvancedIdx===tgWordIdx){inp.value='';return;} // already advanced this word
+    tgLastAdvancedIdx=tgWordIdx;
     tgTyped[tgWordIdx]=typed;
     const correct=typed===tgWords[tgWordIdx];
     if(correct){
@@ -7223,6 +7226,8 @@ function tgKeyDown(e){
       tgStarted=true;tgStartTime=Date.now();
       tgInterval=setInterval(tgTick,200);
     }
+    if(tgLastAdvancedIdx===tgWordIdx){return;} // already advanced this word (e.g. via oninput)
+    tgLastAdvancedIdx=tgWordIdx;
     tgTyped[tgWordIdx]=val;
     const correct=val===tgWords[tgWordIdx];
     if(correct){tgCorrectWords++;tgEarned++;document.getElementById('tg-earned').textContent='+'+tgEarned;}
