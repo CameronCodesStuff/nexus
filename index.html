@@ -7266,6 +7266,9 @@ function tgInit(){
   tgStarted=false;tgFinished=false;tgStartTime=null;
   tgLastAdvancedIdx=-1;
   tgEarned=0;tgCorrectWords=0;
+  tgScrollY=0;tgLastLine=-1;
+  const el=document.getElementById('tg-words');
+  if(el){el.style.transition='none';el.style.transform='translateY(0)';requestAnimationFrame(()=>{el.style.transition='';});}
   clearInterval(tgInterval);tgInterval=null;
   tgTimeLeft=tgModeSecs;
   document.getElementById('tg-timer').textContent=tgModeSecs;
@@ -7297,11 +7300,13 @@ function tgSetMode(secs){
   tgRestart();
 }
 
+let tgScrollY=0; // current translateY in px
+let tgLastLine=-1; // line index of current word when we last scrolled
+
 function tgRender(){
   const el=document.getElementById('tg-words');
   if(!el) return;
   el.innerHTML='';
-  // Only render a window of words around current position for performance
   const winStart=Math.max(0,tgWordIdx-10);
   const winEnd=Math.min(tgWords.length,tgWordIdx+80);
   tgWords.slice(winStart,winEnd).forEach((word,i)=>{
@@ -7321,7 +7326,6 @@ function tgRender(){
       }
       wEl.appendChild(s);
     });
-    // extra chars
     if(wi===tgWordIdx&&typed.length>word.length){
       for(let ei=word.length;ei<typed.length;ei++){
         const s=document.createElement('span');
@@ -7330,13 +7334,26 @@ function tgRender(){
     }
     el.appendChild(wEl);
   });
-  // scroll — find current word by data-wi
-  const curWEl=el.querySelector('[data-wi="'+tgWordIdx+'"]');
-  if(curWEl){
-    const top=curWEl.offsetTop;
-    const lineH=Math.round(el.offsetHeight/3)||44;
-    el.style.transform=top>lineH*1.2?`translateY(-${top-lineH*0.4}px)`:'translateY(0)';
-  }
+
+  // Smooth per-line scroll: only move when current word enters a new line
+  requestAnimationFrame(()=>{
+    const curWEl=el.querySelector('[data-wi="'+tgWordIdx+'"]');
+    if(!curWEl) return;
+    const lineH=parseFloat(getComputedStyle(el).lineHeight)||44;
+    const wordTop=curWEl.offsetTop;
+    // Which visual line is the current word on (relative to untranslated content)?
+    const currentLine=Math.round(wordTop/lineH);
+    // Only scroll when we've moved to a new line AND it's past line 1
+    if(currentLine!==tgLastLine){
+      tgLastLine=currentLine;
+      // Keep current line at the first visible row (line 0 stays put, advance on line 2+)
+      const targetY=currentLine>1?(currentLine-1)*lineH:0;
+      if(targetY!==tgScrollY){
+        tgScrollY=targetY;
+        el.style.transform=`translateY(-${tgScrollY}px)`;
+      }
+    }
+  });
 }
 
 function tgOnInput(){
@@ -8327,8 +8344,8 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
     </div>
 
     <!-- Words -->
-    <div id="tg-words-wrapper" style="background:#16161a;border:1px solid #2a2a30;border-radius:10px;padding:24px 28px;cursor:text;min-height:120px;overflow:hidden;position:relative;">
-      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;max-height:120px;overflow:hidden;"></div>
+    <div id="tg-words-wrapper" style="background:#16161a;border:1px solid #2a2a30;border-radius:10px;padding:24px 28px;cursor:text;height:132px;overflow:hidden;position:relative;">
+      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);will-change:transform;"></div>
       <div style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#16161a);pointer-events:none;"></div>
     </div>
 
