@@ -7266,9 +7266,9 @@ function tgInit(){
   tgStarted=false;tgFinished=false;tgStartTime=null;
   tgLastAdvancedIdx=-1;
   tgEarned=0;tgCorrectWords=0;
-  tgScrollY=0;tgLastLine=-1;
+  tgScrollY=0;
   const el=document.getElementById('tg-words');
-  if(el){el.style.transition='none';el.style.transform='translateY(0)';requestAnimationFrame(()=>{el.style.transition='';});}
+  if(el){el.style.transition='none';el.style.transform='translateY(0)';}
   clearInterval(tgInterval);tgInterval=null;
   tgTimeLeft=tgModeSecs;
   document.getElementById('tg-timer').textContent=tgModeSecs;
@@ -7280,7 +7280,8 @@ function tgInit(){
   if(inp){inp.value='';inp.onkeydown=tgKeyDown;inp.oninput=tgOnInput;setTimeout(()=>inp.focus(),80);}
   const wrap=document.getElementById('tg-words-wrapper');
   if(wrap) wrap.onclick=()=>document.getElementById('tg-input')?.focus();
-  tgRender();
+  tgBuildWords();
+  requestAnimationFrame(()=>{if(el) el.style.transition='transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)';tgRender();});
 }
 
 function tgStop(){clearInterval(tgInterval);tgInterval=null;}
@@ -7300,60 +7301,71 @@ function tgSetMode(secs){
   tgRestart();
 }
 
-let tgScrollY=0; // current translateY in px
-let tgLastLine=-1; // line index of current word when we last scrolled
+let tgScrollY=0;
+
+function tgBuildWords(){
+  // Full rebuild — called once on init
+  const el=document.getElementById('tg-words');
+  if(!el) return;
+  el.innerHTML='';
+  tgWords.forEach((word,wi)=>{
+    const wEl=document.createElement('span');
+    wEl.dataset.wi=wi;
+    wEl.className='tg-word';
+    word.split('').forEach(ch=>{
+      const s=document.createElement('span');
+      s.className='tg-letter';s.textContent=ch;
+      wEl.appendChild(s);
+    });
+    // placeholder for extra chars
+    el.appendChild(wEl);
+  });
+}
 
 function tgRender(){
   const el=document.getElementById('tg-words');
   if(!el) return;
-  el.innerHTML='';
-  const winStart=Math.max(0,tgWordIdx-10);
-  const winEnd=Math.min(tgWords.length,tgWordIdx+80);
-  tgWords.slice(winStart,winEnd).forEach((word,i)=>{
-    const wi=winStart+i;
-    const wEl=document.createElement('span');
-    wEl.dataset.wi=wi;
-    wEl.style.cssText='display:inline-flex;position:relative;';
+
+  // Update letter classes in-place (no innerHTML wipe = no transition interruption)
+  tgWords.forEach((word,wi)=>{
+    const wEl=el.querySelector('[data-wi="'+wi+'"]');
+    if(!wEl) return;
     const typed=tgTyped[wi]||'';
-    word.split('').forEach((ch,li)=>{
-      const s=document.createElement('span');
-      s.className='tg-letter';s.textContent=ch;s.style.position='relative';
+    const letters=Array.from(wEl.querySelectorAll('.tg-letter:not(.extra)'));
+
+    letters.forEach((s,li)=>{
+      let cls='tg-letter';
       if(wi<tgWordIdx){
-        s.className='tg-letter '+(li<typed.length?(typed[li]===ch?'correct':'wrong'):'wrong');
+        cls+=' '+(li<typed.length?(typed[li]===word[li]?'correct':'wrong'):'wrong');
       } else if(wi===tgWordIdx){
-        if(li<typed.length) s.className='tg-letter '+(typed[li]===ch?'correct':'wrong');
-        else if(li===typed.length) s.className='tg-letter tg-cursor';
+        if(li<typed.length) cls+=' '+(typed[li]===word[li]?'correct':'wrong');
+        else if(li===typed.length) cls+=' tg-cursor';
       }
-      wEl.appendChild(s);
+      s.className=cls;
     });
+
+    // Handle extra chars
+    wEl.querySelectorAll('.extra').forEach(e=>e.remove());
     if(wi===tgWordIdx&&typed.length>word.length){
       for(let ei=word.length;ei<typed.length;ei++){
         const s=document.createElement('span');
-        s.className='tg-letter extra';s.textContent=typed[ei];wEl.appendChild(s);
+        s.className='tg-letter extra';s.textContent=typed[ei];
+        wEl.appendChild(s);
       }
     }
-    el.appendChild(wEl);
   });
 
-  // Smooth per-line scroll: only move when current word enters a new line
-  requestAnimationFrame(()=>{
-    const curWEl=el.querySelector('[data-wi="'+tgWordIdx+'"]');
-    if(!curWEl) return;
-    const lineH=parseFloat(getComputedStyle(el).lineHeight)||44;
-    const wordTop=curWEl.offsetTop;
-    // Which visual line is the current word on (relative to untranslated content)?
-    const currentLine=Math.round(wordTop/lineH);
-    // Only scroll when we've moved to a new line AND it's past line 1
-    if(currentLine!==tgLastLine){
-      tgLastLine=currentLine;
-      // Keep current line at the first visible row (line 0 stays put, advance on line 2+)
-      const targetY=currentLine>1?(currentLine-1)*lineH:0;
-      if(targetY!==tgScrollY){
-        tgScrollY=targetY;
-        el.style.transform=`translateY(-${tgScrollY}px)`;
-      }
-    }
-  });
+  // Scroll: measure current word's stable offsetTop and slide to whole-line boundary
+  const curWEl=el.querySelector('[data-wi="'+tgWordIdx+'"]');
+  if(!curWEl) return;
+  const lineH=parseFloat(getComputedStyle(el).lineHeight)||44;
+  const wordTop=curWEl.offsetTop;
+  const lineIdx=Math.round(wordTop/lineH);
+  const targetY=lineIdx>1?Math.round((lineIdx-1)*lineH):0;
+  if(targetY!==tgScrollY){
+    tgScrollY=targetY;
+    el.style.transform=`translateY(-${tgScrollY}px)`;
+  }
 }
 
 function tgOnInput(){
@@ -8345,7 +8357,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
 
     <!-- Words -->
     <div id="tg-words-wrapper" style="background:#16161a;border:1px solid #2a2a30;border-radius:10px;padding:24px 28px;cursor:text;height:132px;overflow:hidden;position:relative;">
-      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);will-change:transform;"></div>
+      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;will-change:transform;"></div>
       <div style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#16161a);pointer-events:none;"></div>
     </div>
 
@@ -8360,7 +8372,9 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
 <style>
   .tg-mode-btn{background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all 0.15s;}
   .tg-mode-btn:hover,.tg-mode-btn.active{border-color:#f0c060;color:#f0c060;}
-  .tg-letter{color:#3a3a45;transition:color 0.06s;}
+  .tg-word{display:inline-flex;position:relative;}
+  #tg-words{transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);}
+  .tg-letter{color:#3a3a45;transition:color 0.06s;position:relative;}
   .tg-letter.correct{color:#7dd3b0;}
   .tg-letter.wrong{color:#e06c75;text-decoration:underline;text-decoration-color:#e06c75;}
   .tg-letter.extra{color:#e06c75;opacity:0.7;}
