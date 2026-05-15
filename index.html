@@ -750,6 +750,61 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .bj-chips-val{color:var(--accent2);font-weight:700;font-family:var(--font-mono);}
   .bj-section-title{font-family:var(--font-display);font-size:9px;letter-spacing:3px;color:var(--text-dim);margin-bottom:4px;}
 
+  /* ── SHELL GAME ───────────────────────────────── */
+  @keyframes sg-title-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  @keyframes sg-breathe-0{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  @keyframes sg-breathe-1{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  @keyframes sg-breathe-2{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  @keyframes sg-hover-wobble{0%{transform:translateY(0) rotate(0)}20%{transform:translateY(-7px) rotate(-2deg)}42%{transform:translateY(-10px) rotate(2deg)}62%{transform:translateY(-7px) rotate(-1deg)}80%{transform:translateY(-5px) rotate(0.5deg)}100%{transform:translateY(-6px) rotate(0)}}
+  @keyframes sg-shake{0%,100%{transform:translateX(0) rotate(0)}14%{transform:translateX(-7px) rotate(-3deg)}28%{transform:translateX(7px) rotate(3deg)}43%{transform:translateX(-5px) rotate(-2deg)}57%{transform:translateX(5px) rotate(2deg)}71%{transform:translateX(-3px) rotate(-1deg)}86%{transform:translateX(3px) rotate(1deg)}}
+  @keyframes sg-ball-bounce{0%{transform:translateX(-50%) translateY(0) scale(1)}28%{transform:translateX(-50%) translateY(-18px) scale(0.88,1.12)}52%{transform:translateX(-50%) translateY(0) scale(1.14,0.86)}72%{transform:translateX(-50%) translateY(-8px) scale(0.93,1.07)}88%{transform:translateX(-50%) translateY(0) scale(1.05,0.95)}100%{transform:translateX(-50%) translateY(0) scale(1)}}
+  @keyframes sg-score-pop{0%{transform:scale(1)}38%{transform:scale(1.55)}68%{transform:scale(0.88)}100%{transform:scale(1)}}
+  @keyframes sg-msg-in{0%{opacity:0;transform:translateY(8px) scale(0.95)}60%{transform:translateY(-1px) scale(1.02)}100%{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes sg-combo-drop{from{transform:translateX(-50%) translateY(-80px)}to{transform:translateX(-50%) translateY(0)}}
+  @keyframes sg-ripple{to{transform:scale(4);opacity:0}}
+  @keyframes sg-overlay-in{from{opacity:0}to{opacity:1}}
+  #sg-overlay{animation:sg-overlay-in 0.25s ease;}
+  .sg-diff-btn{font-family:var(--font-display);font-size:9px;letter-spacing:2px;text-transform:uppercase;padding:6px 16px;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.2s;}
+  .sg-diff-btn:hover{color:var(--accent);border-color:var(--accent);}
+  .sg-diff-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);box-shadow:0 2px 16px var(--glow);}
+  .sg-diff-btn:disabled{opacity:0.35;cursor:not-allowed;}
+  .sg-table{width:clamp(320px,88vw,640px);height:clamp(170px,35vh,260px);background:var(--panel);border:1px solid var(--border);border-radius:18px;position:relative;overflow:visible;box-shadow:0 0 0 1px var(--border),0 24px 60px rgba(0,0,0,0.8),inset 0 1px 0 rgba(255,255,255,0.04);transition:box-shadow 0.4s ease;}
+  .sg-table::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);border-radius:18px 18px 0 0;}
+  .sg-table.pulse-win{box-shadow:0 0 0 1px var(--accent),0 0 40px var(--glow),0 24px 60px rgba(0,0,0,0.8);}
+  .sg-table.pulse-lose{box-shadow:0 0 0 1px var(--danger),0 0 40px rgba(255,51,85,0.3),0 24px 60px rgba(0,0,0,0.8);}
+  .sg-cups-area{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:space-around;padding:0 8%;}
+  .sg-cup-slot{display:flex;flex-direction:column;align-items:center;position:relative;flex:1;max-width:130px;}
+  .sg-cup-wrap{position:relative;width:90px;height:120px;cursor:default;will-change:transform;}
+  .sg-cup-wrap.idle-0{animation:sg-breathe-0 3.4s ease-in-out infinite;}
+  .sg-cup-wrap.idle-1{animation:sg-breathe-1 3.4s ease-in-out 0.8s infinite;}
+  .sg-cup-wrap.idle-2{animation:sg-breathe-2 3.4s ease-in-out 1.6s infinite;}
+  .sg-cup-wrap.can-pick{cursor:pointer;animation:none;}
+  .sg-cup-wrap.can-pick:hover{animation:sg-hover-wobble 0.55s ease-in-out forwards;}
+  .sg-cup-wrap.shake{animation:sg-shake 0.45s ease !important;}
+  .sg-cup-svg{width:100%;height:100%;overflow:visible;transition:filter 0.2s;}
+  .sg-cup-wrap.can-pick:hover .sg-cup-svg{filter:drop-shadow(0 0 12px var(--glow));}
+  .sg-cup-glow .sg-cup-svg{filter:drop-shadow(0 0 14px var(--accent)) drop-shadow(0 0 6px var(--accent2));}
+  .sg-shadow{position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:72px;height:8px;background:rgba(0,0,0,0.45);border-radius:50%;filter:blur(4px);transition:width 0.15s,height 0.15s,opacity 0.15s;}
+  .sg-ball{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:24px;height:24px;border-radius:50%;opacity:0;z-index:2;transition:opacity 0.2s ease;}
+  .sg-ball.bounce{animation:sg-ball-bounce 0.55s cubic-bezier(0.36,0.07,0.19,0.97);}
+  .sg-score-val{font-family:var(--font-display);font-size:1.8rem;font-weight:900;color:var(--accent);line-height:1;display:inline-block;transition:color 0.3s;}
+  .sg-score-val.win-c{color:var(--success);}
+  .sg-score-val.lose-c{color:var(--danger);}
+  .sg-score-val.pop{animation:sg-score-pop 0.42s cubic-bezier(0.34,1.56,0.64,1);}
+  .sg-score-label{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;}
+  .sg-status-msg{font-family:var(--font-display);font-size:14px;letter-spacing:2px;color:var(--text);opacity:0;transform:translateY(8px) scale(0.95);transition:opacity 0.3s ease,transform 0.3s cubic-bezier(0.34,1.56,0.64,1);min-height:1.6rem;text-align:center;}
+  .sg-status-msg.vis{opacity:1;transform:translateY(0) scale(1);}
+  .sg-status-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);font-family:var(--font-mono);opacity:0;transition:opacity 0.35s ease 0.1s;text-align:center;}
+  .sg-status-sub.vis{opacity:1;}
+  .sg-main-btn{font-family:var(--font-display);font-size:10px;letter-spacing:3px;padding:11px 36px;border-radius:100px;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;}
+  .sg-main-btn:hover{background:rgba(68,102,255,0.1);transform:scale(1.05);box-shadow:0 4px 20px var(--glow);}
+  .sg-main-btn:active{transform:scale(0.97);}
+  .sg-main-btn:disabled{opacity:0.35;cursor:not-allowed;transform:none;box-shadow:none;}
+  .sg-ripple{position:absolute;border-radius:50%;background:var(--glow);transform:scale(0);animation:sg-ripple 0.65s linear;pointer-events:none;}
+  .sg-combo{position:absolute;top:0;left:50%;transform:translateX(-50%) translateY(-70px);font-family:var(--font-display);font-size:12px;font-weight:900;letter-spacing:3px;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));padding:6px 24px;border-radius:0 0 16px 16px;box-shadow:0 8px 24px var(--glow);z-index:10;white-space:nowrap;transition:transform 0.5s cubic-bezier(0.34,1.56,0.64,1);}
+  .sg-combo.show{transform:translateX(-50%) translateY(0);}
+  .sg-particles{position:absolute;inset:0;pointer-events:none;border-radius:18px;overflow:hidden;z-index:5;}
+
 </style>
 </head>
 <body>
@@ -855,6 +910,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
             <button onclick="N.openNexusGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⬡ Nexus Energy</button>
             <button onclick="N.openDriftGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🚗 Drift King</button>
             <button onclick="N.openBlackjack();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🃏 Blackjack</button>
+            <button onclick="N.openShellGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎯 Shell Game</button>
 
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -8185,6 +8241,293 @@ async function bjOpenLeaderboard(){
   lbTab('blackjack');
 }
 
+// ── SHELL GAME ───────────────────────────────────
+const SG_DIFFS={easy:{swaps:[3,4],speed:680},medium:{swaps:[5,7],speed:470},hard:{swaps:[8,13],speed:290}};
+let sgDiff='medium',sgBallPos=1,sgState='idle',sgWins=0,sgLosses=0,sgStreak=0,sgRound=0;
+let sgCups,sgBalls,sgShadows,sgParticles=[],sgCtx=null,sgRafId=null;
+
+function sgInit(){
+  sgCups=[0,1,2].map(i=>document.getElementById('sg-cup'+i));
+  sgBalls=[0,1,2].map(i=>document.getElementById('sg-ball'+i));
+  sgShadows=[0,1,2].map(i=>document.getElementById('sg-shadow'+i));
+  // Style balls using current accent colour (read from CSS var)
+  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#4466ff';
+  const accent2=getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim()||'#00d4ff';
+  sgBalls.forEach(b=>{
+    b.style.background=`radial-gradient(circle at 33% 28%, ${accent2}, ${accent} 55%, var(--bg))`;
+    b.style.boxShadow=`0 3px 10px rgba(0,0,0,0.6), 0 0 12px var(--glow)`;
+  });
+  // Canvas for particles
+  const canvas=document.getElementById('sg-canvas');
+  if(canvas){
+    const table=document.getElementById('sg-table');
+    canvas.width=table.offsetWidth||640;
+    canvas.height=table.offsetHeight||260;
+    sgCtx=canvas.getContext('2d');
+    if(!sgRafId)(function tick(){sgRafId=requestAnimationFrame(tick);sgTickParticles();})();
+  }
+  // Difficulty buttons
+  document.getElementById('sg-diff-bar')?.querySelectorAll('.sg-diff-btn').forEach(btn=>{
+    btn.onclick=e=>{
+      if(sgState!=='idle') return;
+      document.querySelectorAll('#sg-diff-bar .sg-diff-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active'); sgDiff=btn.dataset.diff; sgAddRipple(btn,e);
+    };
+  });
+  document.getElementById('sg-btn').onclick=e=>{if(sgState==='idle'){sgAddRipple(document.getElementById('sg-btn'),e);sgStartGame();}};
+  [0,1,2].forEach(i=>{ sgCups[i].addEventListener('click',()=>{ if(sgState==='pick') sgHandlePick(i); }); });
+  sgSetIdle(true);
+  sgSetStatus('Ready to play?','Choose difficulty and press start',0);
+  document.getElementById('sg-msg').classList.add('vis');
+  document.getElementById('sg-sub').classList.add('vis');
+}
+
+function openShellGame(){
+  const overlay=document.getElementById('sg-overlay');
+  if(!overlay) return;
+  overlay.style.display='flex';
+  setTimeout(()=>sgInit(),30);
+}
+function closeShellGame(){
+  const overlay=document.getElementById('sg-overlay');
+  if(overlay) overlay.style.display='none';
+  if(sgRafId){cancelAnimationFrame(sgRafId);sgRafId=null;}
+}
+
+// ── Particles ──
+function sgSpawnParticles(x,y,count,win){
+  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const accent2=getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim();
+  const success=getComputedStyle(document.documentElement).getPropertyValue('--success').trim();
+  const danger=getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+  const colors=win?[accent,accent2,success,'#ffffff']:[danger,'#ff6655','#cc2222'];
+  for(let i=0;i<count;i++){
+    const angle=(Math.PI*2*i/count)+(Math.random()-0.5)*0.8;
+    const spd=2+Math.random()*5;
+    sgParticles.push({x,y,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd-2-Math.random()*3,r:2+Math.random()*4,color:colors[Math.floor(Math.random()*colors.length)],life:1,decay:0.018+Math.random()*0.02,grav:0.12,angle:Math.random()*Math.PI*2,spin:Math.random()*0.4-0.2,type:Math.random()>0.4?'rect':'circle'});
+  }
+}
+function sgTickParticles(){
+  if(!sgCtx) return;
+  const canvas=document.getElementById('sg-canvas');
+  if(!canvas) return;
+  sgCtx.clearRect(0,0,canvas.width,canvas.height);
+  sgParticles=sgParticles.filter(p=>p.life>0);
+  for(const p of sgParticles){
+    p.x+=p.vx;p.y+=p.vy;p.vy+=p.grav;p.vx*=0.98;p.life-=p.decay;p.angle+=p.spin;
+    sgCtx.globalAlpha=Math.max(0,p.life);sgCtx.fillStyle=p.color;
+    if(p.type==='circle'){sgCtx.beginPath();sgCtx.arc(p.x,p.y,p.r,0,Math.PI*2);sgCtx.fill();}
+    else{sgCtx.save();sgCtx.translate(p.x,p.y);sgCtx.rotate(p.angle);sgCtx.fillRect(-p.r,-p.r*0.5,p.r*2,p.r);sgCtx.restore();}
+  }
+  sgCtx.globalAlpha=1;
+}
+
+// ── Helpers ──
+function sgSleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function sgSetStatus(msg,sub,delay=0){
+  setTimeout(()=>{
+    const m=document.getElementById('sg-msg'),s=document.getElementById('sg-sub');
+    m.classList.remove('vis');s.classList.remove('vis');
+    setTimeout(()=>{m.textContent=msg;s.textContent=sub;m.classList.add('vis');if(sub)s.classList.add('vis');},200);
+  },delay);
+}
+function sgAnimScore(id,val,cls){
+  const el=document.getElementById(id);el.textContent=val;
+  if(cls){el.classList.add(cls);setTimeout(()=>el.classList.remove(cls),600);}
+  el.classList.remove('pop');void el.offsetWidth;el.classList.add('pop');
+  setTimeout(()=>el.classList.remove('pop'),500);
+}
+function sgAddRipple(btn,e){
+  const r=btn.getBoundingClientRect(),rip=document.createElement('span');
+  rip.className='sg-ripple';const sz=Math.max(r.width,r.height)*2;
+  rip.style.cssText=`width:${sz}px;height:${sz}px;left:${(e?e.clientX:r.left+r.width/2)-r.left-sz/2}px;top:${(e?e.clientY:r.top+r.height/2)-r.top-sz/2}px`;
+  btn.appendChild(rip);setTimeout(()=>rip.remove(),700);
+}
+function sgUpdateShadow(i,lift){
+  const s=sgShadows[i],sc=1-lift*0.7,op=0.45-lift*0.38;
+  s.style.width=(72*sc)+'px';s.style.height=(8*sc)+'px';s.style.opacity=op;
+}
+let sgCbTimer;
+function sgShowCombo(n){
+  const msgs={3:'🔥 ON FIRE',4:'⚡ UNSTOPPABLE',5:'💥 LEGENDARY',6:'✨ GODLIKE'};
+  const cb=document.getElementById('sg-combo');
+  cb.textContent=msgs[Math.min(n,6)]||'🌟 UNREAL';
+  cb.classList.add('show');clearTimeout(sgCbTimer);
+  sgCbTimer=setTimeout(()=>cb.classList.remove('show'),2200);
+}
+
+// ── Cup physics ──
+function sgLiftCup(i,h=90,dur=370){
+  const cup=sgCups[i];let t0=null;
+  return new Promise(res=>{
+    (function f(ts){
+      if(!t0)t0=ts;const t=Math.min((ts-t0)/dur,1);
+      const e=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+      cup.style.transform=`translateY(${-h*e}px)`;sgUpdateShadow(i,e);
+      t<1?requestAnimationFrame(f):res();
+    })(performance.now());
+  });
+}
+function sgLowerCup(i,h=90,dur=330){
+  const cup=sgCups[i];let t0=null;
+  return new Promise(res=>{
+    (function f(ts){
+      if(!t0)t0=ts;const t=Math.min((ts-t0)/dur,1);
+      let e=t<0.72?Math.pow(t/0.72,2):1+0.05*Math.sin(((t-0.72)/0.28)*Math.PI*2.2)*(1-(t-0.72)/0.28);
+      cup.style.transform=`translateY(${-h*(1-Math.min(e,1))}px)`;sgUpdateShadow(i,1-Math.min(t,1));
+      if(t<1)requestAnimationFrame(f);else{cup.style.transform='';sgUpdateShadow(i,0);res();}
+    })(performance.now());
+  });
+}
+
+// ── Swap ──
+function sgGetCX(i){
+  const s=document.getElementById('sg-slot'+i).getBoundingClientRect();
+  const p=document.getElementById('sg-cups-area').getBoundingClientRect();
+  return s.left+s.width/2-p.left;
+}
+async function sgSwap(a,b,spd){
+  const xa=sgGetCX(a),xb=sgGetCX(b),dA=xb-xa,dB=xa-xb,arc=16+Math.abs(dA)*0.06;
+  const ca=sgCups[a],cb=sgCups[b];let t0=null;
+  await new Promise(res=>{
+    (function f(ts){
+      if(!t0)t0=ts;const t=Math.min((ts-t0)/spd,1);
+      const e=t<0.5?2*t*t:-1+(4-2*t)*t,s=Math.sin(t*Math.PI);
+      ca.style.transform=`translate(${dA*e}px,${-arc*s}px)`;
+      cb.style.transform=`translate(${dB*e}px,${-arc*s}px)`;
+      t<1?requestAnimationFrame(f):res();
+    })(performance.now());
+  });
+  const sA=document.getElementById('sg-slot'+a),sB=document.getElementById('sg-slot'+b);
+  const par=sA.parentNode,anc=sA.nextSibling;
+  par.insertBefore(sA,sB.nextSibling);
+  if(anc===sB)par.insertBefore(sB,sA);else par.insertBefore(sB,anc);
+  ca.style.transform='';cb.style.transform='';
+}
+
+// ── Ball ──
+function sgShowBall(i,bounce=false){
+  sgBalls[i].style.opacity='1';
+  if(bounce){sgBalls[i].classList.remove('bounce');void sgBalls[i].offsetWidth;sgBalls[i].classList.add('bounce');setTimeout(()=>sgBalls[i].classList.remove('bounce'),600);}
+}
+function sgHideBall(i){sgBalls[i].style.opacity='0';}
+function sgSetIdle(on){
+  sgCups.forEach((c,i)=>{c.classList.remove('idle-0','idle-1','idle-2','can-pick');if(on)c.classList.add('idle-'+i);});
+}
+
+// ── Shuffle ──
+async function sgShuffle(){
+  const cfg=SG_DIFFS[sgDiff];
+  const n=cfg.swaps[0]+Math.floor(Math.random()*(cfg.swaps[1]-cfg.swaps[0]+1));
+  let spd=cfg.speed;const pairs=[[0,1],[1,2],[0,2]];let last=[-1,-1];
+  for(let s=0;s<n;s++){
+    let a,b,tries=0;
+    do{const p=pairs[Math.floor(Math.random()*pairs.length)];a=p[0];b=p[1];tries++;}
+    while(tries<10&&a===last[0]&&b===last[1]);last=[a,b];
+    const sA=document.getElementById('sg-slot'+a),sB=document.getElementById('sg-slot'+b);
+    const cA=parseInt(sA.querySelector('.sg-cup-wrap').id.replace('sg-cup','')),
+          cB=parseInt(sB.querySelector('.sg-cup-wrap').id.replace('sg-cup',''));
+    if(sgBallPos===cA)sgBallPos=cB;else if(sgBallPos===cB)sgBallPos=cA;
+    await sgSwap(cA,cB,spd);await sgSleep(spd*0.07);
+    if(sgDiff==='hard'&&s>3)spd=Math.max(190,spd-12);
+  }
+}
+
+// ── Game flow ──
+async function sgStartGame(){
+  sgState='showing';sgRound++;
+  const btn=document.getElementById('sg-btn');
+  btn.disabled=true;btn.textContent='— SHUFFLING —';
+  document.querySelectorAll('#sg-diff-bar .sg-diff-btn').forEach(b=>b.disabled=true);
+  document.getElementById('sg-round-info').textContent=`ROUND ${sgRound} · ${sgDiff.toUpperCase()}`;
+  const table=document.getElementById('sg-table');
+  table.classList.remove('pulse-win','pulse-lose');
+  // Reset positions
+  const area=document.getElementById('sg-cups-area');
+  [0,1,2].forEach(i=>{sgCups[i].style.transform='';sgCups[i].classList.remove('shake','can-pick','sg-cup-glow');sgHideBall(i);sgUpdateShadow(i,0);});
+  [0,1,2].map(i=>document.getElementById('sg-slot'+i)).forEach(s=>area.appendChild(s));
+  sgSetIdle(false);sgParticles=[];
+  sgBallPos=Math.floor(Math.random()*3);
+  sgSetStatus('Watch the ball…','Remember which cup it hides under');
+  await sgSleep(450);
+  // Reveal ball
+  sgCups[sgBallPos].classList.add('sg-cup-glow');
+  await sgLiftCup(sgBallPos,100,420);
+  sgShowBall(sgBallPos,true);
+  await sgSleep(900);
+  sgHideBall(sgBallPos);
+  sgCups[sgBallPos].classList.remove('sg-cup-glow');
+  await sgSleep(150);
+  await sgLowerCup(sgBallPos,100,400);
+  await sgSleep(350);
+  sgSetStatus('Eyes on the prize…','');
+  sgState='shuffling';
+  await sgShuffle();
+  sgState='pick';
+  sgCups.forEach(c=>c.classList.add('can-pick'));
+  sgSetStatus('Which cup?','Click to reveal your choice');
+  btn.textContent='— PICK A CUP —';
+}
+
+async function sgHandlePick(i){
+  sgState='reveal';
+  sgCups.forEach(c=>c.classList.remove('can-pick'));
+  const won=(i===sgBallPos);
+  const table=document.getElementById('sg-table');
+  if(won){
+    await sgLiftCup(i,100,400);
+    sgShowBall(i,true);
+    // Confetti from ball position
+    const canvas=document.getElementById('sg-canvas');
+    if(canvas){
+      const br=sgBalls[i].getBoundingClientRect(),cr=canvas.getBoundingClientRect();
+      const bx=br.left+br.width/2-cr.left,by=br.top+br.height/2-cr.top;
+      sgSpawnParticles(bx,by,40,true);
+      setTimeout(()=>sgSpawnParticles(bx,by,25,true),280);
+    }
+    table.classList.add('pulse-win');
+    sgWins++;sgStreak++;
+    sgAnimScore('sg-wins',sgWins,'win-c');
+    sgAnimScore('sg-streak',sgStreak,'win-c');
+    const fire=document.getElementById('sg-fire');
+    fire.style.opacity=sgStreak>=3?'1':'0';
+    if(sgStreak>=3) sgShowCombo(sgStreak);
+    const msgs=['CORRECT! 🏆','YOU GOT IT ✨','SHARP EYES 🎯','NAILED IT 🌟','BOOM 💥'];
+    sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],sgStreak>=3?`${sgStreak} IN A ROW — INCREDIBLE`:'WELL PLAYED');
+    await sgSleep(2300);
+    sgHideBall(i);await sgLowerCup(i,100,340);
+  } else {
+    sgCups[i].classList.add('shake');
+    // Smoke from wrong cup
+    const canvas=document.getElementById('sg-canvas');
+    if(canvas){
+      const cr=canvas.getBoundingClientRect(),wr=sgCups[i].getBoundingClientRect();
+      sgSpawnParticles(wr.left+wr.width/2-cr.left,wr.top+wr.height/2-cr.top,18,false);
+    }
+    table.classList.add('pulse-lose');
+    await sgSleep(360);sgCups[i].classList.remove('shake');
+    await sgLiftCup(i,90,360);await sgSleep(240);
+    await sgLiftCup(sgBallPos,90,360);
+    sgShowBall(sgBallPos,false);
+    sgLosses++;sgStreak=0;
+    document.getElementById('sg-fire').style.opacity='0';
+    sgAnimScore('sg-losses',sgLosses,'lose-c');
+    sgAnimScore('sg-streak',0,'lose-c');
+    const msgs=['WRONG! 💀','NOT THIS TIME…','SO CLOSE 😬','FOOLED YOU!','TRY AGAIN'];
+    sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],'THE BALL WAS HIDING OVER THERE');
+    await sgSleep(2100);
+    sgHideBall(sgBallPos);
+    await Promise.all([sgLowerCup(i,90,300),sgLowerCup(sgBallPos,90,300)]);
+  }
+  await sgSleep(220);
+  table.classList.remove('pulse-win','pulse-lose');
+  sgSetIdle(true);sgState='idle';
+  const btn=document.getElementById('sg-btn');
+  btn.disabled=false;btn.innerHTML='▶ &nbsp;PLAY AGAIN';
+  document.querySelectorAll('#sg-diff-bar .sg-diff-btn').forEach(b=>b.disabled=false);
+  sgSetStatus('PLAY AGAIN?','Press to shuffle the cups');
+}
+
 function openNexusGame(){
   const overlay=document.getElementById('nexus-game-overlay');
   if(!overlay) return;
@@ -8318,6 +8661,7 @@ window._N = {
   openGamesHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, openDriftGame, closeDriftGame,
+  openShellGame, closeShellGame,
   toggleNotifications, updateNotifSettingsUI,
   openBlackjack, closeBlackjack, bjAddBet, bjClearBet, bjBetAll, bjDeal, bjHit, bjStand, bjDouble, bjPlayAgain, bjOpenLeaderboard,
 };
@@ -8746,6 +9090,15 @@ iStars();reset();loop();
         <span class="game-btn-badge" style="background:rgba(46,204,113,0.15);color:#2ecc71;">CHIPS</span>
       </div>
 
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openShellGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">🎯</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Shell Game</span>
+          <span class="game-btn-desc">Track the ball · beat the shuffle · three difficulty levels</span>
+        </div>
+        <span class="game-btn-badge" style="background:rgba(68,102,255,0.15);color:var(--accent);">REFLEX</span>
+      </div>
+
     </div>
   </div>
 </div>
@@ -8843,6 +9196,149 @@ iStars();reset();loop();
     </div>
 
   </div>
+</div>
+
+<!-- Shell Game Overlay -->
+<div id="sg-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding-bottom:24px;">
+
+  <!-- Top bar -->
+  <div style="width:100%;max-width:680px;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0;">
+    <div style="font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:sg-title-float 4s ease-in-out infinite;">SHELL GAME</div>
+    <button onclick="N.closeShellGame()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">✕</button>
+  </div>
+
+  <!-- Subtitle + difficulty -->
+  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;margin:6px 0 14px;">Three cups · One ball · All eyes on the prize</div>
+  <div style="display:flex;gap:6px;background:var(--panel);border:1px solid var(--border);padding:4px;border-radius:100px;margin-bottom:20px;" id="sg-diff-bar">
+    <button class="sg-diff-btn" data-diff="easy">Easy</button>
+    <button class="sg-diff-btn active" data-diff="medium">Medium</button>
+    <button class="sg-diff-btn" data-diff="hard">Hard</button>
+  </div>
+
+  <!-- Table -->
+  <div style="position:relative;">
+    <div class="sg-combo" id="sg-combo">⚡ UNSTOPPABLE</div>
+    <div class="sg-table" id="sg-table">
+      <canvas class="sg-particles" id="sg-canvas"></canvas>
+      <div class="sg-cups-area" id="sg-cups-area">
+
+        <div class="sg-cup-slot" id="sg-slot0">
+          <div class="sg-cup-wrap idle-0" id="sg-cup0">
+            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sg-cg0" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="var(--bg2)"/>
+                  <stop offset="25%" stop-color="var(--accent)"/>
+                  <stop offset="55%" stop-color="var(--bg3)"/>
+                  <stop offset="100%" stop-color="var(--bg)"/>
+                </linearGradient>
+                <linearGradient id="sg-rg0" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="var(--bg3)"/>
+                  <stop offset="40%" stop-color="var(--accent2)"/>
+                  <stop offset="100%" stop-color="var(--bg2)"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="50" cy="127" rx="42" ry="5" fill="rgba(0,0,0,0.4)"/>
+              <path d="M20 20 L10 120 L90 120 L80 20 Z" fill="url(#sg-cg0)" opacity="0.95"/>
+              <path d="M35 22 L29 118 L38 118 L43 22 Z" fill="rgba(255,255,255,0.06)"/>
+              <path d="M64 22 L70 22 L76 118 L67 118 Z" fill="rgba(0,0,0,0.08)"/>
+              <rect x="14" y="12" width="72" height="12" rx="4" fill="url(#sg-rg0)"/>
+              <rect x="14" y="22" width="72" height="1.5" rx="1" fill="rgba(0,0,0,0.2)"/>
+              <rect x="8" y="118" width="84" height="8" rx="3" fill="url(#sg-rg0)"/>
+              <ellipse cx="50" cy="12" rx="36" ry="5" fill="var(--bg3)" opacity="0.8"/>
+              <rect x="16" y="56" width="68" height="4" rx="2" fill="rgba(0,0,0,0.12)"/>
+              <rect x="16" y="80" width="68" height="2.5" rx="1.5" fill="rgba(255,255,255,0.04)"/>
+            </svg>
+          </div>
+          <div class="sg-shadow" id="sg-shadow0"></div>
+          <div class="sg-ball" id="sg-ball0"></div>
+        </div>
+
+        <div class="sg-cup-slot" id="sg-slot1">
+          <div class="sg-cup-wrap idle-1" id="sg-cup1">
+            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sg-cg1" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="var(--bg2)"/>
+                  <stop offset="25%" stop-color="var(--accent)"/>
+                  <stop offset="55%" stop-color="var(--bg3)"/>
+                  <stop offset="100%" stop-color="var(--bg)"/>
+                </linearGradient>
+                <linearGradient id="sg-rg1" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="var(--bg3)"/>
+                  <stop offset="40%" stop-color="var(--accent2)"/>
+                  <stop offset="100%" stop-color="var(--bg2)"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="50" cy="127" rx="42" ry="5" fill="rgba(0,0,0,0.4)"/>
+              <path d="M20 20 L10 120 L90 120 L80 20 Z" fill="url(#sg-cg1)" opacity="0.95"/>
+              <path d="M35 22 L29 118 L38 118 L43 22 Z" fill="rgba(255,255,255,0.06)"/>
+              <path d="M64 22 L70 22 L76 118 L67 118 Z" fill="rgba(0,0,0,0.08)"/>
+              <rect x="14" y="12" width="72" height="12" rx="4" fill="url(#sg-rg1)"/>
+              <rect x="14" y="22" width="72" height="1.5" rx="1" fill="rgba(0,0,0,0.2)"/>
+              <rect x="8" y="118" width="84" height="8" rx="3" fill="url(#sg-rg1)"/>
+              <ellipse cx="50" cy="12" rx="36" ry="5" fill="var(--bg3)" opacity="0.8"/>
+              <rect x="16" y="56" width="68" height="4" rx="2" fill="rgba(0,0,0,0.12)"/>
+              <rect x="16" y="80" width="68" height="2.5" rx="1.5" fill="rgba(255,255,255,0.04)"/>
+            </svg>
+          </div>
+          <div class="sg-shadow" id="sg-shadow1"></div>
+          <div class="sg-ball" id="sg-ball1"></div>
+        </div>
+
+        <div class="sg-cup-slot" id="sg-slot2">
+          <div class="sg-cup-wrap idle-2" id="sg-cup2">
+            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sg-cg2" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="var(--bg2)"/>
+                  <stop offset="25%" stop-color="var(--accent)"/>
+                  <stop offset="55%" stop-color="var(--bg3)"/>
+                  <stop offset="100%" stop-color="var(--bg)"/>
+                </linearGradient>
+                <linearGradient id="sg-rg2" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="var(--bg3)"/>
+                  <stop offset="40%" stop-color="var(--accent2)"/>
+                  <stop offset="100%" stop-color="var(--bg2)"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="50" cy="127" rx="42" ry="5" fill="rgba(0,0,0,0.4)"/>
+              <path d="M20 20 L10 120 L90 120 L80 20 Z" fill="url(#sg-cg2)" opacity="0.95"/>
+              <path d="M35 22 L29 118 L38 118 L43 22 Z" fill="rgba(255,255,255,0.06)"/>
+              <path d="M64 22 L70 22 L76 118 L67 118 Z" fill="rgba(0,0,0,0.08)"/>
+              <rect x="14" y="12" width="72" height="12" rx="4" fill="url(#sg-rg2)"/>
+              <rect x="14" y="22" width="72" height="1.5" rx="1" fill="rgba(0,0,0,0.2)"/>
+              <rect x="8" y="118" width="84" height="8" rx="3" fill="url(#sg-rg2)"/>
+              <ellipse cx="50" cy="12" rx="36" ry="5" fill="var(--bg3)" opacity="0.8"/>
+              <rect x="16" y="56" width="68" height="4" rx="2" fill="rgba(0,0,0,0.12)"/>
+              <rect x="16" y="80" width="68" height="2.5" rx="1.5" fill="rgba(255,255,255,0.04)"/>
+            </svg>
+          </div>
+          <div class="sg-shadow" id="sg-shadow2"></div>
+          <div class="sg-ball" id="sg-ball2"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Scores -->
+  <div style="display:flex;gap:32px;margin-top:20px;margin-bottom:4px;">
+    <div style="text-align:center;"><div class="sg-score-val" id="sg-wins">0</div><div class="sg-score-label">WINS</div></div>
+    <div style="text-align:center;"><div class="sg-score-val" id="sg-streak">0</div><div class="sg-score-label">STREAK <span id="sg-fire" style="opacity:0;transition:opacity 0.3s;">🔥</span></div></div>
+    <div style="text-align:center;"><div class="sg-score-val" id="sg-losses">0</div><div class="sg-score-label">LOSSES</div></div>
+  </div>
+
+  <!-- Status -->
+  <div style="min-height:56px;display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:10px;">
+    <div class="sg-status-msg" id="sg-msg">Ready to play?</div>
+    <div class="sg-status-sub" id="sg-sub">Choose difficulty and press start</div>
+  </div>
+
+  <!-- Main button -->
+  <button class="sg-main-btn" id="sg-btn">▶ &nbsp;START GAME</button>
+  <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-top:8px;min-height:14px;" id="sg-round-info"></div>
+
 </div>
 
 <!-- Drift King Overlay -->
