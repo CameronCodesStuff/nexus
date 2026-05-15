@@ -8260,13 +8260,10 @@ let sgDiff='medium',sgBallPos=1,sgState='idle',sgWins=0,sgLosses=0,sgStreak=0,sg
 let sgCups,sgBalls,sgShadows,sgParticles=[],sgCtx=null,sgRafId=null;
 
 function sgInit(){
-  sgCups=[0,1,2].map(i=>document.getElementById('sg-cup'+i));
-  sgBalls=[0,1,2].map(i=>document.getElementById('sg-ball'+i));
-  sgShadows=[0,1,2].map(i=>document.getElementById('sg-shadow'+i));
-  // Style balls using current accent colour (read from CSS var)
+  // Style balls using current accent colour
   const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#4466ff';
   const accent2=getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim()||'#00d4ff';
-  sgBalls.forEach(b=>{
+  document.querySelectorAll('.sg-ball').forEach(b=>{
     b.style.background=`radial-gradient(circle at 33% 28%, ${accent2}, ${accent} 55%, var(--bg))`;
     b.style.boxShadow=`0 3px 10px rgba(0,0,0,0.6), 0 0 12px var(--glow)`;
   });
@@ -8288,7 +8285,15 @@ function sgInit(){
     };
   });
   document.getElementById('sg-btn').onclick=e=>{if(sgState==='idle'){sgAddRipple(document.getElementById('sg-btn'),e);sgStartGame();}};
-  [0,1,2].forEach(i=>{ sgCups[i].addEventListener('click',()=>{ if(sgState==='pick') sgHandlePick(i); }); });
+  // Click handler on the cups-area — determine visual position from click target
+  document.getElementById('sg-cups-area').addEventListener('click',e=>{
+    if(sgState!=='pick') return;
+    const cup=e.target.closest('.sg-cup-wrap');
+    if(!cup) return;
+    const area=document.getElementById('sg-cups-area');
+    const pos=Array.from(area.children).findIndex(slot=>slot.contains(cup));
+    if(pos!==-1) sgHandlePick(pos);
+  });
   sgSetIdle(true);
   sgSetStatus('Ready to play?','Choose difficulty and press start',0);
   document.getElementById('sg-msg').classList.add('vis');
@@ -8402,89 +8407,125 @@ function sgLowerCup(i,h=90,dur=330){
   });
 }
 
-// ── Swap ──
-function sgGetCX(i){
-  const s=document.getElementById('sg-slot'+i).getBoundingClientRect();
-  const p=document.getElementById('sg-cups-area').getBoundingClientRect();
-  return s.left+s.width/2-p.left;
+// ── Helpers: get cup element at visual position 0/1/2 ──
+function sgCupAt(pos){
+  const area=document.getElementById('sg-cups-area');
+  return area.children[pos]?.querySelector('.sg-cup-wrap')||null;
 }
-async function sgSwap(a,b,spd){
-  const xa=sgGetCX(a),xb=sgGetCX(b),dA=xb-xa,dB=xa-xb,arc=16+Math.abs(dA)*0.06;
-  const ca=sgCups[a],cb=sgCups[b];let t0=null;
+function sgBallElAt(pos){
+  const area=document.getElementById('sg-cups-area');
+  return area.children[pos]?.querySelector('.sg-ball')||null;
+}
+function sgShadowAt(pos){
+  const area=document.getElementById('sg-cups-area');
+  return area.children[pos]?.querySelector('.sg-shadow')||null;
+}
+
+// ── Cup physics (by visual position) ──
+function sgLiftCup(pos,h=90,dur=370){
+  const cup=sgCupAt(pos);if(!cup) return Promise.resolve();
+  let t0=null;
+  return new Promise(res=>{
+    (function f(ts){
+      if(!t0)t0=ts;const t=Math.min((ts-t0)/dur,1);
+      const e=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+      cup.style.transform=`translateY(${-h*e}px)`;sgUpdateShadowAt(pos,e);
+      t<1?requestAnimationFrame(f):res();
+    })(performance.now());
+  });
+}
+function sgLowerCup(pos,h=90,dur=330){
+  const cup=sgCupAt(pos);if(!cup) return Promise.resolve();
+  let t0=null;
+  return new Promise(res=>{
+    (function f(ts){
+      if(!t0)t0=ts;const t=Math.min((ts-t0)/dur,1);
+      let e=t<0.72?Math.pow(t/0.72,2):1+0.05*Math.sin(((t-0.72)/0.28)*Math.PI*2.2)*(1-(t-0.72)/0.28);
+      cup.style.transform=`translateY(${-h*(1-Math.min(e,1))}px)`;sgUpdateShadowAt(pos,1-Math.min(t,1));
+      if(t<1)requestAnimationFrame(f);else{cup.style.transform='';sgUpdateShadowAt(pos,0);res();}
+    })(performance.now());
+  });
+}
+function sgUpdateShadowAt(pos,lift){
+  const s=sgShadowAt(pos);if(!s) return;
+  const sc=1-lift*0.7,op=0.45-lift*0.38;
+  s.style.width=(72*sc)+'px';s.style.height=(8*sc)+'px';s.style.opacity=op;
+}
+function sgShowBallAt(pos,bounce=false){
+  const b=sgBallElAt(pos);if(!b) return;
+  b.style.opacity='1';
+  if(bounce){b.classList.remove('bounce');void b.offsetWidth;b.classList.add('bounce');setTimeout(()=>b.classList.remove('bounce'),600);}
+}
+function sgHideBallAt(pos){const b=sgBallElAt(pos);if(b) b.style.opacity='0';}
+
+// ── Swap two visual positions ──
+function sgGetCX(pos){
+  const area=document.getElementById('sg-cups-area');
+  const slot=area.children[pos];if(!slot) return 0;
+  const sr=slot.getBoundingClientRect(),pr=area.getBoundingClientRect();
+  return sr.left+sr.width/2-pr.left;
+}
+async function sgSwap(posA,posB,spd){
+  const area=document.getElementById('sg-cups-area');
+  const cupA=sgCupAt(posA),cupB=sgCupAt(posB);
+  if(!cupA||!cupB) return;
+  const xa=sgGetCX(posA),xb=sgGetCX(posB),dA=xb-xa,dB=xa-xb,arc=16+Math.abs(dA)*0.06;
+  let t0=null;
   await new Promise(res=>{
     (function f(ts){
       if(!t0)t0=ts;const t=Math.min((ts-t0)/spd,1);
       const e=t<0.5?2*t*t:-1+(4-2*t)*t,s=Math.sin(t*Math.PI);
-      ca.style.transform=`translate(${dA*e}px,${-arc*s}px)`;
-      cb.style.transform=`translate(${dB*e}px,${-arc*s}px)`;
+      cupA.style.transform=`translate(${dA*e}px,${-arc*s}px)`;
+      cupB.style.transform=`translate(${dB*e}px,${-arc*s}px)`;
       t<1?requestAnimationFrame(f):res();
     })(performance.now());
   });
-  const sA=document.getElementById('sg-slot'+a),sB=document.getElementById('sg-slot'+b);
-  const par=sA.parentNode,anc=sA.nextSibling;
-  par.insertBefore(sA,sB.nextSibling);
-  if(anc===sB)par.insertBefore(sB,sA);else par.insertBefore(sB,anc);
-  ca.style.transform='';cb.style.transform='';
+  // Swap the slot elements in the DOM
+  const slotA=area.children[posA],slotB=area.children[posB];
+  const anchor=slotA.nextSibling===slotB?slotA:slotA.nextSibling;
+  area.insertBefore(slotA,slotB.nextSibling);
+  area.insertBefore(slotB,anchor);
+  cupA.style.transform='';cupB.style.transform='';
+  // sgBallPos tracks visual position — update if ball was in one of these slots
+  if(sgBallPos===posA) sgBallPos=posB;
+  else if(sgBallPos===posB) sgBallPos=posA;
 }
 
-// ── Ball ──
-function sgShowBall(i,bounce=false){
-  sgBalls[i].style.opacity='1';
-  if(bounce){sgBalls[i].classList.remove('bounce');void sgBalls[i].offsetWidth;sgBalls[i].classList.add('bounce');setTimeout(()=>sgBalls[i].classList.remove('bounce'),600);}
-}
-function sgHideBall(i){sgBalls[i].style.opacity='0';}
-function sgSetIdle(on){
-  sgCups.forEach((c,i)=>{c.classList.remove('idle-0','idle-1','idle-2','can-pick');if(on)c.classList.add('idle-'+i);});
-}
-
+// ── Shuffle ──
 async function sgShuffle(){
   const cfg=SG_DIFFS[sgDiff];
   const n=cfg.swaps[0]+Math.floor(Math.random()*(cfg.swaps[1]-cfg.swaps[0]+1));
-  let spd=cfg.speed;const pairs=[[0,1],[1,2],[0,2]];let last=[-1,-1];
-
-  // Record which visual slot the ball starts in (slot order = visual position)
-  function sgBallSlot(){
-    const area=document.getElementById('sg-cups-area');
-    const slots=Array.from(area.children);
-    for(let i=0;i<slots.length;i++){
-      const cw=slots[i].querySelector('.sg-cup-wrap');
-      if(cw&&parseInt(cw.id.replace('sg-cup',''))===sgBallPos) return i;
-    }
-    return -1;
-  }
-  const startSlot=sgBallSlot();
+  let spd=cfg.speed;
+  const pairs=[[0,1],[1,2],[0,2]];
+  let last=[-1,-1];
+  const startPos=sgBallPos;
 
   for(let s=0;s<n;s++){
     let a,b,tries=0;
-    do{const p=pairs[Math.floor(Math.random()*pairs.length)];a=p[0];b=p[1];tries++;}
-    while(tries<10&&a===last[0]&&b===last[1]);last=[a,b];
-    const sA=document.getElementById('sg-slot'+a),sB=document.getElementById('sg-slot'+b);
-    const cA=parseInt(sA.querySelector('.sg-cup-wrap').id.replace('sg-cup','')),
-          cB=parseInt(sB.querySelector('.sg-cup-wrap').id.replace('sg-cup',''));
-    if(sgBallPos===cA)sgBallPos=cB;else if(sgBallPos===cB)sgBallPos=cA;
-    await sgSwap(cA,cB,spd);await sgSleep(spd*0.07);
-    if(sgDiff==='hard'&&s>3)spd=Math.max(190,spd-12);
+    do{
+      const p=pairs[Math.floor(Math.random()*pairs.length)];
+      a=p[0];b=p[1];tries++;
+    }while(tries<10&&a===last[0]&&b===last[1]);
+    last=[a,b];
+    await sgSwap(a,b,spd);
+    await sgSleep(spd*0.07);
+    if(sgDiff==='hard'&&s>3) spd=Math.max(190,spd-12);
   }
 
-  // Guarantee ball ends in a different visual slot than it started
-  if(sgBallSlot()===startSlot){
-    // Find two cups not containing the ball and swap one of them with the ball cup
-    const area=document.getElementById('sg-cups-area');
-    const slots=Array.from(area.children);
-    let ballSlotIdx=-1,otherSlotIdx=-1;
-    slots.forEach((s,i)=>{
-      const cw=s.querySelector('.sg-cup-wrap');
-      const id=cw?parseInt(cw.id.replace('sg-cup','')):-1;
-      if(id===sgBallPos) ballSlotIdx=i;
-      else if(otherSlotIdx===-1) otherSlotIdx=i;
-    });
-    if(ballSlotIdx!==-1&&otherSlotIdx!==-1){
-      const slotA=slots[ballSlotIdx],slotB=slots[otherSlotIdx];
-      const cA=parseInt(slotA.querySelector('.sg-cup-wrap').id.replace('sg-cup',''));
-      const cB=parseInt(slotB.querySelector('.sg-cup-wrap').id.replace('sg-cup',''));
-      if(sgBallPos===cA)sgBallPos=cB;else if(sgBallPos===cB)sgBallPos=cA;
-      await sgSwap(cA,cB,spd);
-    }
+  // Guarantee ball ends in different visual position than it started
+  if(sgBallPos===startPos){
+    const other=sgBallPos===0?1:0;
+    await sgSwap(sgBallPos,other,spd);
+  }
+}
+
+function sgSetIdle(on){
+  // Apply idle animation to whichever cup is at each visual position
+  for(let pos=0;pos<3;pos++){
+    const cup=sgCupAt(pos);
+    if(!cup) continue;
+    cup.classList.remove('idle-0','idle-1','idle-2','can-pick');
+    if(on) cup.classList.add('idle-'+pos);
   }
 }
 
@@ -8497,88 +8538,101 @@ async function sgStartGame(){
   document.getElementById('sg-round-info').textContent=`ROUND ${sgRound} · ${sgDiff.toUpperCase()}`;
   const table=document.getElementById('sg-table');
   table.classList.remove('pulse-win','pulse-lose');
-  // Reset positions
+
+  // Reset: put slot elements back in original order and clear transforms
   const area=document.getElementById('sg-cups-area');
-  [0,1,2].forEach(i=>{sgCups[i].style.transform='';sgCups[i].classList.remove('shake','can-pick','sg-cup-glow');sgHideBall(i);sgUpdateShadow(i,0);});
-  [0,1,2].map(i=>document.getElementById('sg-slot'+i)).forEach(s=>area.appendChild(s));
+  for(let pos=0;pos<3;pos++){
+    const cup=sgCupAt(pos);
+    if(cup){cup.style.transform='';cup.classList.remove('shake','can-pick','sg-cup-glow');}
+    sgHideBallAt(pos);sgUpdateShadowAt(pos,0);
+  }
+  // Re-order slots 0,1,2 by re-appending their home slots
+  ['sg-slot0','sg-slot1','sg-slot2'].forEach(id=>{
+    const el=document.getElementById(id);if(el) area.appendChild(el);
+  });
+
   sgSetIdle(false);sgParticles=[];
+  // sgBallPos is now a visual position (0=left,1=center,2=right)
   sgBallPos=Math.floor(Math.random()*3);
   sgSetStatus('Watch the ball…','Remember which cup it hides under');
   await sgSleep(450);
-  // Reveal ball
-  sgCups[sgBallPos].classList.add('sg-cup-glow');
+
+  // Reveal ball at starting position
+  const revCup=sgCupAt(sgBallPos);
+  if(revCup) revCup.classList.add('sg-cup-glow');
   await sgLiftCup(sgBallPos,100,420);
-  sgShowBall(sgBallPos,true);
+  sgShowBallAt(sgBallPos,true);
   await sgSleep(900);
-  sgHideBall(sgBallPos);
-  sgCups[sgBallPos].classList.remove('sg-cup-glow');
+  sgHideBallAt(sgBallPos);
+  if(revCup) revCup.classList.remove('sg-cup-glow');
   await sgSleep(150);
   await sgLowerCup(sgBallPos,100,400);
   await sgSleep(350);
+
   sgSetStatus('Eyes on the prize…','');
   sgState='shuffling';
   await sgShuffle();
   sgState='pick';
-  sgCups.forEach(c=>c.classList.add('can-pick'));
+
+  // Make all cups clickable — click fires with visual position
+  for(let pos=0;pos<3;pos++){
+    const cup=sgCupAt(pos);
+    if(cup) cup.classList.add('can-pick');
+  }
   sgSetStatus('Which cup?','Click to reveal your choice');
   btn.textContent='— PICK A CUP —';
 }
 
-async function sgHandlePick(i){
+async function sgHandlePick(pos){
   sgState='reveal';
-  sgCups.forEach(c=>c.classList.remove('can-pick'));
-  const won=(i===sgBallPos);
+  // Remove can-pick from all cups
+  for(let p=0;p<3;p++){const c=sgCupAt(p);if(c) c.classList.remove('can-pick');}
+  const won=(pos===sgBallPos);
   const table=document.getElementById('sg-table');
   if(won){
-    await sgLiftCup(i,100,400);
-    sgShowBall(i,true);
-    // Confetti from ball position
+    await sgLiftCup(pos,100,400);
+    sgShowBallAt(pos,true);
+    // Confetti
     const canvas=document.getElementById('sg-canvas');
     if(canvas){
-      const br=sgBalls[i].getBoundingClientRect(),cr=canvas.getBoundingClientRect();
-      const bx=br.left+br.width/2-cr.left,by=br.top+br.height/2-cr.top;
-      sgSpawnParticles(bx,by,40,true);
-      setTimeout(()=>sgSpawnParticles(bx,by,25,true),280);
+      const b=sgBallElAt(pos);
+      if(b){const br=b.getBoundingClientRect(),cr=canvas.getBoundingClientRect();
+        sgSpawnParticles(br.left+br.width/2-cr.left,br.top+br.height/2-cr.top,40,true);
+        setTimeout(()=>sgSpawnParticles(br.left+br.width/2-cr.left,br.top+br.height/2-cr.top,25,true),280);}
     }
     table.classList.add('pulse-win');
     sgWins++;sgStreak++;
-    // Award points based on difficulty
-    const sgPoints={easy:1,medium:3,hard:5}[sgDiff]||1;
+    const pts={easy:1,medium:3,hard:5}[sgDiff]||1;
     if(cu&&!cud?._impersonated){
-      const newScore=(cud?.shellScore||0)+sgPoints;
+      const newScore=(cud?.shellScore||0)+pts;
       updateDoc(doc(db,'users',cu.uid),{shellScore:newScore}).then(()=>{
         if(cud) cud.shellScore=newScore;
         if(uCache[cu.uid]) uCache[cu.uid].shellScore=newScore;
       }).catch(()=>{});
     }
-    // Award points: easy=1, medium=3, hard=5
-    const pts={easy:1,medium:3,hard:5}[sgDiff]||1;
-    sgTotalPts+=pts;
     sgAnimScore('sg-wins',sgWins,'win-c');
     sgAnimScore('sg-streak',sgStreak,'win-c');
-    const ptsEl=document.getElementById('sg-pts');
-    if(ptsEl){ptsEl.textContent=sgTotalPts.toLocaleString();ptsEl.classList.remove('pop');void ptsEl.offsetWidth;ptsEl.classList.add('pop');setTimeout(()=>ptsEl.classList.remove('pop'),500);}
-    // Save to Firestore
-    if(cu){try{await updateDoc(doc(db,'users',cu.uid),{shellScore:sgTotalPts});cud={...cud,shellScore:sgTotalPts};uCache[cu.uid]={...uCache[cu.uid],shellScore:sgTotalPts};}catch(e){}}
     const fire=document.getElementById('sg-fire');
     fire.style.opacity=sgStreak>=3?'1':'0';
     const msgs=['CORRECT! 🏆','YOU GOT IT ✨','SHARP EYES 🎯','NAILED IT 🌟','BOOM 💥'];
-    sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],sgStreak>=3?`${sgStreak} IN A ROW — INCREDIBLE`:`+${pts} PTS · WELL PLAYED`);
+    sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],`+${pts} PT${pts!==1?'S':''} EARNED`);
     await sgSleep(2300);
-    sgHideBall(i);await sgLowerCup(i,100,340);
+    sgHideBallAt(pos);await sgLowerCup(pos,100,340);
   } else {
-    sgCups[i].classList.add('shake');
-    // Smoke from wrong cup
+    const wrongCup=sgCupAt(pos);
+    if(wrongCup) wrongCup.classList.add('shake');
     const canvas=document.getElementById('sg-canvas');
-    if(canvas){
-      const cr=canvas.getBoundingClientRect(),wr=sgCups[i].getBoundingClientRect();
+    if(canvas&&wrongCup){
+      const wr=wrongCup.getBoundingClientRect(),cr=canvas.getBoundingClientRect();
       sgSpawnParticles(wr.left+wr.width/2-cr.left,wr.top+wr.height/2-cr.top,18,false);
     }
     table.classList.add('pulse-lose');
-    await sgSleep(360);sgCups[i].classList.remove('shake');
-    await sgLiftCup(i,90,360);await sgSleep(240);
+    await sgSleep(360);
+    if(wrongCup) wrongCup.classList.remove('shake');
+    await sgLiftCup(pos,90,360);
+    await sgSleep(240);
     await sgLiftCup(sgBallPos,90,360);
-    sgShowBall(sgBallPos,false);
+    sgShowBallAt(sgBallPos,false);
     sgLosses++;sgStreak=0;
     document.getElementById('sg-fire').style.opacity='0';
     sgAnimScore('sg-losses',sgLosses,'lose-c');
@@ -8586,8 +8640,8 @@ async function sgHandlePick(i){
     const msgs=['WRONG! 💀','NOT THIS TIME…','SO CLOSE 😬','FOOLED YOU!','TRY AGAIN'];
     sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],'THE BALL WAS HIDING OVER THERE');
     await sgSleep(2100);
-    sgHideBall(sgBallPos);
-    await Promise.all([sgLowerCup(i,90,300),sgLowerCup(sgBallPos,90,300)]);
+    sgHideBallAt(sgBallPos);
+    await Promise.all([sgLowerCup(pos,90,300),sgLowerCup(sgBallPos,90,300)]);
   }
   await sgSleep(220);
   table.classList.remove('pulse-win','pulse-lose');
