@@ -568,9 +568,11 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
   /* ── ROLES ── */
   /* Ensure role badge text is always visible regardless of parent colour */
-  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner{
+  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one{
     -webkit-text-fill-color:initial !important;
   }
+  @keyframes number-one-shine{0%,100%{background-position:0% center;box-shadow:0 0 8px rgba(255,215,0,0.6),0 0 20px rgba(255,180,0,0.3);}50%{background-position:200% center;box-shadow:0 0 16px rgba(255,215,0,1),0 0 32px rgba(255,180,0,0.6);}}
+  .role-number-one{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#7a4f00,#ffd700,#fff8c0,#ffd700,#7a4f00);background-size:300%;color:#1a0f00;border:1px solid #cc9900;animation:number-one-shine 1.8s linear infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:none;-webkit-text-fill-color:initial;}
   .role-og{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#001133,#002266);color:#4488ff;border:1px solid #2255cc;box-shadow:0 0 8px rgba(68,136,255,0.7),0 0 20px rgba(68,136,255,0.3);vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   @keyframes feedback-pulse{0%,100%{box-shadow:0 0 6px rgba(255,30,60,0.5);}50%{box-shadow:0 0 18px rgba(255,30,60,1),0 0 32px rgba(255,30,60,0.4);}}
   .role-feedback{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 7px;border-radius:4px;background:linear-gradient(135deg,#330008,#660010);color:#ff3355;border:1px solid #cc1133;animation:feedback-pulse 1.5s ease infinite;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
@@ -6305,6 +6307,7 @@ function getRoleBadge(uid){
   const roles=Array.isArray(u.roles)?u.roles:(u.role?[u.role]:[]);
   if(!roles.length) return '';
   const map={
+    '#1':     '<span class="role-number-one">#1</span>',
     owner:    '<span class="role-owner">OWNER</span>',
     tester:   '<span class="role-tester">TESTER</span>',
     beginner_tester:'<span class="role-beginner-tester">BEGINNER TESTER</span>',
@@ -7299,12 +7302,13 @@ async function syncLeaderboardRoles(){
     // Grant or revoke role for every user that changed
     const updates=[];
     allUsers.forEach(u=>{
-      const hasRole=(u.roles||[]).includes(NUMBER_ONE_ROLE);
+      const currentRoles=Array.isArray(u.roles)?u.roles:(u.role?[u.role]:[]);
+      const hasRole=currentRoles.includes(NUMBER_ONE_ROLE);
       const shouldHave=topUids.has(u.id);
       if(shouldHave===hasRole) return; // no change needed
       const newRoles=shouldHave
-        ?[NUMBER_ONE_ROLE,...(u.roles||[]).filter(r=>r!==NUMBER_ONE_ROLE)]
-        :(u.roles||[]).filter(r=>r!==NUMBER_ONE_ROLE);
+        ?[NUMBER_ONE_ROLE,...currentRoles.filter(r=>r!==NUMBER_ONE_ROLE)]
+        :currentRoles.filter(r=>r!==NUMBER_ONE_ROLE);
       updates.push(
         updateDoc(doc(db,'users',u.id),{roles:newRoles,role:newRoles[0]||null})
           .then(()=>{
