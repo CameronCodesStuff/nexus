@@ -8437,11 +8437,23 @@ function sgSetIdle(on){
   sgCups.forEach((c,i)=>{c.classList.remove('idle-0','idle-1','idle-2','can-pick');if(on)c.classList.add('idle-'+i);});
 }
 
-// ── Shuffle ──
 async function sgShuffle(){
   const cfg=SG_DIFFS[sgDiff];
   const n=cfg.swaps[0]+Math.floor(Math.random()*(cfg.swaps[1]-cfg.swaps[0]+1));
   let spd=cfg.speed;const pairs=[[0,1],[1,2],[0,2]];let last=[-1,-1];
+
+  // Record which visual slot the ball starts in (slot order = visual position)
+  function sgBallSlot(){
+    const area=document.getElementById('sg-cups-area');
+    const slots=Array.from(area.children);
+    for(let i=0;i<slots.length;i++){
+      const cw=slots[i].querySelector('.sg-cup-wrap');
+      if(cw&&parseInt(cw.id.replace('sg-cup',''))===sgBallPos) return i;
+    }
+    return -1;
+  }
+  const startSlot=sgBallSlot();
+
   for(let s=0;s<n;s++){
     let a,b,tries=0;
     do{const p=pairs[Math.floor(Math.random()*pairs.length)];a=p[0];b=p[1];tries++;}
@@ -8452,6 +8464,27 @@ async function sgShuffle(){
     if(sgBallPos===cA)sgBallPos=cB;else if(sgBallPos===cB)sgBallPos=cA;
     await sgSwap(cA,cB,spd);await sgSleep(spd*0.07);
     if(sgDiff==='hard'&&s>3)spd=Math.max(190,spd-12);
+  }
+
+  // Guarantee ball ends in a different visual slot than it started
+  if(sgBallSlot()===startSlot){
+    // Find two cups not containing the ball and swap one of them with the ball cup
+    const area=document.getElementById('sg-cups-area');
+    const slots=Array.from(area.children);
+    let ballSlotIdx=-1,otherSlotIdx=-1;
+    slots.forEach((s,i)=>{
+      const cw=s.querySelector('.sg-cup-wrap');
+      const id=cw?parseInt(cw.id.replace('sg-cup','')):-1;
+      if(id===sgBallPos) ballSlotIdx=i;
+      else if(otherSlotIdx===-1) otherSlotIdx=i;
+    });
+    if(ballSlotIdx!==-1&&otherSlotIdx!==-1){
+      const slotA=slots[ballSlotIdx],slotB=slots[otherSlotIdx];
+      const cA=parseInt(slotA.querySelector('.sg-cup-wrap').id.replace('sg-cup',''));
+      const cB=parseInt(slotB.querySelector('.sg-cup-wrap').id.replace('sg-cup',''));
+      if(sgBallPos===cA)sgBallPos=cB;else if(sgBallPos===cB)sgBallPos=cA;
+      await sgSwap(cA,cB,spd);
+    }
   }
 }
 
@@ -8529,7 +8562,6 @@ async function sgHandlePick(i){
     if(cu){try{await updateDoc(doc(db,'users',cu.uid),{shellScore:sgTotalPts});cud={...cud,shellScore:sgTotalPts};uCache[cu.uid]={...uCache[cu.uid],shellScore:sgTotalPts};}catch(e){}}
     const fire=document.getElementById('sg-fire');
     fire.style.opacity=sgStreak>=3?'1':'0';
-    if(sgStreak>=3) sgShowCombo(sgStreak);
     const msgs=['CORRECT! 🏆','YOU GOT IT ✨','SHARP EYES 🎯','NAILED IT 🌟','BOOM 💥'];
     sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],sgStreak>=3?`${sgStreak} IN A ROW — INCREDIBLE`:`+${pts} PTS · WELL PLAYED`);
     await sgSleep(2300);
@@ -9255,7 +9287,6 @@ iStars();reset();loop();
 
   <!-- Table -->
   <div style="position:relative;">
-    <div class="sg-combo" id="sg-combo">⚡ UNSTOPPABLE</div>
     <div class="sg-table" id="sg-table">
       <canvas class="sg-particles" id="sg-canvas"></canvas>
       <div class="sg-cups-area" id="sg-cups-area">
