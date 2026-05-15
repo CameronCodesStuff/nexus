@@ -8370,43 +8370,6 @@ function sgAddRipple(btn,e){
   rip.style.cssText=`width:${sz}px;height:${sz}px;left:${(e?e.clientX:r.left+r.width/2)-r.left-sz/2}px;top:${(e?e.clientY:r.top+r.height/2)-r.top-sz/2}px`;
   btn.appendChild(rip);setTimeout(()=>rip.remove(),700);
 }
-function sgUpdateShadow(i,lift){
-  const s=sgShadows[i],sc=1-lift*0.7,op=0.45-lift*0.38;
-  s.style.width=(72*sc)+'px';s.style.height=(8*sc)+'px';s.style.opacity=op;
-}
-let sgCbTimer;
-function sgShowCombo(n){
-  const msgs={3:'🔥 ON FIRE',4:'⚡ UNSTOPPABLE',5:'💥 LEGENDARY',6:'✨ GODLIKE'};
-  const cb=document.getElementById('sg-combo');
-  cb.textContent=msgs[Math.min(n,6)]||'🌟 UNREAL';
-  cb.classList.add('show');clearTimeout(sgCbTimer);
-  sgCbTimer=setTimeout(()=>cb.classList.remove('show'),2200);
-}
-
-// ── Cup physics ──
-function sgLiftCup(i,h=90,dur=370){
-  const cup=sgCups[i];let t0=null;
-  return new Promise(res=>{
-    (function f(ts){
-      if(!t0)t0=ts;const t=Math.min((ts-t0)/dur,1);
-      const e=t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
-      cup.style.transform=`translateY(${-h*e}px)`;sgUpdateShadow(i,e);
-      t<1?requestAnimationFrame(f):res();
-    })(performance.now());
-  });
-}
-function sgLowerCup(i,h=90,dur=330){
-  const cup=sgCups[i];let t0=null;
-  return new Promise(res=>{
-    (function f(ts){
-      if(!t0)t0=ts;const t=Math.min((ts-t0)/dur,1);
-      let e=t<0.72?Math.pow(t/0.72,2):1+0.05*Math.sin(((t-0.72)/0.28)*Math.PI*2.2)*(1-(t-0.72)/0.28);
-      cup.style.transform=`translateY(${-h*(1-Math.min(e,1))}px)`;sgUpdateShadow(i,1-Math.min(t,1));
-      if(t<1)requestAnimationFrame(f);else{cup.style.transform='';sgUpdateShadow(i,0);res();}
-    })(performance.now());
-  });
-}
-
 // ── Helpers: get cup element at visual position 0/1/2 ──
 function sgCupAt(pos){
   const area=document.getElementById('sg-cups-area');
