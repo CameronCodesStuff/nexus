@@ -781,9 +781,9 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .sg-cup-wrap.can-pick{cursor:pointer;animation:none;}
   .sg-cup-wrap.can-pick:hover{animation:sg-hover-wobble 0.55s ease-in-out forwards;}
   .sg-cup-wrap.shake{animation:sg-shake 0.45s ease !important;}
-  .sg-cup-svg{width:100%;height:100%;overflow:visible;transition:filter 0.2s;}
-  .sg-cup-wrap.can-pick:hover .sg-cup-svg{filter:drop-shadow(0 0 12px var(--glow));}
-  .sg-cup-glow .sg-cup-svg{filter:drop-shadow(0 0 14px var(--accent)) drop-shadow(0 0 6px var(--accent2));}
+  .sg-cup-svg{width:100%;height:100%;overflow:visible;transition:filter 0.2s;filter:drop-shadow(0 8px 18px rgba(0,0,0,0.7)) drop-shadow(0 0 6px var(--glow));}
+  .sg-cup-wrap.can-pick:hover .sg-cup-svg{filter:drop-shadow(0 12px 24px rgba(0,0,0,0.8)) drop-shadow(0 0 18px var(--glow));}
+  .sg-cup-glow .sg-cup-svg{filter:drop-shadow(0 0 20px var(--accent)) drop-shadow(0 0 8px var(--accent2)) drop-shadow(0 8px 18px rgba(0,0,0,0.7));}
   .sg-shadow{position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:72px;height:8px;background:rgba(0,0,0,0.45);border-radius:50%;filter:blur(4px);transition:width 0.15s,height 0.15s,opacity 0.15s;}
   .sg-ball{position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:24px;height:24px;border-radius:50%;opacity:0;z-index:2;transition:opacity 0.2s ease;}
   .sg-ball.bounce{animation:sg-ball-bounce 0.55s cubic-bezier(0.36,0.07,0.19,0.97);}
@@ -1161,6 +1161,8 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
       <div class="lb-tab" id="lb-tab-drift" onclick="N.lbTab('drift')">DRIFT KING</div>
       <div class="lb-tab" id="lb-tab-referrals" onclick="N.lbTab('referrals')">REFERRALS</div>
       <div class="lb-tab" id="lb-tab-blackjack" onclick="N.lbTab('blackjack')">BLACKJACK</div>
+      <div class="lb-tab" id="lb-tab-shell" onclick="N.lbTab('shell')">SHELL GAME</div>
+      <div class="lb-tab" id="lb-tab-shell" onclick="N.lbTab('shell')">SHELL</div>
     </div>
     <div id="lb-content"></div>
   </div>
@@ -5583,6 +5585,7 @@ const OLB_TABS=[
   {id:'drift',   label:'Drift',      field:'driftBest',     fmt:v=>v.toLocaleString()+' pts'},
   {id:'referrals',label:'Referrals', field:'referralCount', fmt:v=>v+' refs'},
   {id:'blackjack',label:'Blackjack', field:'bjChips',       fmt:v=>v.toLocaleString()+' chips'},
+  {id:'shell',    label:'Shell',     field:'shellScore',     fmt:v=>v.toLocaleString()+' pts'},
 ];
 let olbCurrentTab='msgs';
 
@@ -7271,6 +7274,7 @@ function lbTab(tab){
   document.getElementById('lb-tab-drift')?.classList.toggle('active',tab==='drift');
   document.getElementById('lb-tab-referrals')?.classList.toggle('active',tab==='referrals');
   document.getElementById('lb-tab-blackjack')?.classList.toggle('active',tab==='blackjack');
+  document.getElementById('lb-tab-shell')?.classList.toggle('active',tab==='shell');
   renderLeaderboard(tab);
 }
 
@@ -7296,6 +7300,8 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.driftBest||0)>0).sort((a,b)=>(b.driftBest||0)-(a.driftBest||0)).slice(0,20);
     } else if(tab==='blackjack'){
       users=users.filter(u=>(u.bjChips||0)>0).sort((a,b)=>(b.bjChips||0)-(a.bjChips||0)).slice(0,20);
+    } else if(tab==='shell'){
+      users=users.filter(u=>(u.shellScore||0)>0).sort((a,b)=>(b.shellScore||0)-(a.shellScore||0)).slice(0,20);
     } else {
       users=users.filter(u=>(u.referralCount||0)>0).sort((a,b)=>(b.referralCount||0)-(a.referralCount||0)).slice(0,20);
     }
@@ -7330,6 +7336,8 @@ async function renderLeaderboard(tab){
         statVal=u.driftBest||0;statLabel=(u.driftBest||0).toLocaleString()+' pts';
       } else if(tab==='blackjack'){
         statVal=u.bjChips||0;statLabel=statVal.toLocaleString()+' chips';
+      } else if(tab==='shell'){
+        statVal=u.shellScore||0;statLabel=statVal.toLocaleString()+' pts';
       } else {
         statVal=u.referralCount||0;statLabel=statVal+' referral'+(statVal!==1?'s':'');
       }
@@ -7372,6 +7380,11 @@ async function renderLeaderboard(tab){
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#2ecc71;letter-spacing:1px;';
         badge.textContent='🃏 '+(u.bjChips||0).toLocaleString();
+        row.appendChild(badge);
+      } else if(tab==='shell'){
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;color:var(--accent2);letter-spacing:1px;';
+        badge.textContent='🎯 '+(u.shellScore||0).toLocaleString()+' pts';
         row.appendChild(badge);
       } else if(tab==='referrals'){
         const badge=document.createElement('div');
@@ -8243,7 +8256,7 @@ async function bjOpenLeaderboard(){
 
 // ── SHELL GAME ───────────────────────────────────
 const SG_DIFFS={easy:{swaps:[3,4],speed:680},medium:{swaps:[5,7],speed:470},hard:{swaps:[8,13],speed:290}};
-let sgDiff='medium',sgBallPos=1,sgState='idle',sgWins=0,sgLosses=0,sgStreak=0,sgRound=0;
+let sgDiff='medium',sgBallPos=1,sgState='idle',sgWins=0,sgLosses=0,sgStreak=0,sgRound=0,sgTotalPts=0;
 let sgCups,sgBalls,sgShadows,sgParticles=[],sgCtx=null,sgRafId=null;
 
 function sgInit(){
@@ -8280,12 +8293,21 @@ function sgInit(){
   sgSetStatus('Ready to play?','Choose difficulty and press start',0);
   document.getElementById('sg-msg').classList.add('vis');
   document.getElementById('sg-sub').classList.add('vis');
+  const ptsEl=document.getElementById('sg-pts');
+  if(ptsEl) ptsEl.textContent=sgTotalPts.toLocaleString();
 }
 
-function openShellGame(){
+async function openShellGame(){
   const overlay=document.getElementById('sg-overlay');
   if(!overlay) return;
   overlay.style.display='flex';
+  // Load existing score from Firestore
+  if(cu){
+    try{
+      const snap=await getDoc(doc(db,'users',cu.uid));
+      sgTotalPts=snap.data()?.shellScore||0;
+    }catch(e){sgTotalPts=0;}
+  }
   setTimeout(()=>sgInit(),30);
 }
 function closeShellGame(){
@@ -8487,13 +8509,29 @@ async function sgHandlePick(i){
     }
     table.classList.add('pulse-win');
     sgWins++;sgStreak++;
+    // Award points based on difficulty
+    const sgPoints={easy:1,medium:3,hard:5}[sgDiff]||1;
+    if(cu&&!cud?._impersonated){
+      const newScore=(cud?.shellScore||0)+sgPoints;
+      updateDoc(doc(db,'users',cu.uid),{shellScore:newScore}).then(()=>{
+        if(cud) cud.shellScore=newScore;
+        if(uCache[cu.uid]) uCache[cu.uid].shellScore=newScore;
+      }).catch(()=>{});
+    }
+    // Award points: easy=1, medium=3, hard=5
+    const pts={easy:1,medium:3,hard:5}[sgDiff]||1;
+    sgTotalPts+=pts;
     sgAnimScore('sg-wins',sgWins,'win-c');
     sgAnimScore('sg-streak',sgStreak,'win-c');
+    const ptsEl=document.getElementById('sg-pts');
+    if(ptsEl){ptsEl.textContent=sgTotalPts.toLocaleString();ptsEl.classList.remove('pop');void ptsEl.offsetWidth;ptsEl.classList.add('pop');setTimeout(()=>ptsEl.classList.remove('pop'),500);}
+    // Save to Firestore
+    if(cu){try{await updateDoc(doc(db,'users',cu.uid),{shellScore:sgTotalPts});cud={...cud,shellScore:sgTotalPts};uCache[cu.uid]={...uCache[cu.uid],shellScore:sgTotalPts};}catch(e){}}
     const fire=document.getElementById('sg-fire');
     fire.style.opacity=sgStreak>=3?'1':'0';
     if(sgStreak>=3) sgShowCombo(sgStreak);
     const msgs=['CORRECT! 🏆','YOU GOT IT ✨','SHARP EYES 🎯','NAILED IT 🌟','BOOM 💥'];
-    sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],sgStreak>=3?`${sgStreak} IN A ROW — INCREDIBLE`:'WELL PLAYED');
+    sgSetStatus(msgs[Math.floor(Math.random()*msgs.length)],sgStreak>=3?`${sgStreak} IN A ROW — INCREDIBLE`:`+${pts} PTS · WELL PLAYED`);
     await sgSleep(2300);
     sgHideBall(i);await sgLowerCup(i,100,340);
   } else {
@@ -9227,27 +9265,33 @@ iStars();reset();loop();
             <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="sg-cg0" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="var(--bg2)"/>
-                  <stop offset="25%" stop-color="var(--accent)"/>
-                  <stop offset="55%" stop-color="var(--bg3)"/>
-                  <stop offset="100%" stop-color="var(--bg)"/>
-                </linearGradient>
-                <linearGradient id="sg-rg0" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="var(--bg3)"/>
-                  <stop offset="40%" stop-color="var(--accent2)"/>
-                  <stop offset="100%" stop-color="var(--bg2)"/>
+                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
+                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
+                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
                 </linearGradient>
               </defs>
-              <ellipse cx="50" cy="127" rx="42" ry="5" fill="rgba(0,0,0,0.4)"/>
-              <path d="M20 20 L10 120 L90 120 L80 20 Z" fill="url(#sg-cg0)" opacity="0.95"/>
-              <path d="M35 22 L29 118 L38 118 L43 22 Z" fill="rgba(255,255,255,0.06)"/>
-              <path d="M64 22 L70 22 L76 118 L67 118 Z" fill="rgba(0,0,0,0.08)"/>
-              <rect x="14" y="12" width="72" height="12" rx="4" fill="url(#sg-rg0)"/>
-              <rect x="14" y="22" width="72" height="1.5" rx="1" fill="rgba(0,0,0,0.2)"/>
-              <rect x="8" y="118" width="84" height="8" rx="3" fill="url(#sg-rg0)"/>
-              <ellipse cx="50" cy="12" rx="36" ry="5" fill="var(--bg3)" opacity="0.8"/>
-              <rect x="16" y="56" width="68" height="4" rx="2" fill="rgba(0,0,0,0.12)"/>
-              <rect x="16" y="80" width="68" height="2.5" rx="1.5" fill="rgba(255,255,255,0.04)"/>
+              <!-- Drop shadow -->
+              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <!-- Cup body — solid accent colour -->
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
+              <!-- Shading overlay -->
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg0)"/>
+              <!-- Left highlight streak -->
+              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
+              <!-- Bottom rim -->
+              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
+              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <!-- Top rim -->
+              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
+              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <!-- Top cap -->
+              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
+              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
+              <!-- Mid band detail -->
+              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
+              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
             </svg>
           </div>
           <div class="sg-shadow" id="sg-shadow0"></div>
@@ -9259,27 +9303,25 @@ iStars();reset();loop();
             <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="sg-cg1" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="var(--bg2)"/>
-                  <stop offset="25%" stop-color="var(--accent)"/>
-                  <stop offset="55%" stop-color="var(--bg3)"/>
-                  <stop offset="100%" stop-color="var(--bg)"/>
-                </linearGradient>
-                <linearGradient id="sg-rg1" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="var(--bg3)"/>
-                  <stop offset="40%" stop-color="var(--accent2)"/>
-                  <stop offset="100%" stop-color="var(--bg2)"/>
+                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
+                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
+                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
                 </linearGradient>
               </defs>
-              <ellipse cx="50" cy="127" rx="42" ry="5" fill="rgba(0,0,0,0.4)"/>
-              <path d="M20 20 L10 120 L90 120 L80 20 Z" fill="url(#sg-cg1)" opacity="0.95"/>
-              <path d="M35 22 L29 118 L38 118 L43 22 Z" fill="rgba(255,255,255,0.06)"/>
-              <path d="M64 22 L70 22 L76 118 L67 118 Z" fill="rgba(0,0,0,0.08)"/>
-              <rect x="14" y="12" width="72" height="12" rx="4" fill="url(#sg-rg1)"/>
-              <rect x="14" y="22" width="72" height="1.5" rx="1" fill="rgba(0,0,0,0.2)"/>
-              <rect x="8" y="118" width="84" height="8" rx="3" fill="url(#sg-rg1)"/>
-              <ellipse cx="50" cy="12" rx="36" ry="5" fill="var(--bg3)" opacity="0.8"/>
-              <rect x="16" y="56" width="68" height="4" rx="2" fill="rgba(0,0,0,0.12)"/>
-              <rect x="16" y="80" width="68" height="2.5" rx="1.5" fill="rgba(255,255,255,0.04)"/>
+              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg1)"/>
+              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
+              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
+              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
+              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
+              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
+              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
+              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
             </svg>
           </div>
           <div class="sg-shadow" id="sg-shadow1"></div>
@@ -9291,27 +9333,25 @@ iStars();reset();loop();
             <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="sg-cg2" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="var(--bg2)"/>
-                  <stop offset="25%" stop-color="var(--accent)"/>
-                  <stop offset="55%" stop-color="var(--bg3)"/>
-                  <stop offset="100%" stop-color="var(--bg)"/>
-                </linearGradient>
-                <linearGradient id="sg-rg2" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="var(--bg3)"/>
-                  <stop offset="40%" stop-color="var(--accent2)"/>
-                  <stop offset="100%" stop-color="var(--bg2)"/>
+                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
+                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
+                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
                 </linearGradient>
               </defs>
-              <ellipse cx="50" cy="127" rx="42" ry="5" fill="rgba(0,0,0,0.4)"/>
-              <path d="M20 20 L10 120 L90 120 L80 20 Z" fill="url(#sg-cg2)" opacity="0.95"/>
-              <path d="M35 22 L29 118 L38 118 L43 22 Z" fill="rgba(255,255,255,0.06)"/>
-              <path d="M64 22 L70 22 L76 118 L67 118 Z" fill="rgba(0,0,0,0.08)"/>
-              <rect x="14" y="12" width="72" height="12" rx="4" fill="url(#sg-rg2)"/>
-              <rect x="14" y="22" width="72" height="1.5" rx="1" fill="rgba(0,0,0,0.2)"/>
-              <rect x="8" y="118" width="84" height="8" rx="3" fill="url(#sg-rg2)"/>
-              <ellipse cx="50" cy="12" rx="36" ry="5" fill="var(--bg3)" opacity="0.8"/>
-              <rect x="16" y="56" width="68" height="4" rx="2" fill="rgba(0,0,0,0.12)"/>
-              <rect x="16" y="80" width="68" height="2.5" rx="1.5" fill="rgba(255,255,255,0.04)"/>
+              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg2)"/>
+              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
+              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
+              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
+              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
+              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
+              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
+              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
             </svg>
           </div>
           <div class="sg-shadow" id="sg-shadow2"></div>
@@ -9323,10 +9363,14 @@ iStars();reset();loop();
   </div>
 
   <!-- Scores -->
-  <div style="display:flex;gap:32px;margin-top:20px;margin-bottom:4px;">
+  <div style="display:flex;gap:28px;margin-top:20px;margin-bottom:4px;align-items:flex-end;">
     <div style="text-align:center;"><div class="sg-score-val" id="sg-wins">0</div><div class="sg-score-label">WINS</div></div>
     <div style="text-align:center;"><div class="sg-score-val" id="sg-streak">0</div><div class="sg-score-label">STREAK <span id="sg-fire" style="opacity:0;transition:opacity 0.3s;">🔥</span></div></div>
     <div style="text-align:center;"><div class="sg-score-val" id="sg-losses">0</div><div class="sg-score-label">LOSSES</div></div>
+    <div style="text-align:center;border-left:1px solid var(--border);padding-left:28px;">
+      <div class="sg-score-val" id="sg-pts" style="color:var(--accent2);font-size:1.4rem;">0</div>
+      <div class="sg-score-label">TOTAL PTS</div>
+    </div>
   </div>
 
   <!-- Status -->
