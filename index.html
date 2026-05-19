@@ -404,6 +404,18 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
   /* Voice note */
   .voice-msg{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px 14px;min-width:220px;max-width:320px;}
+
+  /* Video message */
+  .video-msg{background:var(--bg3);border:1px solid var(--border);border-radius:12px;overflow:hidden;max-width:320px;min-width:220px;}
+  .video-msg video{width:100%;display:block;border-radius:12px 12px 0 0;max-height:240px;background:#000;}
+  .video-msg-meta{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);}
+  .video-msg-dl{background:none;border:1px solid var(--border);color:var(--accent);font-size:10px;font-family:var(--font-display);letter-spacing:1px;padding:3px 8px;border-radius:5px;cursor:pointer;transition:all 0.2s;}
+  .video-msg-dl:hover{background:rgba(68,102,255,0.12);border-color:var(--accent);}
+
+  /* Upload progress overlay */
+  .upload-progress-bar{height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden;display:none;}
+  .upload-progress-bar.active{display:block;}
+  .upload-progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;width:0%;transition:width 0.2s;}
   .voice-play{width:34px;height:34px;border-radius:50%;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;transition:all 0.2s;}
   .voice-play:hover{transform:scale(1.08);box-shadow:0 0 10px var(--glow);}
   .voice-wave{flex:1;height:28px;display:flex;align-items:center;gap:2px;overflow:hidden;}
@@ -1009,6 +1021,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
             <button class="btn-small primary" onclick="N.stopRecording()">SEND ›</button>
           </div>
           <div class="typing-indicator" id="typing-indicator"></div>
+          <div id="upload-progress-wrap" style="padding:0 24px 4px;display:none;">
+            <div style="font-size:10px;font-family:var(--font-mono);color:var(--accent);margin-bottom:3px;" id="upload-progress-label">Uploading… 0%</div>
+            <div class="upload-progress-bar active"><div class="upload-progress-fill" id="upload-progress-fill"></div></div>
+          </div>
           <div class="input-bar">
             <div class="input-actions">
               <label class="icon-btn" title="Attach file" style="cursor:pointer;">
@@ -1295,6 +1311,9 @@ import {
   orderBy, limitToLast, startAfter, endBefore, limit,
   serverTimestamp, arrayUnion, arrayRemove, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ── STARFIELD ──────────────────────────────────
 // ── BACKGROUND EFFECT ENGINE ──────────────────────
@@ -1863,6 +1882,7 @@ const FB = {
 const fbApp = initializeApp(FB);
 const auth  = getAuth(fbApp);
 const db    = getFirestore(fbApp);
+const storage = getStorage(fbApp);
 
 // Always require fresh login — sign out any cached session immediately on load
 // This runs synchronously before onAuthStateChanged is registered below
@@ -1895,8 +1915,9 @@ const ago=d=>{const t=Date.now()-d;if(t<6e4)return'now';if(t<36e5)return~~(t/6e4
 const fmtT=d=>d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const fmtD=d=>{const t=new Date();if(d.toDateString()===t.toDateString())return'TODAY';const y=new Date(t);y.setDate(y.getDate()-1);return d.toDateString()===y.toDateString()?'YESTERDAY':d.toLocaleDateString([],{month:'short',day:'numeric'});};
 const fmtB=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';
-const fIcon=n=>{const e=(n||'').split('.').pop().toLowerCase();return({pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp4:'🎬',mov:'🎬',mp3:'🎵',wav:'🎵',zip:'📦',rar:'📦',js:'💻',ts:'💻',py:'💻',txt:'📃',md:'📃'})[e]||'📁';};
+const fIcon=n=>{const e=(n||'').split('.').pop().toLowerCase();return({pdf:'📄',doc:'📝',docx:'📝',xls:'📊',xlsx:'📊',jpg:'🖼️',jpeg:'🖼️',png:'🖼️',gif:'🖼️',webp:'🖼️',mp4:'🎬',mov:'🎬',webm:'🎬',mkv:'🎬',avi:'🎬',m4v:'🎬',mp3:'🎵',wav:'🎵',zip:'📦',rar:'📦',js:'💻',ts:'💻',py:'💻',txt:'📃',md:'📃'})[e]||'📁';};
 const isImgFile=n=>Boolean(n?.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp|ico|tiff?|avif|heic)/i));
+const isVideoFile=n=>Boolean(n?.match(/\.(mp4|mov|webm|mkv|avi|m4v|ogv|3gp|flv|wmv)/i));
 
 // Emoji avatars — consistent per user based on uid
 const AVATAR_EMOJIS=['👑','🦊','🐺','🦁','🐯','🦋','🐉','🦄','🔥','⚡','🌊','🌙','⭐','🎭','🎯','💎','🛸','🌸','🍀','🎪','🦅','🐬','🐧','🦈','🦚','🎸','🎺','🎲','🌋','🎃','🌀','🦜','🐲','🌺','🎋','🦩','🐙','🌵','🍄','💫','🔮','🧿','⚔️','🏹','🪄','🎠','🌈','🏔️','🗿','🧬','🪐','💀','🦂','🐍'];
@@ -2606,11 +2627,41 @@ function renderMsgs(cid){
         imgEl.title=msg.fileName||'Image';
         imgEl.onclick=()=>openLightbox(msg.fileData,msg.fileName);
         wr.appendChild(imgEl);
+      } else if(isImgFile(msg.fileName)&&msg.fileUrl){
+        // Image uploaded via Storage
+        const imgEl=document.createElement('img');
+        imgEl.className='msg-img';
+        imgEl.src=msg.fileUrl;
+        imgEl.alt=msg.fileName||'Image';
+        imgEl.loading='lazy';
+        imgEl.title=msg.fileName||'Image';
+        imgEl.onclick=()=>openLightbox(msg.fileUrl,msg.fileName);
+        wr.appendChild(imgEl);
+      } else if(msg.fileUrl){
+        // Generic file via Storage
+        const fm=document.createElement('div');fm.className='file-msg';
+        fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)} · Click to download</div></div>`;
+        fm.onclick=()=>window.open(msg.fileUrl,'_blank');wr.appendChild(fm);
       } else {
         const fm=document.createElement('div');fm.className='file-msg';
         fm.innerHTML=`<div class="file-icon">${fIcon(msg.fileName)}</div><div class="file-info"><div class="file-name">${esc(msg.fileName)}</div><div class="file-size">${fmtB(msg.fileSize||0)} · Click to download</div></div>`;
         fm.onclick=()=>dlFile(msg.fileData,msg.fileName);wr.appendChild(fm);
       }
+    } else if(msg.type==='video'){
+      // Video uploaded to Firebase Storage
+      const vm=document.createElement('div');vm.className='video-msg';
+      const vid=document.createElement('video');
+      vid.controls=true;
+      vid.preload='metadata';
+      vid.style.cssText='width:100%;display:block;max-height:240px;background:#000;border-radius:12px 12px 0 0;';
+      if(msg.fileUrl) vid.src=msg.fileUrl;
+      const meta=document.createElement('div');meta.className='video-msg-meta';
+      const nameSpan=document.createElement('span');nameSpan.textContent='🎬 '+esc(msg.fileName||'Video')+(msg.fileSize?' · '+fmtB(msg.fileSize):'');
+      const dlBtn=document.createElement('button');dlBtn.className='video-msg-dl';dlBtn.textContent='⬇ Save';
+      dlBtn.onclick=()=>{const a=document.createElement('a');a.href=msg.fileUrl||'';a.download=msg.fileName||'video';a.target='_blank';a.click();};
+      meta.appendChild(nameSpan);meta.appendChild(dlBtn);
+      vm.appendChild(vid);vm.appendChild(meta);
+      wr.appendChild(vm);
     } else if(msg.type==='voice'){
       wr.appendChild(renderVoiceNote(msg));
 
@@ -2696,7 +2747,7 @@ function setReply(msg, cid){
   replyingTo = {
     id: msg.id,
     senderName: uCache[msg.senderUid]?.displayName || msg.senderName || 'User',
-    text: msg.type==='voice'?'🎙️ Voice note': msg.type==='file'?`📎 ${msg.fileName||'File'}`: (msg.text||'')
+    text: msg.type==='voice'?'🎙️ Voice note': msg.type==='video'?`🎬 ${msg.fileName||'Video'}`: msg.type==='file'?`📎 ${msg.fileName||'File'}`: (msg.text||'')
   };
   const bar=$('reply-bar');bar.classList.add('active');
   const nameEl=$('reply-bar-name');if(nameEl) nameEl.textContent=replyingTo.senderName;
@@ -2748,16 +2799,22 @@ const autoResize=el=>{el.style.height='22px';el.style.height=Math.min(el.scrollH
 
 function handleFileAttach(input){
   const file=input.files[0];if(!file)return;
-  // Warn (but don't block) for very large files — Firestore doc limit is ~1MB after base64
-  if(file.size>750000){
+  const isVideo=isVideoFile(file.name);
+  // Videos always go via Firebase Storage — no size limit warning needed
+  if(!isVideo && file.size>750000){
     toast('Large file ('+fmtB(file.size)+') — may fail if over ~750KB for Firestore.','');
   }
   pf=file;
-  const h=$('input-hint');h.style.display='block';h.textContent=`📎 ${file.name} (${fmtB(file.size)}) — Press Send`;
+  const h=$('input-hint');h.style.display='block';
+  h.textContent=`${isVideo?'🎬':'📎'} ${file.name} (${fmtB(file.size)}) — Press Send${isVideo?' · Uploading via Firebase Storage':''}`;
   $('msg-input').placeholder='Add a message or just send the file…';
 }
 
 async function sendFile(file){
+  // Route videos and large files (>750KB) through Firebase Storage
+  if(isVideoFile(file.name) || file.size > 750000){
+    return sendFileViaStorage(file);
+  }
   return new Promise(res=>{
     const r=new FileReader();
     r.onload=async e=>{
@@ -2776,6 +2833,56 @@ async function sendFile(file){
       res();
     };
     r.readAsDataURL(file);
+  });
+}
+
+async function sendFileViaStorage(file){
+  if(!acid||!cu) return;
+  const isVideo=isVideoFile(file.name);
+  // Unique path: chats/{chatId}/{uid}/{timestamp}_{filename}
+  const path=`chats/${acid}/${cu.uid}/${Date.now()}_${file.name}`;
+  const sRef=storageRef(storage, path);
+  // Show progress UI
+  const wrap=$('upload-progress-wrap');
+  const fill=$('upload-progress-fill');
+  const label=$('upload-progress-label');
+  if(wrap) wrap.style.display='block';
+  pf=null;$('input-hint').style.display='none';$('msg-input').placeholder='Send a message…';$('file-input').value='';
+  return new Promise(res=>{
+    const task=uploadBytesResumable(sRef, file);
+    task.on('state_changed',
+      snap=>{
+        const pct=Math.round(snap.bytesTransferred/snap.totalBytes*100);
+        if(fill) fill.style.width=pct+'%';
+        if(label) label.textContent=`Uploading ${file.name}… ${pct}%`;
+      },
+      err=>{
+        if(wrap) wrap.style.display='none';
+        toast('Upload failed: '+err.message,'danger');
+        res();
+      },
+      async()=>{
+        if(wrap) wrap.style.display='none';
+        try{
+          const url=await getDownloadURL(task.snapshot.ref);
+          const msgType=isVideo?'video':'file';
+          await addDoc(collection(db,'chats',acid,'messages'),{
+            senderUid:cu.uid,senderName:cud?.displayName||'User',
+            ts:serverTimestamp(),type:msgType,
+            fileName:file.name,fileSize:file.size,
+            fileUrl:url,           // Storage download URL
+            storagePath:path,      // for future deletion
+            reactions:{}
+          });
+          const preview=isVideo?`🎬 ${file.name}`:`📎 ${file.name}`;
+          await updateDoc(doc(db,'chats',acid),{lastMessage:preview,lastTs:serverTimestamp(),lastSenderUid:cu.uid,lastSenderName:cud?.displayName||'User'});
+          toast('File sent!','success');
+        }catch(err){
+          toast('Send failed: '+err.message,'danger');
+        }
+        res();
+      }
+    );
   });
 }
 
@@ -2803,10 +2910,18 @@ function dlLightbox(){dlFile(_lbData,_lbName);}
 // ── DELETE MESSAGE ───────────────────────────────
 async function deleteMessage(msgId, chatId){
   try{
+    // If message has a Storage file, delete it too
+    const msgs=mCache[chatId]||[];
+    const msg=msgs.find(m=>m.id===msgId);
+    if(msg?.storagePath){
+      try{
+        const sRef=storageRef(storage, msg.storagePath);
+        await deleteObject(sRef);
+      }catch(e2){ /* Storage delete failure is non-fatal */ }
+    }
     await deleteDoc(doc(db,'chats',chatId,'messages',msgId));
     unlockAch('delete_msg'); // after success
     // If it was the last message, update the preview
-    const msgs=mCache[chatId]||[];
     const remaining=msgs.filter(m=>m.id!==msgId);
     const last=remaining[remaining.length-1];
     await updateDoc(doc(db,'chats',chatId),{
