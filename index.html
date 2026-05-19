@@ -2485,10 +2485,16 @@ function openChat(cid){
   const tttBtn=$('ttt-btn');
   if(tttBtn) tttBtn.style.display=(!ig)?'flex':'none';
   clearReply();
+  window._forceScrollBottom=true;
   subMsgs(cid);renderSidebar();
   setTimeout(()=>applyChatBgPreset(cid),50);
   // Mark messages as read
   markRead(cid);
+  // Ensure we land at the bottom after the first render paints
+  requestAnimationFrame(()=>{
+    const area=$('messages-area');
+    if(area) area.scrollTop=area.scrollHeight;
+  });
   // Auto-close sidebar on mobile after selecting a chat
   if(mobileMode) closeSidebar();
   // Subscribe to typing indicator for this chat
@@ -2732,8 +2738,11 @@ function renderMsgs(cid){
     }
     if(gEl) gEl.appendChild(wr);
   });
-  // Only auto-scroll if user was already near the bottom
-  if(wasAtBottom) area.scrollTop=area.scrollHeight;
+  // Always scroll to bottom when first opening a chat, otherwise only if already near bottom
+  if(window._forceScrollBottom || wasAtBottom){
+    area.scrollTop=area.scrollHeight;
+    window._forceScrollBottom=false;
+  }
 }
 
 const fmtMsg=t=>t?esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>'):'';
