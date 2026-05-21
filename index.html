@@ -87,6 +87,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .sidebar-search input::placeholder{color:var(--text-dim);}
   .sidebar-section{padding:8px 14px 4px;font-family:var(--font-display);font-size:9px;letter-spacing:3px;color:var(--text-dim);flex-shrink:0;}
   .chat-feed{flex:1;overflow-y:auto;padding:4px 0;}
+  #more-menu::-webkit-scrollbar{width:4px;}  #more-menu::-webkit-scrollbar-track{background:transparent;}  #more-menu::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
   .chat-feed::-webkit-scrollbar{width:3px;}
   .chat-feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
   .feed-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s;position:relative;border-left:2px solid transparent;}
@@ -908,7 +909,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
         <button class="icon-btn" title="Settings" onclick="N.openModal('settings-modal')">⚙️</button>
         <div style="position:relative;">
           <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
-          <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:180px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);max-height:calc(100vh - 60px);overflow-y:auto;">
+          <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:180px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);max-height:calc(100vh - 60px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;">
             <button onclick="N.openModal('lb-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏅 Leaderboard</button>
             <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
             <button onclick="N.openModal('credits-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">✦ Credits</button>
@@ -5288,6 +5289,7 @@ function toggleMoreMenu(){
   const open=m.style.display==='block';
   m.style.display=open?'none':'block';
   if(!open){
+    m.scrollTop=0;
     // Show owner portal option only for owner
     checkOwnerAndShowBtn();
     // Close on outside click
@@ -8101,14 +8103,29 @@ window.addEventListener('message', function(e){
       if(d.civName) updates.longestCiv=d.civName;
       if(d.eraName) updates.longestEraName=d.eraName;
       if(d.techsResearched) updates.longestTechs=d.techsResearched;
-      import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js').then(function(m){
-        m.updateDoc(m.doc(db,'users',cu.uid),updates).then(function(){
-          // Refresh leaderboard live if it's currently open on longest tab
-          if(lbCurrentTab==='longest' && document.getElementById('lb-modal')?.classList.contains('active')){
-            renderLeaderboard('longest');
-          }
-        }).catch(function(){});
-      }).catch(function(){});
+      // Use globally available Firestore functions (already loaded by NEXUS)
+      var _doUpdate=function(){
+        try{
+          updateDoc(doc(db,'users',cu.uid),updates).then(function(){
+            // Refresh leaderboard live if it's currently open on longest tab
+            if(lbCurrentTab==='longest' && document.getElementById('lb-modal')?.classList.contains('active')){
+              renderLeaderboard('longest');
+            }
+          }).catch(function(e){console.warn('LGE lb update failed:',e);});
+        }catch(e2){
+          // Fallback: try via setDoc merge if updateDoc not in scope
+          try{
+            import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js').then(function(m){
+              m.updateDoc(m.doc(db,'users',cu.uid),updates).then(function(){
+                if(lbCurrentTab==='longest' && document.getElementById('lb-modal')?.classList.contains('active')){
+                  renderLeaderboard('longest');
+                }
+              }).catch(function(){});
+            }).catch(function(){});
+          }catch(_){}
+        }
+      };
+      _doUpdate();
     }
   }catch(_){}
 });
