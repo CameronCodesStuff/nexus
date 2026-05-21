@@ -2535,10 +2535,18 @@ function filterCleared(msgs, clearedSec){
 }
 
 function subMsgs(cid){
+  // Unsubscribe from the previous chat to stop background Firestore reads
+  // Keep the cached messages so switching back is instant
+  if(window._activeMsgUnsub && window._activeMsgCid && window._activeMsgCid !== cid){
+    window._activeMsgUnsub();
+    delete clsnrs[window._activeMsgCid];
+    window._activeMsgUnsub = null;
+    window._activeMsgCid = null;
+  }
   if(clsnrs[cid]){renderMsgs(cid);setTimeout(()=>applyChatBgPreset(cid),30);return;}
   // Only subscribe to the latest MSG_PAGE_SIZE messages
   const q=query(collection(db,'chats',cid,'messages'),orderBy('ts','asc'),limitToLast(MSG_PAGE_SIZE));
-  clsnrs[cid]=onSnapshot(q,snap=>{
+  const unsub = onSnapshot(q,snap=>{
     const allMsgs=snap.docs.map(d=>({id:d.id,...d.data()}));
     const clearedSec=getClearedSec(cid);
     mCache[cid]=filterCleared(allMsgs,clearedSec);
@@ -2548,6 +2556,9 @@ function subMsgs(cid){
     msgPageMap[cid].hasMore=snap.docs.length>=MSG_PAGE_SIZE;
     if(acid===cid){ renderMsgs(cid); markRead(cid); }
   });
+  clsnrs[cid] = unsub;
+  window._activeMsgUnsub = unsub;
+  window._activeMsgCid = cid;
 }
 
 async function loadOlderMsgs(cid){
@@ -8004,19 +8015,173 @@ window.addEventListener('resize',()=>{
 // ── NEXUS FLAP ───────────────────────────────────
 let _flapEarnedTotal=0;
 
+var _FLAP_SRCDOC = "<!DOCTYPE html><html><head><meta charset=&quot;UTF-8&quot;>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:Orbitron,monospace}
+canvas{display:block}
+</style>
+</head>
+<body>
+<canvas id=&quot;c&quot;></canvas>
+<script>
+var cv=document.getElementById(&quot;c&quot;),ctx=cv.getContext(&quot;2d&quot;);
+var W=360,H=540;
+cv.width=W;cv.height=H;
+var state=&quot;idle&quot;,score=0,best=0,frame=0;
+var bird,pipes,parts,stars;
+var cooldown=false,sanim=0,earned=0;
+function iStars(){
+  stars=[];
+  var cols=[&quot;#fff&quot;,&quot;#4466ff&quot;,&quot;#00d4ff&quot;,&quot;#9933ff&quot;];
+  for(var i=0;i<70;i++) stars.push({x:Math.random()*W,y:Math.random()*H*0.85,r:Math.random()*1.3+0.3,tw:Math.random()*6.28,tws:Math.random()*0.03+0.01,c:cols[Math.floor(Math.random()*4)]});
+}
+function reset(){
+  frame=0;score=0;
+  bird={x:72,y:H/2,vy:0,ang:0,trail:[],alive:true,df:undefined};
+  pipes=[];parts=[];
+}
+function spawnPipe(){
+  var gap=145,topH=Math.random()*(H-200-gap)+70;
+  pipes.push({x:W+20,topH:topH,botY:topH+gap,scored:false,hue:200+Math.random()*80});
+}
+function flap(){
+  if(state===&quot;playing&quot;&amp;&amp;bird.alive){bird.vy=-7.2;sParts(bird.x,bird.y,&quot;#4466ff&quot;,5);}
+}
+function sParts(x,y,col,n){
+  for(var i=0;i<n;i++){var a=Math.random()*6.28,s=Math.random()*2.5+0.5;parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,dec:Math.random()*0.04+0.025,col:col,r:Math.random()*3+1});}
+}
+function hit(cx,cy,cr,rx,ry,rw,rh){var nx=Math.max(rx,Math.min(cx,rx+rw)),ny=Math.max(ry,Math.min(cy,ry+rh));return (cx-nx)*(cx-nx)+(cy-ny)*(cy-ny)<cr*cr;}
+function update(){
+  if(state!==&quot;playing&quot;)return;
+  frame++;
+  bird.vy+=0.42;if(bird.vy>11)bird.vy=11;
+  bird.y+=bird.vy;
+  bird.ang=Math.max(-0.45,Math.min(1.43,bird.vy*0.07));
+  var spd=2.7+score*0.03;
+  if(frame%95===0)spawnPipe();
+  var pw=50,capH=15,capW=60;
+  for(var i=0;i<pipes.length;i++){
+    var p=pipes[i];p.x-=spd;
+    if(!p.scored&amp;&amp;p.x+pw<bird.x-10){
+      p.scored=true;score++;earned+=2;
+      document.getElementById(&quot;sc&quot;).textContent=&quot;+&quot;+earned;
+      window.parent.postMessage({type:&quot;flapScore&quot;,earned:earned},&quot;*&quot;);
+      sParts(bird.x,bird.y,&quot;#ffcc00&quot;,10);sParts(bird.x,bird.y,&quot;#4466ff&quot;,6);
+    }
+    if(bird.alive){
+      var cx=p.x-5;
+      if(hit(bird.x,bird.y,10,p.x,0,pw,p.topH-capH)||hit(bird.x,bird.y,10,cx,p.topH-capH,capW,capH)||hit(bird.x,bird.y,10,cx,p.botY,capW,capH)||hit(bird.x,bird.y,10,p.x,p.botY+capH,pw,H))die();
+    }
+  }
+  pipes=pipes.filter(function(p){return p.x>-80;});
+  if(bird.y+10>H-60){bird.y=H-70;die();}
+  if(bird.y-10<0){bird.y=10;bird.vy=1;}
+}
+function die(){
+  if(!bird.alive)return;
+  bird.alive=false;bird.df=frame;
+  if(score>best)best=score;
+  sParts(bird.x,bird.y,&quot;#ff3355&quot;,20);sParts(bird.x,bird.y,&quot;#ff8800&quot;,10);sParts(bird.x,bird.y,&quot;#fff&quot;,6);
+  setTimeout(function(){state=&quot;dead&quot;;sanim=0;},700);
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
+function dBg(){
+  var bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,&quot;#020208&quot;);bg.addColorStop(0.5,&quot;#050515&quot;);bg.addColorStop(1,&quot;#080510&quot;);ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+  for(var i=0;i<stars.length;i++){var s=stars[i];s.tw+=s.tws;var a=0.4+0.6*Math.abs(Math.sin(s.tw));ctx.save();ctx.globalAlpha=a;ctx.fillStyle=s.c;ctx.shadowColor=s.c;ctx.shadowBlur=s.r*4;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.28);ctx.fill();ctx.restore();}
+}
+function dGround(){
+  var gY=H-55;ctx.fillStyle=&quot;#030314&quot;;ctx.fillRect(0,gY+2,W,H);
+  ctx.strokeStyle=&quot;#4466ff&quot;;ctx.lineWidth=2;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(0,gY);ctx.lineTo(W,gY);ctx.stroke();ctx.shadowBlur=0;
+}
+function dPipe(p){
+  var pw=50,capH=15,capW=60,cx2=p.x-5,h=p.hue;
+  ctx.save();ctx.shadowColor=&quot;hsl(&quot;+h+&quot;,100%,60%)&quot;;ctx.shadowBlur=14;
+  function body(x,y,w,bh){if(bh<=0)return;var g=ctx.createLinearGradient(x,0,x+w,0);g.addColorStop(0,&quot;hsl(&quot;+h+&quot;,70%,6%)&quot;);g.addColorStop(0.4,&quot;hsl(&quot;+h+&quot;,80%,22%)&quot;);g.addColorStop(0.6,&quot;hsl(&quot;+h+&quot;,80%,22%)&quot;);g.addColorStop(1,&quot;hsl(&quot;+h+&quot;,70%,6%)&quot;);ctx.fillStyle=g;ctx.fillRect(x,y,w,bh);ctx.strokeStyle=&quot;hsl(&quot;+h+&quot;,100%,65%)&quot;;ctx.lineWidth=1.5;ctx.strokeRect(x+0.75,y,w-1.5,bh);}
+  body(p.x,0,pw,p.topH-capH);body(cx2,p.topH-capH,capW,capH);body(cx2,p.botY,capW,capH);body(p.x,p.botY+capH,pw,H-p.botY-capH);
+  ctx.restore();
+}
+function dBird(){
+  var b=bird,sz=18;
+  b.trail.push({x:b.x,y:b.y,a:0});if(b.trail.length>14)b.trail.shift();
+  for(var i=0;i<b.trail.length;i++){var t=b.trail[i];t.a++;ctx.save();ctx.globalAlpha=(1-t.a/14)*0.35;ctx.fillStyle=&quot;#4466ff&quot;;ctx.beginPath();ctx.arc(t.x,t.y,Math.max(0,sz*0.35*(1-t.a/14)),0,6.28);ctx.fill();ctx.restore();}
+  ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.ang);
+  ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=sz*1.5;
+  var g=ctx.createRadialGradient(-sz*0.2,-sz*0.2,sz*0.1,0,0,sz*0.85);g.addColorStop(0,&quot;#fff&quot;);g.addColorStop(0.3,&quot;#88aaff&quot;);g.addColorStop(0.7,&quot;#4466ff&quot;);g.addColorStop(1,&quot;#112&quot;);
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,sz*0.85,0,6.28);ctx.fill();ctx.shadowBlur=0;
+  ctx.save();ctx.rotate(-0.3+Math.sin(frame*0.25)*0.4);ctx.fillStyle=&quot;rgba(68,102,255,0.7)&quot;;ctx.beginPath();ctx.ellipse(-sz*0.3,sz*0.2,sz*0.6,sz*0.25,-0.3,0,6.28);ctx.fill();ctx.restore();
+  ctx.fillStyle=&quot;#fff&quot;;ctx.beginPath();ctx.arc(sz*0.35,-sz*0.15,sz*0.22,0,6.28);ctx.fill();ctx.fillStyle=&quot;#001&quot;;ctx.beginPath();ctx.arc(sz*0.4,-sz*0.12,sz*0.11,0,6.28);ctx.fill();ctx.fillStyle=&quot;#00d4ff&quot;;ctx.beginPath();ctx.arc(sz*0.38,-sz*0.14,sz*0.05,0,6.28);ctx.fill();
+  ctx.restore();
+}
+function dParts(){
+  parts=parts.filter(function(p){return p.life>0;});
+  for(var i=0;i<parts.length;i++){var p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.08;p.life-=p.dec;ctx.save();ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.col;ctx.shadowColor=p.col;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0,p.r*p.life),0,6.28);ctx.fill();ctx.restore();}
+}
+function dScore(){ctx.save();ctx.textAlign=&quot;center&quot;;ctx.font=&quot;bold 36px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#fff&quot;;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=20;ctx.fillText(score,W/2,46);ctx.restore();}
+function dIdle(){
+  sanim+=0.04;var p=0.82+0.18*Math.sin(sanim*2);
+  ctx.save();ctx.fillStyle=&quot;rgba(0,0,0,0.5)&quot;;ctx.fillRect(0,0,W,H);ctx.textAlign=&quot;center&quot;;
+  ctx.font=&quot;bold 36px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#4466ff&quot;;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=28*p;ctx.fillText(&quot;NEXUS FLAP&quot;,W/2,H/2-50);
+  ctx.font=&quot;12px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#00d4ff&quot;;ctx.shadowBlur=6;ctx.fillText(&quot;EVERY POINT = +2 MESSAGES&quot;,W/2,H/2-22);
+  if(Math.sin(sanim*3)>0){ctx.font=&quot;bold 14px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#4466ff&quot;;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=14;ctx.fillText(&quot;[ TAP TO FLY ]&quot;,W/2,H/2+18);}
+  ctx.shadowBlur=0;ctx.font=&quot;10px Arial&quot;;ctx.fillStyle=&quot;rgba(255,255,255,0.3)&quot;;ctx.fillText(&quot;SPACE OR CLICK&quot;,W/2,H/2+44);ctx.restore();
+}
+function dDead(){
+  sanim+=0.05;var ease=Math.min(1,sanim/1.2);
+  ctx.save();ctx.fillStyle=&quot;rgba(0,0,0,&quot;+(0.6*ease)+&quot;)&quot;;ctx.fillRect(0,0,W,H);
+  var cw=260,ch=196,cx3=(W-cw)/2,cy3=H/2-ch/2-10;ctx.globalAlpha=ease;
+  ctx.fillStyle=&quot;#08081a&quot;;rr(cx3,cy3,cw,ch,12);ctx.fill();ctx.strokeStyle=&quot;rgba(68,102,255,0.7)&quot;;ctx.lineWidth=1.5;rr(cx3,cy3,cw,ch,12);ctx.stroke();
+  var hg=ctx.createLinearGradient(cx3,cy3,cx3+cw,cy3);hg.addColorStop(0,&quot;#4466ff&quot;);hg.addColorStop(1,&quot;#00d4ff&quot;);ctx.fillStyle=hg;rr(cx3,cy3,cw,42,12);ctx.fill();
+  ctx.font=&quot;bold 15px Orbitron,Arial&quot;;ctx.textAlign=&quot;center&quot;;ctx.fillStyle=&quot;#fff&quot;;ctx.fillText(&quot;GAME OVER&quot;,W/2,cy3+28);
+  ctx.font=&quot;10px Arial&quot;;ctx.fillStyle=&quot;rgba(68,102,255,0.5)&quot;;ctx.fillText(&quot;SCORE&quot;,W/2-55,cy3+66);ctx.fillText(&quot;BEST&quot;,W/2+55,cy3+66);
+  ctx.font=&quot;bold 30px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#ffcc00&quot;;ctx.shadowColor=&quot;#ffcc00&quot;;ctx.shadowBlur=12;ctx.fillText(score,W/2-55,cy3+100);
+  var nb=score>0&amp;&amp;score>=best;ctx.fillStyle=nb?&quot;#00ff88&quot;:&quot;#aaa&quot;;ctx.shadowColor=nb?&quot;#00ff88&quot;:&quot;#555&quot;;ctx.shadowBlur=nb?12:4;ctx.fillText(best,W/2+55,cy3+100);ctx.shadowBlur=0;
+  if(nb){ctx.font=&quot;bold 9px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#00ff88&quot;;ctx.fillText(&quot;NEW BEST!&quot;,W/2+55,cy3+116);}
+  ctx.font=&quot;bold 11px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#00d4ff&quot;;ctx.shadowColor=&quot;#00d4ff&quot;;ctx.shadowBlur=8;ctx.fillText(&quot;+&quot;+earned+&quot; MSGS EARNED&quot;,W/2,cy3+140);ctx.shadowBlur=0;
+  var ready=ease>=0.88,bp=ready?0.65+0.35*Math.sin(sanim*4):0;
+  ctx.fillStyle=ready?&quot;rgba(68,102,255,&quot;+bp+&quot;)&quot;:&quot;rgba(68,102,255,0.15)&quot;;ctx.font=&quot;bold 11px Orbitron,Arial&quot;;ctx.fillText(&quot;[ TAP TO RESTART ]&quot;,W/2,cy3+178);
+  ctx.restore();
+}
+function loop(){
+  ctx.clearRect(0,0,W,H);dBg();update();
+  for(var i=0;i<pipes.length;i++)dPipe(pipes[i]);
+  dGround();if(state!==&quot;idle&quot;)dBird();dParts();
+  if(state===&quot;playing&quot;)dScore();
+  if(!bird.alive&amp;&amp;bird.df!==undefined){var t=Math.min(1,(frame-bird.df)/18);ctx.save();ctx.fillStyle=&quot;rgba(255,51,85,&quot;+(0.3*(1-t))+&quot;)&quot;;ctx.fillRect(0,0,W,H);ctx.restore();}
+  if(state===&quot;idle&quot;)dIdle();if(state===&quot;dead&quot;)dDead();
+  requestAnimationFrame(loop);
+}
+function startGame(){reset();state=&quot;playing&quot;;sanim=0;cooldown=true;setTimeout(function(){cooldown=false;},320);setTimeout(spawnPipe,1100);}
+function handleInput(){
+  if(cooldown)return;
+  if(state===&quot;idle&quot;){startGame();return;}
+  if(state===&quot;dead&quot;&amp;&amp;sanim>=1.1){startGame();return;}
+  if(state===&quot;playing&quot;)flap();
+}
+cv.addEventListener(&quot;click&quot;,handleInput);
+cv.addEventListener(&quot;touchstart&quot;,function(e){e.preventDefault();handleInput();},{passive:false});
+document.addEventListener(&quot;keydown&quot;,function(e){if(e.code===&quot;Space&quot;){e.preventDefault();handleInput();}});
+iStars();reset();loop();
+&lt;/script&gt;
+<div id=&quot;sc&quot; style=&quot;display:none&quot;>+0</div>
+</body></html>";
+
 function openFlapGame(){
   _flapEarnedTotal=0;
   _flapLastSaved=0;
   const el=document.getElementById('flap-earned');
   if(el) el.textContent='+0';
-  // Reload iframe so game resets completely
+  // Lazy-load: inject srcdoc fresh every open so game resets
   const iframe=document.getElementById('flap-iframe');
-  if(iframe){const src=iframe.srcdoc||'';iframe.srcdoc='';setTimeout(()=>{iframe.srcdoc=src;},10);}
+  if(iframe){iframe.srcdoc='';requestAnimationFrame(()=>{iframe.srcdoc=_FLAP_SRCDOC;});}
   document.getElementById('flap-modal').classList.add('open');
 }
 
 function closeFlapGame(){
   document.getElementById('flap-modal').classList.remove('open');
+  // Kill the game — clear srcdoc so it stops running in background
+  const iframe=document.getElementById('flap-iframe');
+  if(iframe){try{iframe.contentWindow.location.replace('about:blank');}catch(e){}iframe.srcdoc='';}
 }
 
 // Listen for score messages from the iframe
@@ -8076,11 +8241,18 @@ function openDriftGame(){
 }
 function closeDriftGame(){
   const iframe=document.getElementById('drift-game-iframe');
+  // Request final score save before killing
   try{if(iframe&&iframe.contentWindow)iframe.contentWindow.postMessage({type:'requestDriftScore'},'*');}catch(e){}
   setTimeout(()=>{
     const overlay=document.getElementById('drift-game-overlay');
     if(overlay)overlay.style.display='none';
-  },200);
+    // Kill iframe so game stops running in background
+    if(iframe){
+      iframe._loaded=false;
+      try{iframe.contentWindow.location.replace('about:blank');}catch(e){}
+      iframe.srcdoc='';
+    }
+  },250);
 }
 
 // ── DRIVE GAME ───────────────────────────────────
@@ -8142,6 +8314,12 @@ function openLongestGame(){
 function closeLongestGame(){
   var overlay=document.getElementById('longest-game-overlay');
   if(overlay)overlay.style.display='none';
+  // Kill iframe so game stops in background; state is saved to localStorage already
+  var iframe=document.getElementById('longest-game-iframe');
+  if(iframe){
+    try{iframe.contentWindow.location.replace('about:blank');}catch(e){}
+    iframe.srcdoc='';
+  }
 }
 function openDriveGame(){
   const overlay=document.getElementById('drive-game-overlay');
@@ -9073,893 +9251,7 @@ async function sgHandlePick(pos){
   sgSetStatus('PLAY AGAIN?','Press to shuffle the cups');
 }
 
-function openNexusGame(){
-  const overlay=document.getElementById('nexus-game-overlay');
-  if(!overlay) return;
-  overlay.style.display='block';
-  // If iframe hasn't loaded yet, initialize it
-  const iframe=document.getElementById('nexus-game-iframe');
-  if(iframe&&!iframe._loaded){
-    iframe._loaded=true;
-    // Give it a moment to load then request state
-    setTimeout(()=>{
-      try{
-        const saved=localStorage.getItem('nexus_energy_save');
-        if(saved&&iframe.contentWindow){
-          iframe.contentWindow.postMessage({type:'nexusLoad',v:3,state:JSON.parse(saved)},'*');
-        }
-      }catch{}
-    },300);
-  }
-}
-
-window.addEventListener('message',async function(e){
-  if(!e.data) return;
-  if(e.data.type==='closeNexusGame'){
-    document.getElementById('nexus-game-overlay').style.display='none';
-  }
-  if(e.data.type==='nexusSave'){
-    if(!cu||!cud||!e.data.state) return;
-    const _uid=cu.uid;
-    const _state=e.data.state;
-    // Save to uid-specific localStorage key (prevents cross-account bleed)
-    try{localStorage.setItem('nexus_energy_'+_uid, JSON.stringify(_state));}catch{}
-    // Build Firestore update
-    const _updates={nexusGameSave:JSON.stringify(_state)};
-    const _total=_state.total||0;
-    if(_total>(cud.nexusEnergy||0)){
-      _updates.nexusEnergy=_total;
-      cud={...cud,nexusEnergy:_total};
-      uCache[_uid]={...uCache[_uid],nexusEnergy:_total};
-    }
-    // Save full state to Firestore for cross-device restore
-    try{
-      await updateDoc(doc(db,'users',_uid),_updates);
-      cud={...cud,nexusGameSave:_updates.nexusGameSave};
-    }catch{}
-  }
-  if(e.data.type==='driftScore'&&cu&&cud){
-    const ds=e.data.score||0;
-    if(ds>(cud.driftBest||0)){
-      try{
-        await updateDoc(doc(db,'users',cu.uid),{driftBest:ds});
-        cud={...cud,driftBest:ds};
-        uCache[cu.uid]={...uCache[cu.uid],driftBest:ds};
-        toast('🚗 New drift record: '+ds.toLocaleString()+'!','success');
-        syncLeaderboardRoles().catch(()=>{});
-      }catch{}
-    }
-  }
-  if(e.data.type==='nexusLoad'){
-    // Reply directly to the source window (avoids stale contentWindow ref)
-    try{
-      const saved=localStorage.getItem('nexus_energy_save');
-      if(saved&&e.source){
-        const sv=JSON.parse(saved);
-        e.source.postMessage({type:'nexusLoad',v:3,state:sv},'*');
-      }
-    }catch{}
-  }
-  if(e.data.type==='nexusGameRedeem'&&cu&&cud){
-    const amount=e.data.amount||0;
-    if(amount<=0) return;
-    try{
-      const newCount=(cud.msgCount||0)+amount;
-      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
-      cud={...cud,msgCount:newCount};
-      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
-      renderProfile();
-      toast('⬡ +'+amount+' messages redeemed from Nexus Energy!','success');
-    }catch(err){toast('Could not save messages.','danger');}
-  }
-});
-
-// ── GLOBAL EVENTS ──────────────────────────────
-document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
-
-// ── WIRE UP window.N (after all functions defined) ─
-window._N = {
-  switchTab, doLogin, doRegister, doLogout,
-  openModal, closeModal,
-  filterFeed: v=>{ffilter=v.toLowerCase();renderSidebar();},
-  openChat, sendMessage, handleInputKey, autoResize,
-  handleFileAttach, toggleEmojiPicker,
-  confirmWipe, doWipe, cancelWipe,
-  startDM, startCall, endCall, answerCall, rejectCall,
-  toggleMute, toggleCamera, toggleScreenShare, toggleFullscreen,
-  leaveCall, endCallForAll, updateCallButtons,
-  acceptInvite, declineInvite, toggleInvitee, createGroup,
-  confirmLeaveGroup, doLeaveGroup,
-  addRxn, applyTheme,
-  openProfileModal, saveBio,
-  applyBgUrl, applyBgFile, clearChatBg,
-  saveEmoji,
-  saveBanner, saveBannerUrl, saveBannerFile,
-  toggleSidebar, closeSidebar, setMobileMode,
-  toggleBlock, saveProfilePicUrl, saveProfilePicFile, clearProfilePic,
-  toggleRecording, stopRecording, cancelRecording, playVoice, cycleSpeed,
-  flipCamera,
-  openCreditsModal, sendHelp,
-  openChangelog, openFeedback, submitFeedback,
-  saveUserFont,
-  showChatContextMenu, clearChatHistory, clearCurrentChat,
-  adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
-  adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
-  showImpersonationBanner, returnToOwner,
-  adminRenameUser, adminChangePassword, adminDeleteAccount,
-  renderAnnouncePanel,
-  loadOwnerLeaderboards, olbTab, olbSave,
-  openTtt, tttSendChallenge, tttMove, tttOpenGame, tttNewGame, tttCleanup, tttClose,
-  showTnC, hideTnC,
-  setReply, clearReply, scrollToMsg,
-  openLightbox, closeLightbox, dlLightbox, deleteMessage,
-  openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
-  toggleMoreMenu, closeMoreMenu, filterUsers,
-  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
-  adminClearTickets, adminResetMsgs, openOwnerModal,
-  setStatus, toggleStatusPicker, updateMyStatusDot,
-  saveNote, clearNote,
-  setBgEffect, eggOpen, eggClose,
-  openAchievementsModal, unlockAch, syncAchCache,
-  lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
-  tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openGamesHub, openFlapGame, closeFlapGame, doLoginCloaked,
-  adminSendPopup, adminClearPopup, closePopupAnnounce,
-  openNexusGame, openDriftGame, closeDriftGame,
-  openDriveGame, closeDriveGame,
-  openLongestGame, closeLongestGame,
-  openShellGame, closeShellGame,
-  toggleNotifications, updateNotifSettingsUI,
-  syncLeaderboardRoles,
-  openBlackjack, closeBlackjack, bjAddBet, bjClearBet, bjBetAll, bjDeal, bjHit, bjStand, bjDouble, bjPlayAgain, bjOpenLeaderboard,
-};
-window._DRIFT_SRCDOC = decodeURIComponent(escape(atob("PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHRpdGxlPkRSSUZUIEtJTkc8L3RpdGxlPgo8c3R5bGU+CkBpbXBvcnQgdXJsKCdodHRwczovL2ZvbnRzLmdvb2dsZWFwaXMuY29tL2NzczI/ZmFtaWx5PUJlYmFzK05ldWUmZmFtaWx5PVNwYWNlK01vbm86d2dodEA0MDA7NzAwJmRpc3BsYXk9c3dhcCcpOwoqe21hcmdpbjowO3BhZGRpbmc6MDtib3gtc2l6aW5nOmJvcmRlci1ib3h9Cmh0bWwsYm9keXt3aWR0aDoxMDAlO2hlaWdodDoxMDAlO292ZXJmbG93OmhpZGRlbjtiYWNrZ3JvdW5kOiMwZDBkMGY7ZGlzcGxheTpmbGV4O2FsaWduLWl0ZW1zOmNlbnRlcjtqdXN0aWZ5LWNvbnRlbnQ6Y2VudGVyO2ZvbnQtZmFtaWx5OidTcGFjZSBNb25vJyxtb25vc3BhY2U7Y29sb3I6I2ZmZn0KI3dyYXB7cG9zaXRpb246cmVsYXRpdmU7d2lkdGg6OTAwcHg7aGVpZ2h0OjY1MHB4O2ZsZXgtc2hyaW5rOjB9CmNhbnZhc3tkaXNwbGF5OmJsb2NrfQojaHVke3Bvc2l0aW9uOmFic29sdXRlO2luc2V0OjA7cG9pbnRlci1ldmVudHM6bm9uZX0KLmhse2ZvbnQtc2l6ZTo5cHg7bGV0dGVyLXNwYWNpbmc6NHB4O2NvbG9yOiMzYTNhM2E7dGV4dC10cmFuc2Zvcm06dXBwZXJjYXNlO21hcmdpbi1ib3R0b206MnB4fQouaHZ7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7bGluZS1oZWlnaHQ6MX0KI2h1ZC1zY29yZXtwb3NpdGlvbjphYnNvbHV0ZTt0b3A6MThweDtsZWZ0OjI0cHh9CiNodWQtc2NvcmUgLmh2e2ZvbnQtc2l6ZTo1NnB4O2NvbG9yOiNkZGR9CiNodWQtY29tYm97cG9zaXRpb246YWJzb2x1dGU7dG9wOjE4cHg7cmlnaHQ6MjRweDt0ZXh0LWFsaWduOnJpZ2h0fQojaHVkLWNvbWJvIC5odntmb250LXNpemU6NjBweDtjb2xvcjojZmY0NTAwO3RleHQtc2hhZG93OjAgMCAzMHB4IHJnYmEoMjU1LDgwLDAsMC4zNSk7dHJhbnNpdGlvbjp0cmFuc2Zvcm0gLjA4cyxjb2xvciAuMXN9CiNodWQtY29tYm8gLmh2LnBvcHt0cmFuc2Zvcm06c2NhbGUoMS41KTtjb2xvcjojZmZkZDAwfQojZG17cG9zaXRpb246YWJzb2x1dGU7Ym90dG9tOjI2cHg7bGVmdDo1MCU7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoLTUwJSk7d2lkdGg6MjYwcHg7dGV4dC1hbGlnbjpjZW50ZXJ9CiNkbS1iYXJ7aGVpZ2h0OjRweDtiYWNrZ3JvdW5kOiMxODE4MTg7Ym9yZGVyLXJhZGl1czoycHg7Ym9yZGVyOjFweCBzb2xpZCAjMjIyO292ZXJmbG93OmhpZGRlbjttYXJnaW4tdG9wOjVweH0KI2RtLWZpbGx7aGVpZ2h0OjEwMCU7d2lkdGg6MCU7YmFja2dyb3VuZDpsaW5lYXItZ3JhZGllbnQoOTBkZWcsI2ZmMzMwMCwjZmZjYzAwKTtib3JkZXItcmFkaXVzOjJweH0KI2Rwb3B7cG9zaXRpb246YWJzb2x1dGU7Ym90dG9tOjUwcHg7bGVmdDo1MCU7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoLTUwJSk7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7Zm9udC1zaXplOjI2cHg7Y29sb3I6I2ZmY2MwMDtsZXR0ZXItc3BhY2luZzoycHg7b3BhY2l0eTowO3doaXRlLXNwYWNlOm5vd3JhcDtwb2ludGVyLWV2ZW50czpub25lO3RleHQtc2hhZG93OjAgMCAxNHB4IHJnYmEoMjU1LDIxMCwwLC43KTt0cmFuc2l0aW9uOm9wYWNpdHkgLjE1c30KI2h1ZC1ibHtwb3NpdGlvbjphYnNvbHV0ZTtib3R0b206MjZweDtsZWZ0OjI0cHh9CiNodWQtYmwgLmh2e2ZvbnQtc2l6ZToyMHB4O2NvbG9yOiMyZTJlMmV9CiNodWQtYnJ7cG9zaXRpb246YWJzb2x1dGU7Ym90dG9tOjI2cHg7cmlnaHQ6MjRweDt0ZXh0LWFsaWduOnJpZ2h0fQojaHVkLWJyIC5odntmb250LXNpemU6MjBweDtjb2xvcjojMmUyZTJlfQojb3ZlcmxheXtwb3NpdGlvbjphYnNvbHV0ZTtpbnNldDowO2JhY2tncm91bmQ6cmdiYSg2LDYsOCwuOTIpO2Rpc3BsYXk6ZmxleDtmbGV4LWRpcmVjdGlvbjpjb2x1bW47YWxpZ24taXRlbXM6Y2VudGVyO2p1c3RpZnktY29udGVudDpjZW50ZXI7Z2FwOjE0cHg7cG9pbnRlci1ldmVudHM6YWxsfQojb3ZlcmxheSBoMXtmb250LWZhbWlseTonQmViYXMgTmV1ZScsc2Fucy1zZXJpZjtmb250LXNpemU6ODhweDtsZXR0ZXItc3BhY2luZzoxMnB4O2xpbmUtaGVpZ2h0OjF9CiNvdmVybGF5IGgxIGJ7Y29sb3I6I2ZmNDUwMDtmb250LXdlaWdodDo0MDB9CiNvdmVybGF5IHB7Zm9udC1zaXplOjEwcHg7Y29sb3I6IzU1NTtsZXR0ZXItc3BhY2luZzozcHg7dGV4dC1hbGlnbjpjZW50ZXI7bGluZS1oZWlnaHQ6Mi40fQojb3ZlcmxheSBwIGVte2NvbG9yOiNhYWE7Zm9udC1zdHlsZTpub3JtYWx9CiNmaW5hbHtmb250LWZhbWlseTonQmViYXMgTmV1ZScsc2Fucy1zZXJpZjtmb250LXNpemU6MzBweDtjb2xvcjojZmZjYzAwO2xldHRlci1zcGFjaW5nOjVweDtkaXNwbGF5Om5vbmV9CiNidG57cGFkZGluZzoxMnB4IDU0cHg7YmFja2dyb3VuZDojZmY0NTAwO2JvcmRlcjpub25lO2NvbG9yOiNmZmY7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7Zm9udC1zaXplOjIycHg7bGV0dGVyLXNwYWNpbmc6NnB4O2N1cnNvcjpwb2ludGVyO2JvcmRlci1yYWRpdXM6MnB4O21hcmdpbi10b3A6NnB4O3RyYW5zaXRpb246YmFja2dyb3VuZCAuMTJzLHRyYW5zZm9ybSAuMDdzfQojYnRuOmhvdmVye2JhY2tncm91bmQ6I2ZmNWMxYX0jYnRuOmFjdGl2ZXt0cmFuc2Zvcm06c2NhbGUoLjk3KX0KI2RpZmYtcm93e2Rpc3BsYXk6ZmxleDtnYXA6MTBweDttYXJnaW4tdG9wOjRweH0KLmRidG57cGFkZGluZzo5cHggMjJweDtib3JkZXI6MS41cHggc29saWQgIzMzMztiYWNrZ3JvdW5kOnRyYW5zcGFyZW50O2NvbG9yOiM1NTU7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7Zm9udC1zaXplOjE4cHg7bGV0dGVyLXNwYWNpbmc6NHB4O2N1cnNvcjpwb2ludGVyO2JvcmRlci1yYWRpdXM6MnB4O3RyYW5zaXRpb246YWxsIC4xMnN9Ci5kYnRuOmhvdmVye2JvcmRlci1jb2xvcjojODg4O2NvbG9yOiNjY2N9LmRidG4uc2Vse2JvcmRlci1jb2xvcjojZmY0NTAwO2NvbG9yOiNmZjQ1MDA7YmFja2dyb3VuZDpyZ2JhKDI1NSw2OSwwLDAuMDgpfQojZGlmZi1sYWJlbHtmb250LXNpemU6OXB4O2xldHRlci1zcGFjaW5nOjRweDtjb2xvcjojNDQ0O21hcmdpbi10b3A6MnB4fQojbm8tbXNncy1ub3RpY2V7cG9zaXRpb246YWJzb2x1dGU7dG9wOjE0cHg7bGVmdDo1MCU7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoLTUwJSk7Zm9udC1zaXplOjlweDtsZXR0ZXItc3BhY2luZzozcHg7Y29sb3I6IzMzMztmb250LWZhbWlseTonU3BhY2UgTW9ubycsbW9ub3NwYWNlO3doaXRlLXNwYWNlOm5vd3JhcDtwb2ludGVyLWV2ZW50czpub25lfQo8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5Pgo8ZGl2IGlkPSJ3cmFwIj4KICA8Y2FudmFzIGlkPSJjIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjY1MCI+PC9jYW52YXM+CiAgPGRpdiBpZD0iaHVkIj4KICAgIDxkaXYgaWQ9Imh1ZC1zY29yZSI+PGRpdiBjbGFzcz0iaGwiPnNjb3JlPC9kaXY+PGRpdiBjbGFzcz0iaHYiIGlkPSJlU2NvcmUiPjA8L2Rpdj48L2Rpdj4KICAgIDxkaXYgaWQ9Imh1ZC1jb21ibyI+PGRpdiBjbGFzcz0iaGwiPmNvbWJvPC9kaXY+PGRpdiBjbGFzcz0iaHYiIGlkPSJlQ29tYm8iPngxPC9kaXY+PC9kaXY+CiAgICA8ZGl2IGlkPSJkbSI+PGRpdiBjbGFzcz0iaGwiPmRyaWZ0PC9kaXY+PGRpdiBpZD0iZG0tYmFyIj48ZGl2IGlkPSJkbS1maWxsIj48L2Rpdj48L2Rpdj48L2Rpdj4KICAgIDxkaXYgaWQ9ImRwb3AiPjwvZGl2PgogICAgPGRpdiBpZD0iaHVkLWJsIj48ZGl2IGNsYXNzPSJobCI+c3BlZWQ8L2Rpdj48ZGl2IGNsYXNzPSJodiIgaWQ9ImVTcGQiPjAga20vaDwvZGl2PjwvZGl2PgogICAgPGRpdiBpZD0iaHVkLWJyIj48ZGl2IGNsYXNzPSJobCI+YmVzdCBjb21ibzwvZGl2PjxkaXYgY2xhc3M9Imh2IiBpZD0iZUJlc3QiPngxPC9kaXY+PC9kaXY+CiAgICA8ZGl2IGlkPSJuby1tc2dzLW5vdGljZSI+Tk8gTUVTU0FHRVMgRUFSTkVEPC9kaXY+CiAgPC9kaXY+CiAgPGRpdiBpZD0ib3ZlcmxheSI+CiAgICA8aDE+RFJJRlQgPGI+S0lORzwvYj48L2gxPgogICAgPHA+PGVtPlcv4oaRPC9lbT4gdGhyb3R0bGUgJm5ic3A7PGVtPlMv4oaTPC9lbT4gYnJha2U8YnI+PGVtPkEv4oaQIEQv4oaSPC9lbT4gc3RlZXI8YnI+PGVtPlNQQUNFPC9lbT4gaGFuZGJyYWtlPC9wPgogICAgPGRpdiBpZD0iZGlmZi1sYWJlbCI+dHJhY2s8L2Rpdj4KICAgIDxkaXYgaWQ9ImRpZmYtcm93Ij4KICAgICAgPGJ1dHRvbiBjbGFzcz0iZGJ0biBzZWwiIGRhdGEtdD0ib3BlbiI+T1BFTiBQTEFURTwvYnV0dG9uPgogICAgICA8YnV0dG9uIGNsYXNzPSJkYnRuIiBkYXRhLXQ9ImNpcmN1aXQiPkNJUkNVSVQ8L2J1dHRvbj4KICAgIDwvZGl2PgogICAgPGRpdiBpZD0iZmluYWwiPjwvZGl2PgogICAgPGJ1dHRvbiBpZD0iYnRuIj5TVEFSVCBFTkdJTkU8L2J1dHRvbj4KICA8L2Rpdj4KPC9kaXY+CjxzY3JpcHQ+Cid1c2Ugc3RyaWN0JzsKY29uc3QgY3Y9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2MnKSxjdHg9Y3YuZ2V0Q29udGV4dCgnMmQnKSxXPTkwMCxIPTY1MDsKbGV0IHRyYWNrTW9kZT0nb3Blbic7CmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5kYnRuJykuZm9yRWFjaChiPT57Yi5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsKCk9Pntkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCcuZGJ0bicpLmZvckVhY2goeD0+eC5jbGFzc0xpc3QucmVtb3ZlKCdzZWwnKSk7Yi5jbGFzc0xpc3QuYWRkKCdzZWwnKTt0cmFja01vZGU9Yi5kYXRhc2V0LnQ7fSk7fSk7CmNvbnN0IGVTY29yZT1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZVNjb3JlJyksZUNvbWJvPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdlQ29tYm8nKSxlU3BkPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdlU3BkJyksZUJlc3Q9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2VCZXN0JyksZG1GaWxsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdkbS1maWxsJyksZHBvcD1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZHBvcCcpLG92ZXJsYXk9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ292ZXJsYXknKSxidG49ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bicpLGZpbmFsXz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZmluYWwnKTsKY29uc3QgSz17fTsKd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoJ2tleWRvd24nLGU9PntLW2UuY29kZV09MTtbJ1NwYWNlJywnQXJyb3dVcCcsJ0Fycm93RG93bicsJ0Fycm93TGVmdCcsJ0Fycm93UmlnaHQnXS5pbmNsdWRlcyhlLmNvZGUpJiZlLnByZXZlbnREZWZhdWx0KCk7fSk7CndpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdrZXl1cCcsZT0+e0tbZS5jb2RlXT0wO30pOwpjb25zdCBjYW09e3g6MCx5OjB9Owpjb25zdCBjYXI9e3g6MCx5OjAsYW5nbGU6MCx2eDowLHZ5OjAseWF3OjAsc3RlZXI6MH07CmNvbnN0IEFDQ0VMPTAuMjAsVE9QU1BEPTcuMCxGUklDVElPTj0wLjk5MixHUklQPTAuMDA4LEhCX0dSSVA9MC4wMDEsWUFXX0ZPUkNFPTAuMDAyOCxZQVdfREFNUD0wLjk2OCxTVEVFUl9NQVg9MS4wLFNURUVSX1JBVEU9MC4xMixTVEVFUl9SVE49MC4xMDsKbGV0IHNjb3JlPTAsY29tYm89MSxiZXN0Q29tYm89MSxkcmlmdFRpbWU9MCxkcmlmdEFjdGl2ZT1mYWxzZSxkcmlmdEFjYz0wLGNvbWJvRGVjYXk9MCxydW5uaW5nPWZhbHNlLHJhZj1udWxsLGJ1cm5vdXRUaW1lPTAscm9sbGJhY2tTbW9rZT0wOwpjb25zdCBzbW9rZT1bXSxzdHJpcHM9W107bGV0IGN1clN0cmlwPW51bGw7CmNvbnN0IFRZUkVfSEFMRj01LjUsQVhMRV9CQUNLPTIwLE1BUktfTElGRT0xODAwLE1BUktfQUxQSEE9MC44MjsKZnVuY3Rpb24gbWFya0F4bGVQb3MoKXtjb25zdCBjYT1NYXRoLmNvcyhjYXIuYW5nbGUpLHNhPU1hdGguc2luKGNhci5hbmdsZSksY3g9Y2FyLngtY2EqQVhMRV9CQUNLLGN5PWNhci55LXNhKkFYTEVfQkFDSyxyeD0tc2Escnk9Y2E7cmV0dXJue2x4OmN4LXJ4KlRZUkVfSEFMRixseTpjeS1yeSpUWVJFX0hBTEYscng6Y3grcngqVFlSRV9IQUxGLHJ5OmN5K3J5KlRZUkVfSEFMRn07fQpmdW5jdGlvbiBzdGFydFN0cmlwKCl7Y3VyU3RyaXA9e3B0czpbXSxhZ2U6MCxkb25lOmZhbHNlfTtzdHJpcHMucHVzaChjdXJTdHJpcCk7fQpmdW5jdGlvbiBhcHBlbmRNYXJrKCl7aWYoIWN1clN0cmlwKXN0YXJ0U3RyaXAoKTtjb25zdCBwPW1hcmtBeGxlUG9zKCk7Y3VyU3RyaXAucHRzLnB1c2goe2x4OnAubHgsbHk6cC5seSxyeDpwLnJ4LHJ5OnAucnl9KTt9CmZ1bmN0aW9uIGVuZFN0cmlwKCl7aWYoY3VyU3RyaXApe2N1clN0cmlwLmRvbmU9dHJ1ZTtjdXJTdHJpcD1udWxsO319CmZ1bmN0aW9uIHRpY2tNYXJrcygpe2ZvcihsZXQgaT1zdHJpcHMubGVuZ3RoLTE7aT49MDtpLS0pe3N0cmlwc1tpXS5hZ2UrKztpZihzdHJpcHNbaV0uYWdlPk1BUktfTElGRSlzdHJpcHMuc3BsaWNlKGksMSk7fXdoaWxlKHN0cmlwcy5sZW5ndGg+MTIwKXN0cmlwcy5zaGlmdCgpO30KZnVuY3Rpb24gYWRkU21va2Uobixzcyxhcyl7Y29uc3QgcmE9Y2FyLmFuZ2xlLGJ4PWNhci54LU1hdGguY29zKHJhKSoyMCxieT1jYXIueS1NYXRoLnNpbihyYSkqMjAsc3Z4PWNhci52eCowLjQsc3Z5PWNhci52eSowLjQ7Zm9yKGxldCBpPTA7aTxuO2krKyl7Y29uc3Qgc3A9NypzcyxveD0oTWF0aC5yYW5kb20oKS0uNSkqc3Asb3k9KE1hdGgucmFuZG9tKCktLjUpKnNwLGR2eD1zdngrKE1hdGgucmFuZG9tKCktLjUpKjAuOSpzcyxkdnk9c3Z5KyhNYXRoLnJhbmRvbSgpLS41KSowLjkqc3MtMC4xOCpzcztzbW9rZS5wdXNoKHt4OmJ4K294LHk6Ynkrb3ksdng6ZHZ4LHZ5OmR2eSx3eDooTWF0aC5yYW5kb20oKS0uNSkqMC4wNCx3eTooTWF0aC5yYW5kb20oKS0uNSkqMC4wNCxyOjIuNSpzcytNYXRoLnJhbmRvbSgpKjMuNSpzcyxncjowLjM4KnNzK01hdGgucmFuZG9tKCkqMC4yMipzcyxhOigwLjIyK01hdGgucmFuZG9tKCkqMC4xNCkqYXMsZGE6MC45NjgtTWF0aC5yYW5kb20oKSowLjAwOCxncmV5OjE3MCtNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkqNDApLGxpZmU6MCxtbDo1MCtNYXRoLnJhbmRvbSgpKjYwfSk7fX0KY29uc3QgVFJLQ1A9W3t4Oi05MDAseTo5MDB9LHt4OjAseTo5MDB9LHt4OjkwMCx5OjkwMH0se3g6MTMwMCx5OjcwMH0se3g6MTUwMCx5OjB9LHt4OjEzMDAseTotNzAwfSx7eDo5MDAseTotOTAwfSx7eDowLHk6LTkwMH0se3g6LTkwMCx5Oi05MDB9LHt4Oi0xMzAwLHk6LTcwMH0se3g6LTE1MDAseTowfSx7eDotMTMwMCx5OjcwMH1dOwpjb25zdCBUUktOPVRSS0NQLmxlbmd0aCxUUkFDS19XPTE2MCxLRVJCX1c9MTgsVFJLU1VCRElWPTIwOwpsZXQgdHJrU2FtcGxlcz1bXSx0cmtDYW52YXM9bnVsbDsKZnVuY3Rpb24gc2FtcGxlVHJhY2soKXt0cmtTYW1wbGVzPVtdO2ZvcihsZXQgaT0wO2k8VFJLTjtpKyspe2NvbnN0IHAwPVRSS0NQWyhpLTErVFJLTiklVFJLTl0scDE9VFJLQ1BbaV0scDI9VFJLQ1BbKGkrMSklVFJLTl0scDM9VFJLQ1BbKGkrMiklVFJLTl07Zm9yKGxldCBzPTA7czxUUktTVUJESVY7cysrKXtjb25zdCB0PXMvVFJLU1VCRElWLHQyPXQqdCx0Mz10Mip0LHg9MC41KigoMipwMS54KSsoLXAwLngrcDIueCkqdCsoMipwMC54LTUqcDEueCs0KnAyLngtcDMueCkqdDIrKC1wMC54KzMqcDEueC0zKnAyLngrcDMueCkqdDMpLHk9MC41KigoMipwMS55KSsoLXAwLnkrcDIueSkqdCsoMipwMC55LTUqcDEueSs0KnAyLnktcDMueSkqdDIrKC1wMC55KzMqcDEueS0zKnAyLnkrcDMueSkqdDMpLGR0PTAuMDEsdHg9MC41KigoMipwMS54KSsoLXAwLngrcDIueCkqKHQrZHQpKygyKnAwLngtNSpwMS54KzQqcDIueC1wMy54KSoodCtkdCkqKHQrZHQpKygtcDAueCszKnAxLngtMypwMi54K3AzLngpKih0K2R0KSoodCtkdCkqKHQrZHQpKSx0eT0wLjUqKCgyKnAxLnkpKygtcDAueStwMi55KSoodCtkdCkrKDIqcDAueS01KnAxLnkrNCpwMi55LXAzLnkpKih0K2R0KSoodCtkdCkrKC1wMC55KzMqcDEueS0zKnAyLnkrcDMueSkqKHQrZHQpKih0K2R0KSoodCtkdCkpLGR4PXR4LXgsZHk9dHkteSxkbD1NYXRoLnNxcnQoZHgqZHgrZHkqZHkpfHwxO3Rya1NhbXBsZXMucHVzaCh7eCx5LG54Oi1keS9kbCxueTpkeC9kbH0pO319fQpmdW5jdGlvbiBidWlsZFRyYWNrQ2FudmFzKCl7c2FtcGxlVHJhY2soKTtjb25zdCBTPXRya1NhbXBsZXMsU049Uy5sZW5ndGg7bGV0IG1pblg9SW5maW5pdHksbWluWT1JbmZpbml0eSxtYXhYPS1JbmZpbml0eSxtYXhZPS1JbmZpbml0eTtmb3IoY29uc3QgcCBvZiBTKXtjb25zdCBveD1wLngrcC5ueCooVFJBQ0tfVysyMCksb3k9cC55K3AubnkqKFRSQUNLX1crMjApLGl4PXAueC1wLm54KihUUkFDS19XKzIwKSxpeT1wLnktcC5ueSooVFJBQ0tfVysyMCk7bWluWD1NYXRoLm1pbihtaW5YLG94LGl4KTttaW5ZPU1hdGgubWluKG1pblksb3ksaXkpO21heFg9TWF0aC5tYXgobWF4WCxveCxpeCk7bWF4WT1NYXRoLm1heChtYXhZLG95LGl5KTt9Y29uc3QgUEFEPTQwLGN3PU1hdGguY2VpbChtYXhYLW1pblgpK1BBRCoyLGNoPU1hdGguY2VpbChtYXhZLW1pblkpK1BBRCoyLG9mZlg9LW1pblgrUEFELG9mZlk9LW1pblkrUEFEO3Rya0NhbnZhcz1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdjYW52YXMnKTt0cmtDYW52YXMud2lkdGg9Y3c7dHJrQ2FudmFzLmhlaWdodD1jaDt0cmtDYW52YXMuX29mZlg9b2ZmWDt0cmtDYW52YXMuX29mZlk9b2ZmWTtjb25zdCB0Yz10cmtDYW52YXMuZ2V0Q29udGV4dCgnMmQnKSx3eD1pPT5TW2ldLngrb2ZmWCx3eT1pPT5TW2ldLnkrb2ZmWSxseD0oaSx3KT0+U1tpXS54K1NbaV0ubngqdytvZmZYLGx5PShpLHcpPT5TW2ldLnkrU1tpXS5ueSp3K29mZlkscng9KGksdyk9PlNbaV0ueC1TW2ldLm54Kncrb2ZmWCxyeT0oaSx3KT0+U1tpXS55LVNbaV0ubnkqdytvZmZZO3RjLmJlZ2luUGF0aCgpO3RjLm1vdmVUbyhseCgwLFRSQUNLX1cpLGx5KDAsVFJBQ0tfVykpO2ZvcihsZXQgaT0xO2k8U047aSsrKXRjLmxpbmVUbyhseChpLFRSQUNLX1cpLGx5KGksVFJBQ0tfVykpO2ZvcihsZXQgaT1TTi0xO2k+PTA7aS0tKXRjLmxpbmVUbyhyeChpLFRSQUNLX1cpLHJ5KGksVFJBQ0tfVykpO3RjLmNsb3NlUGF0aCgpO3RjLmZpbGxTdHlsZT0nIzFjMWMyNCc7dGMuZmlsbCgpO3RjLnNhdmUoKTt0Yy5jbGlwKCk7dGMuYmVnaW5QYXRoKCk7dGMubW92ZVRvKGx4KDAsVFJBQ0tfVyksbHkoMCxUUkFDS19XKSk7Zm9yKGxldCBpPTE7aTxTTjtpKyspdGMubGluZVRvKGx4KGksVFJBQ0tfVyksbHkoaSxUUkFDS19XKSk7Zm9yKGxldCBpPVNOLTE7aT49MDtpLS0pdGMubGluZVRvKHJ4KGksVFJBQ0tfVykscnkoaSxUUkFDS19XKSk7dGMuY2xvc2VQYXRoKCk7dGMuY2xpcCgpO2ZvcihsZXQgaT0wO2k8MTgwMDtpKyspe2NvbnN0IHY9MTArTWF0aC5yYW5kb20oKSoxMjt0Yy5maWxsU3R5bGU9YHJnYmEoJHt2fSwke3Z9LCR7disyfSwwLjQpYDt0Yy5maWxsUmVjdChtaW5YLVBBRCtNYXRoLnJhbmRvbSgpKihjdykrb2ZmWCxtaW5ZLVBBRCtNYXRoLnJhbmRvbSgpKihjaCkrb2ZmWSwxLDEpO310Yy5yZXN0b3JlKCk7Zm9yKGxldCBpPTA7aTxTTjtpKyspe2NvbnN0IGo9KGkrMSklU04sY29sPU1hdGguZmxvb3IoaS8yKSUyPT09MD8ncmdiYSgyMTAsMzAsMjAsMC44NSknOidyZ2JhKDIzNSwyMzUsMjM1LDAuODApJzt0Yy5zdHJva2VTdHlsZT1jb2w7dGMubGluZVdpZHRoPUtFUkJfVzt0Yy5saW5lQ2FwPSdidXR0Jzt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8obHgoaSxUUkFDS19XLUtFUkJfVy8yKSxseShpLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5saW5lVG8obHgoaixUUkFDS19XLUtFUkJfVy8yKSxseShqLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5zdHJva2UoKTt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8ocngoaSxUUkFDS19XLUtFUkJfVy8yKSxyeShpLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5saW5lVG8ocngoaixUUkFDS19XLUtFUkJfVy8yKSxyeShqLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5zdHJva2UoKTt9dGMuc3Ryb2tlU3R5bGU9J3JnYmEoMjU1LDI1NSwyNTUsMC4wOSknO3RjLmxpbmVXaWR0aD0yO3RjLmxpbmVDYXA9J3JvdW5kJzt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8obHgoMCxUUkFDS19XKSxseSgwLFRSQUNLX1cpKTtmb3IobGV0IGk9MTtpPFNOO2krKyl0Yy5saW5lVG8obHgoaSxUUkFDS19XKSxseShpLFRSQUNLX1cpKTt0Yy5jbG9zZVBhdGgoKTt0Yy5zdHJva2UoKTt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8ocngoMCxUUkFDS19XKSxyeSgwLFRSQUNLX1cpKTtmb3IobGV0IGk9MTtpPFNOO2krKyl0Yy5saW5lVG8ocngoaSxUUkFDS19XKSxyeShpLFRSQUNLX1cpKTt0Yy5jbG9zZVBhdGgoKTt0Yy5zdHJva2UoKTt0Yy5zdHJva2VTdHlsZT0ncmdiYSgyNTUsMjU1LDI1NSwwLjEwKSc7dGMubGluZVdpZHRoPTEuNTt0Yy5zZXRMaW5lRGFzaChbMjIsMzJdKTt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8od3goMCksd3koMCkpO2ZvcihsZXQgaT0xO2k8U047aSsrKXRjLmxpbmVUbyh3eChpKSx3eShpKSk7dGMuY2xvc2VQYXRoKCk7dGMuc3Ryb2tlKCk7dGMuc2V0TGluZURhc2goW10pO30KZnVuY3Rpb24gZHJhd1RyYWNrKCl7aWYoIXRya0NhbnZhcylyZXR1cm47Y3R4LmRyYXdJbWFnZSh0cmtDYW52YXMsLXRya0NhbnZhcy5fb2ZmWCwtdHJrQ2FudmFzLl9vZmZZKTt9CmNvbnN0IFNQQVdOX1g9LTYwMCxTUEFXTl9ZPTkwMCxTUEFXTl9BTkdMRT0wOwpsZXQgZmxvb3JQYXQ9bnVsbDsKZnVuY3Rpb24gZW5zdXJlRmxvb3IoKXtpZih0cmFja01vZGU9PT0nY2lyY3VpdCcmJiF0cmtDYW52YXMpYnVpbGRUcmFja0NhbnZhcygpO2lmKGZsb29yUGF0KXJldHVybjtjb25zdCBmYz1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdjYW52YXMnKTtmYy53aWR0aD0xNjA7ZmMuaGVpZ2h0PTE2MDtjb25zdCBmeD1mYy5nZXRDb250ZXh0KCcyZCcpO2Z4LmZpbGxTdHlsZT0nIzExMTExNSc7ZnguZmlsbFJlY3QoMCwwLDE2MCwxNjApO2ZvcihsZXQgaT0wO2k8NjAwO2krKyl7Y29uc3Qgdj04K01hdGgucmFuZG9tKCkqMTQ7ZnguZmlsbFN0eWxlPWByZ2JhKCR7dn0sJHt2fSwke3YrMn0sLjU1KWA7ZnguZmlsbFJlY3QoTWF0aC5yYW5kb20oKSoxNjAsTWF0aC5yYW5kb20oKSoxNjAsMSwxKTt9Znguc3Ryb2tlU3R5bGU9J3JnYmEoMjU1LDI1NSwyNTUsMC4wMjIpJztmeC5saW5lV2lkdGg9MTtmb3IobGV0IHg9MDt4PDE2MDt4Kz00MCl7ZnguYmVnaW5QYXRoKCk7ZngubW92ZVRvKHgsMCk7ZngubGluZVRvKHgsMTYwKTtmeC5zdHJva2UoKTt9Zm9yKGxldCB5PTA7eTwxNjA7eSs9NDApe2Z4LmJlZ2luUGF0aCgpO2Z4Lm1vdmVUbygwLHkpO2Z4LmxpbmVUbygxNjAseSk7Znguc3Ryb2tlKCk7fWZsb29yUGF0PWN0eC5jcmVhdGVQYXR0ZXJuKGZjLCdyZXBlYXQnKTt9CmZ1bmN0aW9uIHJlc2V0Q2FyKCl7aWYodHJhY2tNb2RlPT09J2NpcmN1aXQnKXtjYXIueD1TUEFXTl9YO2Nhci55PVNQQVdOX1k7Y2FyLmFuZ2xlPVNQQVdOX0FOR0xFO2NhbS54PVNQQVdOX1gtVy8yO2NhbS55PVNQQVdOX1ktSC8yO31lbHNle2Nhci54PTA7Y2FyLnk9MDtjYXIuYW5nbGU9MDtjYW0ueD0tVy8yO2NhbS55PS1ILzI7fWNhci52eD0wO2Nhci52eT0wO2Nhci55YXc9MDtjYXIuc3RlZXI9MDtzdHJpcHMubGVuZ3RoPTA7Y3VyU3RyaXA9bnVsbDtzbW9rZS5sZW5ndGg9MDt9CmZ1bmN0aW9uIHJlc2V0R2FtZSgpe3Njb3JlPTA7Y29tYm89MTtiZXN0Q29tYm89MTtkcmlmdFRpbWU9MDtkcmlmdEFjdGl2ZT1mYWxzZTtkcmlmdEFjYz0wO2NvbWJvRGVjYXk9MDtlU2NvcmUudGV4dENvbnRlbnQ9JzAnO2VDb21iby50ZXh0Q29udGVudD0neDEnO2VCZXN0LnRleHRDb250ZW50PSd4MSc7ZG1GaWxsLnN0eWxlLndpZHRoPScwJSc7ZHBvcC5zdHlsZS5vcGFjaXR5PScwJztyZXNldENhcigpO30KZnVuY3Rpb24gdXBkYXRlKCl7Y29uc3QgdXA9S1snQXJyb3dVcCddfHxLWydLZXlXJ10sZG49S1snQXJyb3dEb3duJ118fEtbJ0tleVMnXSxsZj1LWydBcnJvd0xlZnQnXXx8S1snS2V5QSddLHJ0PUtbJ0Fycm93UmlnaHQnXXx8S1snS2V5RCddLGhiPUtbJ1NwYWNlJ10sc3BkPU1hdGguc3FydChjYXIudngqY2FyLnZ4K2Nhci52eSpjYXIudnkpLGNvc0E9TWF0aC5jb3MoY2FyLmFuZ2xlKSxzaW5BPU1hdGguc2luKGNhci5hbmdsZSksZndkVj1jYXIudngqY29zQStjYXIudnkqc2luQTsKaWYobGYpY2FyLnN0ZWVyPU1hdGgubWF4KGNhci5zdGVlci1TVEVFUl9SQVRFLC1TVEVFUl9NQVgpO2Vsc2UgaWYocnQpY2FyLnN0ZWVyPU1hdGgubWluKGNhci5zdGVlcitTVEVFUl9SQVRFLFNURUVSX01BWCk7ZWxzZSBjYXIuc3RlZXIqPSgxLVNURUVSX1JUTik7CmNvbnN0IHN0ZWVyRGlyPWZ3ZFY+PTA/MTotMTtjYXIueWF3Kz1jYXIuc3RlZXIqWUFXX0ZPUkNFKnN0ZWVyRGlyKigwLjQrc3BkL1RPUFNQRCowLjYpO2Nhci55YXcqPVlBV19EQU1QO2Nhci5hbmdsZSs9Y2FyLnlhdzsKY29uc3QgYnVybm91dD11cCYmZG4mJnNwZDwyLjAscm9sbGJhY2s9dXAmJmZ3ZFY8LTAuOCYmc3BkPjAuODsKaWYoYnVybm91dCl7YnVybm91dFRpbWUrKztjYXIudngrPWNvc0EqMC4wMypNYXRoLnNpbihidXJub3V0VGltZSowLjM1KTtjYXIudnkrPXNpbkEqMC4wMypNYXRoLnNpbihidXJub3V0VGltZSowLjM1KTtjYXIudngqPTAuODA7Y2FyLnZ5Kj0wLjgwO3JvbGxiYWNrU21va2U9MDt9CmVsc2UgaWYocm9sbGJhY2spe2J1cm5vdXRUaW1lPTA7Y2FyLnZ4Kz1jb3NBKkFDQ0VMKjEuMzU7Y2FyLnZ5Kz1zaW5BKkFDQ0VMKjEuMzU7Y2FyLnlhdys9Y2FyLnN0ZWVyKllBV19GT1JDRSoyLjI7cm9sbGJhY2tTbW9rZT0yNTt9CmVsc2V7YnVybm91dFRpbWU9MDtpZih1cCl7Y29uc3QgZm9yY2U9QUNDRUwqKDEtc3BkL1RPUFNQRCowLjU1KTtjYXIudngrPWNvc0EqZm9yY2U7Y2FyLnZ5Kz1zaW5BKmZvcmNlO31pZihkbiYmc3BkPjAuMTUpe2Nhci52eCo9MC45NTI7Y2FyLnZ5Kj0wLjk1Mjt9fQppZihyb2xsYmFja1Ntb2tlPjApcm9sbGJhY2tTbW9rZS0tOwpjb25zdCBncmlwPWhiP0hCX0dSSVA6R1JJUCxyaWdodFg9LXNpbkEscmlnaHRZPWNvc0EsbGF0Vj1jYXIudngqcmlnaHRYK2Nhci52eSpyaWdodFk7Y2FyLnZ4LT1yaWdodFgqbGF0VipncmlwO2Nhci52eS09cmlnaHRZKmxhdFYqZ3JpcDtjYXIudngqPUZSSUNUSU9OO2Nhci52eSo9RlJJQ1RJT047CmNvbnN0IG5zPU1hdGguc3FydChjYXIudngqY2FyLnZ4K2Nhci52eSpjYXIudnkpO2lmKG5zPlRPUFNQRCl7Y2FyLnZ4PWNhci52eC9ucypUT1BTUEQ7Y2FyLnZ5PWNhci52eS9ucypUT1BTUEQ7fQpjYXIueCs9Y2FyLnZ4O2Nhci55Kz1jYXIudnk7Y2FtLngrPShjYXIueC1XLzItY2FtLngpKjAuMDg7Y2FtLnkrPShjYXIueS1ILzItY2FtLnkpKjAuMDg7CmNvbnN0IHZlbEFuZz1NYXRoLmF0YW4yKGNhci52eSxjYXIudngpO2xldCBzbGlwPXZlbEFuZy1jYXIuYW5nbGU7c2xpcD0oKHNsaXAlKE1hdGguUEkqMikpK01hdGguUEkqMyklKE1hdGguUEkqMiktTWF0aC5QSTsKY29uc3QgYWJzU2xpcD1NYXRoLmFicyhzbGlwKSxhYnNZYXc9TWF0aC5hYnMoY2FyLnlhdyksaXNTcGlubmluZz1hYnNZYXc+MC4wMjUsaXNEcmlmdD0oYWJzU2xpcD4wLjIwJiZucz4yLjApfHxpc1NwaW5uaW5nOwppZihpc0RyaWZ0KXtkcmlmdFRpbWUrKztkcmlmdEFjdGl2ZT10cnVlO2NvbWJvRGVjYXk9MDtjb25zdCBwdHM9TWF0aC5jZWlsKChhYnNTbGlwK2Fic1lhdyo4KSpucypjb21ibyo1KTtkcmlmdEFjYys9cHRzO3Njb3JlKz1wdHM7ZG1GaWxsLnN0eWxlLndpZHRoPU1hdGgubWluKDEwMCxkcmlmdFRpbWUqLjg1KSsnJSc7c2hvd1BvcChkcmlmdEFjYyxjb21ibyk7Y29uc3Qgc2k9TWF0aC5taW4oKGFic1NsaXArYWJzWWF3KjYpLzAuOCwxLjApO2lmKGRyaWZ0VGltZSUyPT09MCl7YXBwZW5kTWFyaygpO2FkZFNtb2tlKDIsMC42K3NpKjAuNSwwLjgpO31lbHNlIGlmKCFjdXJTdHJpcCl7c3RhcnRTdHJpcCgpO319CmVsc2V7aWYoZHJpZnRBY3RpdmUpe3Njb3JlKz1NYXRoLmZsb29yKGRyaWZ0VGltZSpjb21ibyozKTtjb21ibz1NYXRoLm1pbihjb21ibysxLDI1KTtpZihjb21ibz5iZXN0Q29tYm8pYmVzdENvbWJvPWNvbWJvO2VDb21iby50ZXh0Q29udGVudD0neCcrY29tYm87ZUJlc3QudGV4dENvbnRlbnQ9J3gnK2Jlc3RDb21ibztlQ29tYm8uY2xhc3NMaXN0LmFkZCgncG9wJyk7c2V0VGltZW91dCgoKT0+ZUNvbWJvLmNsYXNzTGlzdC5yZW1vdmUoJ3BvcCcpLDE0MCk7ZHJpZnRBY3RpdmU9ZmFsc2U7ZW5kU3RyaXAoKTt9ZHJpZnRUaW1lPTA7ZHJpZnRBY2M9MDtjb21ib0RlY2F5Kys7ZG1GaWxsLnN0eWxlLndpZHRoPScwJSc7aWYoY29tYm9EZWNheT4xMzAmJmNvbWJvPjEpe2NvbWJvPU1hdGgubWF4KDEsY29tYm8tMSk7ZUNvbWJvLnRleHRDb250ZW50PSd4Jytjb21ibztjb21ib0RlY2F5PTA7fX0KaWYoYnVybm91dCYmYnVybm91dFRpbWU+OCl7YWRkU21va2UoMywwLjkrTWF0aC5taW4oYnVybm91dFRpbWUvNjAsMSkqMC41LDAuOSk7aWYoYnVybm91dFRpbWUlMz09PTApYXBwZW5kTWFyaygpO31lbHNlIGlmKCFidXJub3V0JiZjdXJTdHJpcCYmIWRyaWZ0QWN0aXZlKXtlbmRTdHJpcCgpO30KaWYocm9sbGJhY2tTbW9rZT4wKXthZGRTbW9rZSg0LDEuMSsocm9sbGJhY2tTbW9rZS8yNSkqMC42LDEuMCk7aWYocm9sbGJhY2tTbW9rZSUyPT09MClhcHBlbmRNYXJrKCk7fQpmb3IobGV0IGk9c21va2UubGVuZ3RoLTE7aT49MDtpLS0pe2NvbnN0IHM9c21va2VbaV07cy52eCs9cy53eDtzLnZ5Kz1zLnd5O3MudngqPTAuOTg1O3MudnkqPTAuOTg1O3MueCs9cy52eDtzLnkrPXMudnk7cy5yKz1zLmdyO3MubGlmZSsrO3MuYSo9cy5kYTtpZihzLmxpZmU+PXMubWx8fHMuYTwwLjAwOClzbW9rZS5zcGxpY2UoaSwxKTt9CnRpY2tNYXJrcygpO2VTY29yZS50ZXh0Q29udGVudD1zY29yZS50b0xvY2FsZVN0cmluZygpO2VTcGQudGV4dENvbnRlbnQ9TWF0aC5yb3VuZChucyoyNCkrJyBrbS9oJzt9CmxldCBwb3BUO2Z1bmN0aW9uIHNob3dQb3AocHRzLGMpe2Rwb3AudGV4dENvbnRlbnQ9JysnK3B0cy50b0xvY2FsZVN0cmluZygpKyhjPjE/JyB4JytjOicnKTtkcG9wLnN0eWxlLm9wYWNpdHk9JzEnO2NsZWFyVGltZW91dChwb3BUKTtwb3BUPXNldFRpbWVvdXQoKCk9PmRwb3Auc3R5bGUub3BhY2l0eT0nMCcsODAwKTt9CmZ1bmN0aW9uIGRyYXcoKXtlbnN1cmVGbG9vcigpO2N0eC5jbGVhclJlY3QoMCwwLFcsSCk7Y3R4LnNhdmUoKTtjdHgudHJhbnNsYXRlKC1jYW0ueCwtY2FtLnkpO2N0eC5zYXZlKCk7aWYoZmxvb3JQYXQpe2N0eC5maWxsU3R5bGU9Zmxvb3JQYXQ7Y3R4LmZpbGxSZWN0KGNhbS54LTIwMCxjYW0ueS0yMDAsVys0MDAsSCs0MDApO31jdHgucmVzdG9yZSgpO2NvbnN0IEdTPTgwO2N0eC5zdHJva2VTdHlsZT0ncmdiYSgyNTUsMjU1LDI1NSwwLjAyNSknO2N0eC5saW5lV2lkdGg9MTtjb25zdCBneDA9TWF0aC5mbG9vcigoY2FtLngtMTAwKS9HUykqR1MsZ3kwPU1hdGguZmxvb3IoKGNhbS55LTEwMCkvR1MpKkdTO2ZvcihsZXQgZ3g9Z3gwO2d4PGNhbS54K1crMTAwO2d4Kz1HUyl7Y3R4LmJlZ2luUGF0aCgpO2N0eC5tb3ZlVG8oZ3gsY2FtLnktMTAwKTtjdHgubGluZVRvKGd4LGNhbS55K0grMTAwKTtjdHguc3Ryb2tlKCk7fWZvcihsZXQgZ3k9Z3kwO2d5PGNhbS55K0grMTAwO2d5Kz1HUyl7Y3R4LmJlZ2luUGF0aCgpO2N0eC5tb3ZlVG8oY2FtLngtMTAwLGd5KTtjdHgubGluZVRvKGNhbS54K1crMTAwLGd5KTtjdHguc3Ryb2tlKCk7fWlmKHRyYWNrTW9kZT09PSdjaXJjdWl0JylkcmF3VHJhY2soKTtjdHgubGluZUNhcD0ncm91bmQnO2N0eC5saW5lSm9pbj0ncm91bmQnO2Zvcihjb25zdCBzdHJpcCBvZiBzdHJpcHMpe2lmKHN0cmlwLnB0cy5sZW5ndGg8Miljb250aW51ZTtjb25zdCBhZj1NYXRoLm1heCgwLDEtc3RyaXAuYWdlL01BUktfTElGRSksaXQ9YWY+MC42PzE6YWYvMC42LGJhPU1BUktfQUxQSEEqaXQ7aWYoYmE8MC4wMSljb250aW51ZTtjdHguc3Ryb2tlU3R5bGU9YHJnYmEoOCw1LDMsJHtiYX0pYDtjdHgubGluZVdpZHRoPTMuNTtjdHguYmVnaW5QYXRoKCk7Y3R4Lm1vdmVUbyhzdHJpcC5wdHNbMF0ubHgsc3RyaXAucHRzWzBdLmx5KTtmb3IobGV0IGk9MTtpPHN0cmlwLnB0cy5sZW5ndGg7aSsrKWN0eC5saW5lVG8oc3RyaXAucHRzW2ldLmx4LHN0cmlwLnB0c1tpXS5seSk7Y3R4LnN0cm9rZSgpO2N0eC5iZWdpblBhdGgoKTtjdHgubW92ZVRvKHN0cmlwLnB0c1swXS5yeCxzdHJpcC5wdHNbMF0ucnkpO2ZvcihsZXQgaT0xO2k8c3RyaXAucHRzLmxlbmd0aDtpKyspY3R4LmxpbmVUbyhzdHJpcC5wdHNbaV0ucngsc3RyaXAucHRzW2ldLnJ5KTtjdHguc3Ryb2tlKCk7fQpmb3IoY29uc3QgcyBvZiBzbW9rZSl7aWYocy5hPDAuMDA4KWNvbnRpbnVlO2NvbnN0IGc9cy5ncmV5O2N0eC5iZWdpblBhdGgoKTtjdHguYXJjKHMueCxzLnkscy5yKjEuNiwwLE1hdGguUEkqMik7Y3R4LmZpbGxTdHlsZT1gcmdiYSgke2d9LCR7Z30sJHtnfSwke3MuYSowLjE4fSlgO2N0eC5maWxsKCk7Y3R4LmJlZ2luUGF0aCgpO2N0eC5hcmMocy54LHMueSxzLnIsMCxNYXRoLlBJKjIpO2N0eC5maWxsU3R5bGU9YHJnYmEoJHtnfSwke2d9LCR7Z30sJHtzLmEqMC41Mn0pYDtjdHguZmlsbCgpO2NvbnN0IGNBPXMuYSpNYXRoLm1heCgwLDEtcy5saWZlLzMwKSowLjc7aWYoY0E+MC4wMSl7Y3R4LmJlZ2luUGF0aCgpO2N0eC5hcmMocy54LHMueSxzLnIqMC40MiwwLE1hdGguUEkqMik7Y3R4LmZpbGxTdHlsZT1gcmdiYSg2MCw1Miw0NCwke2NBfSlgO2N0eC5maWxsKCk7fX0KZHJhd0NhcigpO2N0eC5yZXN0b3JlKCk7fQpmdW5jdGlvbiBkcmF3Q2FyKCl7Y29uc3QgdmVsQW5nPU1hdGguYXRhbjIoY2FyLnZ5LGNhci52eCk7bGV0IHNsaXA9dmVsQW5nLWNhci5hbmdsZTtzbGlwPSgoc2xpcCUoTWF0aC5QSSoyKSkrTWF0aC5QSSozKSUoTWF0aC5QSSoyKS1NYXRoLlBJO2NvbnN0IGlzRHJpZnQ9TWF0aC5hYnMoc2xpcCk+MC4yMCYmTWF0aC5zcXJ0KGNhci52eCpjYXIudngrY2FyLnZ5KmNhci52eSk+MjtjdHguc2F2ZSgpO2N0eC50cmFuc2xhdGUoY2FyLngsY2FyLnkpO2N0eC5yb3RhdGUoY2FyLmFuZ2xlKTtjb25zdCBITD0yMCxIVz05O2N0eC5zYXZlKCk7Y3R4LnRyYW5zbGF0ZSgzLDMuNSk7Y3R4LmZpbGxTdHlsZT0ncmdiYSgwLDAsMCwuMjgpJztjdHguYmVnaW5QYXRoKCk7Y3R4LnJvdW5kUmVjdCgtSEwsLUhXLEhMKjIsSFcqMiwzKTtjdHguZmlsbCgpO2N0eC5yZXN0b3JlKCk7Y3R4LmZpbGxTdHlsZT1pc0RyaWZ0PycjZDQyMDAwJzonI2JiMWQwMCc7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoLUhMLC1IVyxITCoyLEhXKjIsMyk7Y3R4LmZpbGwoKTtjdHguZmlsbFN0eWxlPSdyZ2JhKDAsMCwwLC4yMCknO2N0eC5iZWdpblBhdGgoKTtjdHgucm91bmRSZWN0KC1ITCwtSFcsMTEsSFcqMiwyKTtjdHguZmlsbCgpO2N0eC5maWxsU3R5bGU9J3JnYmEoMjU1LDI1NSwyNTUsLjA2KSc7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoMSwtSFcrMiwxMyxIVyoyLTQsMik7Y3R4LmZpbGwoKTtjdHguZmlsbFN0eWxlPSdyZ2JhKDEyNSwyMDUsMjU1LC43OCknO2N0eC5iZWdpblBhdGgoKTtjdHgucm91bmRSZWN0KDIsLUhXKzEuNSwxMCw1LjUsMSk7Y3R4LmZpbGwoKTtjdHguYmVnaW5QYXRoKCk7Y3R4LnJvdW5kUmVjdCgyLEhXLTcsMTAsNS41LDEpO2N0eC5maWxsKCk7Y3R4LmZpbGxTdHlsZT0ncmdiYSgyNTUsMjQ4LDE1NSwuOTUpJztjdHguZmlsbFJlY3QoSEwtMiwtSFcrMSwyLjUsMy41KTtjdHguZmlsbFJlY3QoSEwtMixIVy00LjUsMi41LDMuNSk7Y3R4LmZpbGxTdHlsZT1pc0RyaWZ0PydyZ2JhKDI1NSw4MCwwLC45NSknOidyZ2JhKDIwMCwyMCwxMCwuODUpJztjdHguZmlsbFJlY3QoLUhMLTAuNSwtSFcrMSwyLjUsMy41KTtjdHguZmlsbFJlY3QoLUhMLTAuNSxIVy00LjUsMi41LDMuNSk7Y29uc3QgZHc9KGx4LGx5LGEpPT57Y3R4LnNhdmUoKTtjdHgudHJhbnNsYXRlKGx4LGx5KTtjdHgucm90YXRlKGEpO2N0eC5maWxsU3R5bGU9JyMxMzEzMTMnO2N0eC5iZWdpblBhdGgoKTtjdHgucm91bmRSZWN0KC00LC0xLjYsOCwzLjIsMSk7Y3R4LmZpbGwoKTtjdHguZmlsbFN0eWxlPScjMmEyYTJhJztjdHguYmVnaW5QYXRoKCk7Y3R4LnJvdW5kUmVjdCgtMi41LC0uOSw1LDEuOCwuNSk7Y3R4LmZpbGwoKTtjdHgucmVzdG9yZSgpO307ZHcoLUhMKzUsLUhXLTIsMCk7ZHcoLUhMKzUsSFcrMiwwKTtkdyhITC01LC1IVy0yLGNhci5zdGVlcioxLjYpO2R3KEhMLTUsSFcrMixjYXIuc3RlZXIqMS42KTtpZihpc0RyaWZ0KXtjb25zdCB0PURhdGUubm93KCkqLjAyMjtjdHguc3Ryb2tlU3R5bGU9YHJnYmEoMjU1LCR7MTAwK01hdGguc2luKHQpKjUwfSwxMCwkey40NStNYXRoLnNpbih0KjEuNCkqLjJ9KWA7Y3R4LmxpbmVXaWR0aD0yLjU7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoLUhMLC1IVyxITCoyLEhXKjIsMyk7Y3R4LnN0cm9rZSgpO31jdHgucmVzdG9yZSgpO30KZnVuY3Rpb24gbG9vcCgpe3VwZGF0ZSgpO2RyYXcoKTtyYWY9cmVxdWVzdEFuaW1hdGlvbkZyYW1lKGxvb3ApO30KYnRuLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJywoKT0+e292ZXJsYXkuc3R5bGUuZGlzcGxheT0nbm9uZSc7ZmluYWxfLnN0eWxlLmRpc3BsYXk9J25vbmUnO3Jlc2V0R2FtZSgpO3J1bm5pbmc9dHJ1ZTtpZihyYWYpY2FuY2VsQW5pbWF0aW9uRnJhbWUocmFmKTtsb29wKCk7fSk7CndpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdrZXlkb3duJyxlPT57aWYoIXJ1bm5pbmd8fGUuY29kZSE9PSdFc2NhcGUnKXJldHVybjtydW5uaW5nPWZhbHNlO2NhbmNlbEFuaW1hdGlvbkZyYW1lKHJhZik7ZmluYWxfLnRleHRDb250ZW50PSdGSU5BTDogJytzY29yZS50b0xvY2FsZVN0cmluZygpO2ZpbmFsXy5zdHlsZS5kaXNwbGF5PSdibG9jayc7YnRuLnRleHRDb250ZW50PSdQTEFZIEFHQUlOJztvdmVybGF5LnN0eWxlLmRpc3BsYXk9J2ZsZXgnO30pOwo8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+")))
-// Also copy onto N directly in case Proxy isn't supported
-Object.assign(window.N, window._N);
-// Replay any calls that were queued before module was ready
-if(window._N_queue){
-  window._N_queue.forEach(([k,args])=>{try{if(window._N[k])window._N[k](...args);}catch(e){}});
-  window._N_queue=[];
-}
-// Expose game fns globally for modal onclicks
-window._setBubbleEffect=async function(eff){
-  const root=document.documentElement;
-  // Update cud immediately so renderSettings shows selected state
-  if(cud) cud={...cud,bubbleEffect:eff};
-  // Apply effect - works on any bubble colour
-  const _animMap={pulse:'bubblePulse 1.5s ease-in-out infinite',bounce:'bubbleBounce 0.8s ease-in-out infinite',shimmer:'bubbleShimmer 2s linear infinite',glow:'bubbleGlow 2s ease-in-out infinite',ripple:'bubbleRipple 1.2s ease-out infinite',wave:'bubbleWave 2s ease-in-out infinite'};
-  root.style.setProperty('--bubble-own-anim', _animMap[eff]||'none');
-  // Re-render settings immediately
-  if(window._N&&window._N.renderSettings) window._N.renderSettings();
-  // Save to Firestore
-  if(cu&&cud){
-    try{
-      await updateDoc(doc(db,'users',cu.uid),{bubbleEffect:eff});
-      uCache[cu.uid]={...uCache[cu.uid],bubbleEffect:eff};
-    }catch{}
-  }
-};
-window._setBubbleColour=async function(col){
-  const root=document.documentElement;
-  // Update cud immediately so renderSettings shows correct selected state
-  if(cud) cud={...cud,bubbleColour:col};
-  if(!col){
-    root.style.removeProperty('--bubble-own');root.style.removeProperty('--bubble-own-border');
-    root.style.removeProperty('--bubble-own-anim');
-  } else {
-    const r2=parseInt(col.slice(1,3),16),g2=parseInt(col.slice(3,5),16),b2=parseInt(col.slice(5,7),16);
-    root.style.setProperty('--bubble-own','rgba('+r2+','+g2+','+b2+',0.6)');
-    root.style.setProperty('--bubble-own-border','rgba('+r2+','+g2+','+b2+',0.4)');
-    // Keep existing effect animation when changing colour
-    const curEff=cud?.bubbleEffect||'';
-    if(curEff){
-      const _am={pulse:'bubblePulse 1.5s ease-in-out infinite',bounce:'bubbleBounce 0.8s ease-in-out infinite',shimmer:'bubbleShimmer 2s linear infinite',glow:'bubbleGlow 2s ease-in-out infinite',ripple:'bubbleRipple 1.2s ease-out infinite',wave:'bubbleWave 2s ease-in-out infinite'};
-      if(_am[curEff]) root.style.setProperty('--bubble-own-anim',_am[curEff]);
-    }
-  }
-  // Re-render settings immediately to show selected state
-  if(window._N&&window._N.renderSettings) window._N.renderSettings();
-  // Save to Firestore
-  if(cu&&cud){
-    try{
-      await updateDoc(doc(db,'users',cu.uid),{bubbleColour:col});
-      uCache[cu.uid]={...uCache[cu.uid],bubbleColour:col};
-    }catch{}
-  }
-};
-window._setTextCol=function(col){
-  const root=document.documentElement;
-  if(!col){
-    root.style.removeProperty('--text');
-    localStorage.removeItem('nexus_text_colour');
-  } else {
-    root.style.setProperty('--text',col);
-    localStorage.setItem('nexus_text_colour',col);
-  }
-  if(window._N&&window._N.renderSettings) window._N.renderSettings();
-};
-window._setBgCol=async function(col){
-  const root=document.documentElement;
-  if(col==='default'){
-    ['--bg','--bg2','--bg3','--panel','--app-bg'].forEach(v=>root.style.removeProperty(v));
-    localStorage.removeItem('nexus_bg_colour');
-    if(cu&&cud){try{await updateDoc(doc(db,'users',cu.uid),{bgColour:''});cud={...cud,bgColour:''};uCache[cu.uid]={...uCache[cu.uid],bgColour:''};}catch{}}
-  } else {
-    const r=parseInt(col.slice(1,3),16),g=parseInt(col.slice(3,5),16),b=parseInt(col.slice(5,7),16);
-    const mk=(dr,dg,db)=>'rgb('+Math.min(255,r+dr)+','+Math.min(255,g+dg)+','+Math.min(255,b+db)+')';
-    root.style.setProperty('--bg',col);root.style.setProperty('--app-bg',col);
-    root.style.setProperty('--bg2',mk(5,5,8));root.style.setProperty('--bg3',mk(10,10,18));
-    root.style.setProperty('--panel',mk(3,3,5));
-    localStorage.setItem('nexus_bg_colour',col);
-    if(cu&&cud){try{await updateDoc(doc(db,'users',cu.uid),{bgColour:col});cud={...cud,bgColour:col};uCache[cu.uid]={...uCache[cu.uid],bgColour:col};}catch{}}
-  }
-  if(window._N&&window._N.renderSettings) setTimeout(()=>window._N.renderSettings(),50);
-};
-// Apply on load
-(function(){
-  const saved=localStorage.getItem('nexus_bg_colour');
-  if(saved&&saved!=='default') window._setBgCol(saved);
-  const savedTxt=localStorage.getItem('nexus_text_colour');
-  if(savedTxt) document.documentElement.style.setProperty('--text',savedTxt);
-})();
-window.sendTyping=function(){
-  if(!cu||!acid) return;
-  updateDoc(doc(db,'chats',acid),{['typing.'+cu.uid]:Date.now()}).catch(()=>{});
-  clearTimeout(window._typingTimer);
-  window._typingTimer=setTimeout(()=>{
-    updateDoc(doc(db,'chats',acid),{['typing.'+cu.uid]:0}).catch(()=>{});
-  },3000);
-};
-window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
-// Expose lightbox fns globally (used in HTML onclick attributes)
-window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
-
-</script>
-<!-- TTT MODAL -->
-<div class="modal-overlay" id="ttt-modal">
-  <div class="modal" style="width:340px;">
-    <div class="modal-title">🎮 TIC-TAC-TOE</div>
-    <button class="modal-close" onclick="N.closeModal('ttt-modal');N.tttCleanup()">✕</button>
-    <div id="ttt-content"></div>
-  </div>
-</div>
-
-<!-- EASTER EGG MINI GAME -->
-<div id="egg-modal">
-  <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.3);margin-bottom:-6px;">🐣 SECRET DISCOVERED</div>
-  <canvas id="egg-canvas" width="500" height="320"></canvas>
-  <div class="egg-ui">
-    <div>TRIES</div>
-    <div class="egg-tries">
-      <div class="egg-try" id="egg-t1"></div>
-      <div class="egg-try" id="egg-t2"></div>
-      <div class="egg-try" id="egg-t3"></div>
-    </div>
-    <div id="egg-timer" style="display:none;font-size:10px;"></div>
-  </div>
-  <div id="egg-msg">Click anywhere on the canvas to launch the ball!</div>
-  <button class="egg-close" onclick="N.eggClose()">CLOSE</button>
-</div>
-
-<!-- TYPE & EARN GAME MODAL -->
-<div class="modal-overlay" id="typegame-modal" style="align-items:center;justify-content:center;">
-  <div style="background:#0d0d0f;border:1px solid rgba(68,102,255,0.25);border-radius:16px;padding:28px 32px;width:min(820px,96vw);max-height:95vh;overflow-y:auto;position:relative;box-shadow:0 0 60px rgba(68,102,255,0.15);">
-    <div style="font-family:'Orbitron',monospace;font-size:12px;letter-spacing:4px;background:linear-gradient(135deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;">NEXUS TYPE</div>
-    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#5a5a7a;letter-spacing:2px;margin-bottom:20px;">EVERY CORRECT WORD = +1 MESSAGE</div>
-    <button onclick="N.closeModal('typegame-modal');tgStop()" style="position:absolute;top:16px;right:16px;background:none;border:1px solid rgba(100,100,255,0.15);border-radius:6px;color:#5a5a7a;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">✕</button>
-
-    <!-- Stats row -->
-    <div style="display:flex;gap:28px;margin-bottom:20px;align-items:flex-end;">
-      <div>
-        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">WPM</div>
-        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#f0c060;line-height:1;" id="tg-wpm">0</div>
-      </div>
-      <div>
-        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">ACC</div>
-        <div style="font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:700;color:#7dd3b0;line-height:1;" id="tg-acc">100%</div>
-      </div>
-      <div>
-        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">TIME</div>
-        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#f0c060;line-height:1;" id="tg-timer">60</div>
-      </div>
-      <div style="margin-left:auto;text-align:right;">
-        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">EARNED</div>
-        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#00d4ff;line-height:1;" id="tg-earned">+0</div>
-      </div>
-    </div>
-
-    <!-- Mode buttons -->
-    <div style="display:flex;gap:6px;margin-bottom:16px;">
-      <button class="tg-mode-btn" data-secs="15" onclick="tgSetMode(15)">15s</button>
-      <button class="tg-mode-btn" data-secs="30" onclick="tgSetMode(30)">30s</button>
-      <button class="tg-mode-btn active" data-secs="60" onclick="tgSetMode(60)">60s</button>
-      <button class="tg-mode-btn" data-secs="120" onclick="tgSetMode(120)">120s</button>
-    </div>
-
-    <!-- Progress bar -->
-    <div style="height:2px;background:#2a2a30;border-radius:2px;margin-bottom:16px;overflow:hidden;">
-      <div id="tg-progress" style="height:100%;background:#f0c060;border-radius:2px;width:0%;transition:width 0.3s;"></div>
-    </div>
-
-    <!-- Words -->
-    <div id="tg-words-wrapper" style="background:#16161a;border:1px solid #2a2a30;border-radius:10px;padding:24px 28px;cursor:text;height:132px;overflow:hidden;position:relative;">
-      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;will-change:transform;"></div>
-      <div style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#16161a);pointer-events:none;"></div>
-    </div>
-
-    <!-- Bottom -->
-    <div style="display:flex;align-items:center;margin-top:14px;gap:12px;">
-      <span style="font-size:10px;color:#3a3a45;font-family:'JetBrains Mono',monospace;">click to focus · <kbd style="background:#16161a;border:1px solid #2a2a30;border-radius:3px;padding:1px 5px;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:10px;">tab</kbd> restart</span>
-      <button onclick="tgRestart()" style="margin-left:auto;background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 14px;border-radius:5px;cursor:pointer;">↺ restart</button>
-    </div>
-  </div>
-</div>
-
-<style>
-  .tg-mode-btn{background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all 0.15s;}
-  .tg-mode-btn:hover,.tg-mode-btn.active{border-color:#f0c060;color:#f0c060;}
-  .tg-word{display:inline-flex;position:relative;}
-  #tg-words{transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);}
-  .tg-letter{color:#3a3a45;transition:color 0.06s;position:relative;}
-  .tg-letter.correct{color:#7dd3b0;}
-  .tg-letter.wrong{color:#e06c75;text-decoration:underline;text-decoration-color:#e06c75;}
-  .tg-letter.extra{color:#e06c75;opacity:0.7;}
-  .tg-cursor::before{content:'';position:absolute;left:-2px;top:0;bottom:0;width:2px;background:#f0c060;border-radius:2px;animation:blink 0.9s step-end infinite;}
-</style>
-
-<input id="tg-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position:fixed;top:-999px;left:-999px;opacity:0;">
-
-<!-- NEXUS FLAP MODAL -->
-
-<!-- NEXUS FLAP MODAL -->
-<div class="modal-overlay" id="flap-modal" style="align-items:center;justify-content:center;">
-  <div style="background:#050508;border:1px solid rgba(68,102,255,0.3);border-radius:16px;padding:20px;position:relative;box-shadow:0 0 40px rgba(68,102,255,0.2);">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:20px;">
-      <div>
-        <div style="font-family:'Orbitron',monospace;font-size:13px;letter-spacing:4px;background:linear-gradient(135deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">NEXUS FLAP</div>
-        <div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:#5a5a7a;letter-spacing:2px;margin-top:2px;">EVERY POINT = +2 MESSAGES</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="text-align:right;">
-          <div style="font-size:8px;color:#3a3a45;font-family:'JetBrains Mono',monospace;letter-spacing:2px;">EARNED</div>
-          <div id="flap-earned" style="font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:700;color:#00d4ff;">+0</div>
-        </div>
-        <button onclick="N.closeFlapGame()" style="background:none;border:1px solid rgba(100,100,255,0.2);border-radius:6px;color:#5a5a7a;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">&#10005;</button>
-      </div>
-    </div>
-    <iframe id="flap-iframe"
-      srcdoc="<!DOCTYPE html><html><head><meta charset=&quot;UTF-8&quot;>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#000;overflow:hidden;font-family:Orbitron,monospace}
-canvas{display:block}
-</style>
-</head>
-<body>
-<canvas id=&quot;c&quot;></canvas>
-<script>
-var cv=document.getElementById(&quot;c&quot;),ctx=cv.getContext(&quot;2d&quot;);
-var W=360,H=540;
-cv.width=W;cv.height=H;
-var state=&quot;idle&quot;,score=0,best=0,frame=0;
-var bird,pipes,parts,stars;
-var cooldown=false,sanim=0,earned=0;
-function iStars(){
-  stars=[];
-  var cols=[&quot;#fff&quot;,&quot;#4466ff&quot;,&quot;#00d4ff&quot;,&quot;#9933ff&quot;];
-  for(var i=0;i<70;i++) stars.push({x:Math.random()*W,y:Math.random()*H*0.85,r:Math.random()*1.3+0.3,tw:Math.random()*6.28,tws:Math.random()*0.03+0.01,c:cols[Math.floor(Math.random()*4)]});
-}
-function reset(){
-  frame=0;score=0;
-  bird={x:72,y:H/2,vy:0,ang:0,trail:[],alive:true,df:undefined};
-  pipes=[];parts=[];
-}
-function spawnPipe(){
-  var gap=145,topH=Math.random()*(H-200-gap)+70;
-  pipes.push({x:W+20,topH:topH,botY:topH+gap,scored:false,hue:200+Math.random()*80});
-}
-function flap(){
-  if(state===&quot;playing&quot;&amp;&amp;bird.alive){bird.vy=-7.2;sParts(bird.x,bird.y,&quot;#4466ff&quot;,5);}
-}
-function sParts(x,y,col,n){
-  for(var i=0;i<n;i++){var a=Math.random()*6.28,s=Math.random()*2.5+0.5;parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,dec:Math.random()*0.04+0.025,col:col,r:Math.random()*3+1});}
-}
-function hit(cx,cy,cr,rx,ry,rw,rh){var nx=Math.max(rx,Math.min(cx,rx+rw)),ny=Math.max(ry,Math.min(cy,ry+rh));return (cx-nx)*(cx-nx)+(cy-ny)*(cy-ny)<cr*cr;}
-function update(){
-  if(state!==&quot;playing&quot;)return;
-  frame++;
-  bird.vy+=0.42;if(bird.vy>11)bird.vy=11;
-  bird.y+=bird.vy;
-  bird.ang=Math.max(-0.45,Math.min(1.43,bird.vy*0.07));
-  var spd=2.7+score*0.03;
-  if(frame%95===0)spawnPipe();
-  var pw=50,capH=15,capW=60;
-  for(var i=0;i<pipes.length;i++){
-    var p=pipes[i];p.x-=spd;
-    if(!p.scored&amp;&amp;p.x+pw<bird.x-10){
-      p.scored=true;score++;earned+=2;
-      document.getElementById(&quot;sc&quot;).textContent=&quot;+&quot;+earned;
-      window.parent.postMessage({type:&quot;flapScore&quot;,earned:earned},&quot;*&quot;);
-      sParts(bird.x,bird.y,&quot;#ffcc00&quot;,10);sParts(bird.x,bird.y,&quot;#4466ff&quot;,6);
-    }
-    if(bird.alive){
-      var cx=p.x-5;
-      if(hit(bird.x,bird.y,10,p.x,0,pw,p.topH-capH)||hit(bird.x,bird.y,10,cx,p.topH-capH,capW,capH)||hit(bird.x,bird.y,10,cx,p.botY,capW,capH)||hit(bird.x,bird.y,10,p.x,p.botY+capH,pw,H))die();
-    }
-  }
-  pipes=pipes.filter(function(p){return p.x>-80;});
-  if(bird.y+10>H-60){bird.y=H-70;die();}
-  if(bird.y-10<0){bird.y=10;bird.vy=1;}
-}
-function die(){
-  if(!bird.alive)return;
-  bird.alive=false;bird.df=frame;
-  if(score>best)best=score;
-  sParts(bird.x,bird.y,&quot;#ff3355&quot;,20);sParts(bird.x,bird.y,&quot;#ff8800&quot;,10);sParts(bird.x,bird.y,&quot;#fff&quot;,6);
-  setTimeout(function(){state=&quot;dead&quot;;sanim=0;},700);
-}
-function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
-function dBg(){
-  var bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,&quot;#020208&quot;);bg.addColorStop(0.5,&quot;#050515&quot;);bg.addColorStop(1,&quot;#080510&quot;);ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
-  for(var i=0;i<stars.length;i++){var s=stars[i];s.tw+=s.tws;var a=0.4+0.6*Math.abs(Math.sin(s.tw));ctx.save();ctx.globalAlpha=a;ctx.fillStyle=s.c;ctx.shadowColor=s.c;ctx.shadowBlur=s.r*4;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.28);ctx.fill();ctx.restore();}
-}
-function dGround(){
-  var gY=H-55;ctx.fillStyle=&quot;#030314&quot;;ctx.fillRect(0,gY+2,W,H);
-  ctx.strokeStyle=&quot;#4466ff&quot;;ctx.lineWidth=2;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(0,gY);ctx.lineTo(W,gY);ctx.stroke();ctx.shadowBlur=0;
-}
-function dPipe(p){
-  var pw=50,capH=15,capW=60,cx2=p.x-5,h=p.hue;
-  ctx.save();ctx.shadowColor=&quot;hsl(&quot;+h+&quot;,100%,60%)&quot;;ctx.shadowBlur=14;
-  function body(x,y,w,bh){if(bh<=0)return;var g=ctx.createLinearGradient(x,0,x+w,0);g.addColorStop(0,&quot;hsl(&quot;+h+&quot;,70%,6%)&quot;);g.addColorStop(0.4,&quot;hsl(&quot;+h+&quot;,80%,22%)&quot;);g.addColorStop(0.6,&quot;hsl(&quot;+h+&quot;,80%,22%)&quot;);g.addColorStop(1,&quot;hsl(&quot;+h+&quot;,70%,6%)&quot;);ctx.fillStyle=g;ctx.fillRect(x,y,w,bh);ctx.strokeStyle=&quot;hsl(&quot;+h+&quot;,100%,65%)&quot;;ctx.lineWidth=1.5;ctx.strokeRect(x+0.75,y,w-1.5,bh);}
-  body(p.x,0,pw,p.topH-capH);body(cx2,p.topH-capH,capW,capH);body(cx2,p.botY,capW,capH);body(p.x,p.botY+capH,pw,H-p.botY-capH);
-  ctx.restore();
-}
-function dBird(){
-  var b=bird,sz=18;
-  b.trail.push({x:b.x,y:b.y,a:0});if(b.trail.length>14)b.trail.shift();
-  for(var i=0;i<b.trail.length;i++){var t=b.trail[i];t.a++;ctx.save();ctx.globalAlpha=(1-t.a/14)*0.35;ctx.fillStyle=&quot;#4466ff&quot;;ctx.beginPath();ctx.arc(t.x,t.y,Math.max(0,sz*0.35*(1-t.a/14)),0,6.28);ctx.fill();ctx.restore();}
-  ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.ang);
-  ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=sz*1.5;
-  var g=ctx.createRadialGradient(-sz*0.2,-sz*0.2,sz*0.1,0,0,sz*0.85);g.addColorStop(0,&quot;#fff&quot;);g.addColorStop(0.3,&quot;#88aaff&quot;);g.addColorStop(0.7,&quot;#4466ff&quot;);g.addColorStop(1,&quot;#112&quot;);
-  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,sz*0.85,0,6.28);ctx.fill();ctx.shadowBlur=0;
-  ctx.save();ctx.rotate(-0.3+Math.sin(frame*0.25)*0.4);ctx.fillStyle=&quot;rgba(68,102,255,0.7)&quot;;ctx.beginPath();ctx.ellipse(-sz*0.3,sz*0.2,sz*0.6,sz*0.25,-0.3,0,6.28);ctx.fill();ctx.restore();
-  ctx.fillStyle=&quot;#fff&quot;;ctx.beginPath();ctx.arc(sz*0.35,-sz*0.15,sz*0.22,0,6.28);ctx.fill();ctx.fillStyle=&quot;#001&quot;;ctx.beginPath();ctx.arc(sz*0.4,-sz*0.12,sz*0.11,0,6.28);ctx.fill();ctx.fillStyle=&quot;#00d4ff&quot;;ctx.beginPath();ctx.arc(sz*0.38,-sz*0.14,sz*0.05,0,6.28);ctx.fill();
-  ctx.restore();
-}
-function dParts(){
-  parts=parts.filter(function(p){return p.life>0;});
-  for(var i=0;i<parts.length;i++){var p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.08;p.life-=p.dec;ctx.save();ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.col;ctx.shadowColor=p.col;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0,p.r*p.life),0,6.28);ctx.fill();ctx.restore();}
-}
-function dScore(){ctx.save();ctx.textAlign=&quot;center&quot;;ctx.font=&quot;bold 36px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#fff&quot;;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=20;ctx.fillText(score,W/2,46);ctx.restore();}
-function dIdle(){
-  sanim+=0.04;var p=0.82+0.18*Math.sin(sanim*2);
-  ctx.save();ctx.fillStyle=&quot;rgba(0,0,0,0.5)&quot;;ctx.fillRect(0,0,W,H);ctx.textAlign=&quot;center&quot;;
-  ctx.font=&quot;bold 36px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#4466ff&quot;;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=28*p;ctx.fillText(&quot;NEXUS FLAP&quot;,W/2,H/2-50);
-  ctx.font=&quot;12px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#00d4ff&quot;;ctx.shadowBlur=6;ctx.fillText(&quot;EVERY POINT = +2 MESSAGES&quot;,W/2,H/2-22);
-  if(Math.sin(sanim*3)>0){ctx.font=&quot;bold 14px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#4466ff&quot;;ctx.shadowColor=&quot;#4466ff&quot;;ctx.shadowBlur=14;ctx.fillText(&quot;[ TAP TO FLY ]&quot;,W/2,H/2+18);}
-  ctx.shadowBlur=0;ctx.font=&quot;10px Arial&quot;;ctx.fillStyle=&quot;rgba(255,255,255,0.3)&quot;;ctx.fillText(&quot;SPACE OR CLICK&quot;,W/2,H/2+44);ctx.restore();
-}
-function dDead(){
-  sanim+=0.05;var ease=Math.min(1,sanim/1.2);
-  ctx.save();ctx.fillStyle=&quot;rgba(0,0,0,&quot;+(0.6*ease)+&quot;)&quot;;ctx.fillRect(0,0,W,H);
-  var cw=260,ch=196,cx3=(W-cw)/2,cy3=H/2-ch/2-10;ctx.globalAlpha=ease;
-  ctx.fillStyle=&quot;#08081a&quot;;rr(cx3,cy3,cw,ch,12);ctx.fill();ctx.strokeStyle=&quot;rgba(68,102,255,0.7)&quot;;ctx.lineWidth=1.5;rr(cx3,cy3,cw,ch,12);ctx.stroke();
-  var hg=ctx.createLinearGradient(cx3,cy3,cx3+cw,cy3);hg.addColorStop(0,&quot;#4466ff&quot;);hg.addColorStop(1,&quot;#00d4ff&quot;);ctx.fillStyle=hg;rr(cx3,cy3,cw,42,12);ctx.fill();
-  ctx.font=&quot;bold 15px Orbitron,Arial&quot;;ctx.textAlign=&quot;center&quot;;ctx.fillStyle=&quot;#fff&quot;;ctx.fillText(&quot;GAME OVER&quot;,W/2,cy3+28);
-  ctx.font=&quot;10px Arial&quot;;ctx.fillStyle=&quot;rgba(68,102,255,0.5)&quot;;ctx.fillText(&quot;SCORE&quot;,W/2-55,cy3+66);ctx.fillText(&quot;BEST&quot;,W/2+55,cy3+66);
-  ctx.font=&quot;bold 30px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#ffcc00&quot;;ctx.shadowColor=&quot;#ffcc00&quot;;ctx.shadowBlur=12;ctx.fillText(score,W/2-55,cy3+100);
-  var nb=score>0&amp;&amp;score>=best;ctx.fillStyle=nb?&quot;#00ff88&quot;:&quot;#aaa&quot;;ctx.shadowColor=nb?&quot;#00ff88&quot;:&quot;#555&quot;;ctx.shadowBlur=nb?12:4;ctx.fillText(best,W/2+55,cy3+100);ctx.shadowBlur=0;
-  if(nb){ctx.font=&quot;bold 9px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#00ff88&quot;;ctx.fillText(&quot;NEW BEST!&quot;,W/2+55,cy3+116);}
-  ctx.font=&quot;bold 11px Orbitron,Arial&quot;;ctx.fillStyle=&quot;#00d4ff&quot;;ctx.shadowColor=&quot;#00d4ff&quot;;ctx.shadowBlur=8;ctx.fillText(&quot;+&quot;+earned+&quot; MSGS EARNED&quot;,W/2,cy3+140);ctx.shadowBlur=0;
-  var ready=ease>=0.88,bp=ready?0.65+0.35*Math.sin(sanim*4):0;
-  ctx.fillStyle=ready?&quot;rgba(68,102,255,&quot;+bp+&quot;)&quot;:&quot;rgba(68,102,255,0.15)&quot;;ctx.font=&quot;bold 11px Orbitron,Arial&quot;;ctx.fillText(&quot;[ TAP TO RESTART ]&quot;,W/2,cy3+178);
-  ctx.restore();
-}
-function loop(){
-  ctx.clearRect(0,0,W,H);dBg();update();
-  for(var i=0;i<pipes.length;i++)dPipe(pipes[i]);
-  dGround();if(state!==&quot;idle&quot;)dBird();dParts();
-  if(state===&quot;playing&quot;)dScore();
-  if(!bird.alive&amp;&amp;bird.df!==undefined){var t=Math.min(1,(frame-bird.df)/18);ctx.save();ctx.fillStyle=&quot;rgba(255,51,85,&quot;+(0.3*(1-t))+&quot;)&quot;;ctx.fillRect(0,0,W,H);ctx.restore();}
-  if(state===&quot;idle&quot;)dIdle();if(state===&quot;dead&quot;)dDead();
-  requestAnimationFrame(loop);
-}
-function startGame(){reset();state=&quot;playing&quot;;sanim=0;cooldown=true;setTimeout(function(){cooldown=false;},320);setTimeout(spawnPipe,1100);}
-function handleInput(){
-  if(cooldown)return;
-  if(state===&quot;idle&quot;){startGame();return;}
-  if(state===&quot;dead&quot;&amp;&amp;sanim>=1.1){startGame();return;}
-  if(state===&quot;playing&quot;)flap();
-}
-cv.addEventListener(&quot;click&quot;,handleInput);
-cv.addEventListener(&quot;touchstart&quot;,function(e){e.preventDefault();handleInput();},{passive:false});
-document.addEventListener(&quot;keydown&quot;,function(e){if(e.code===&quot;Space&quot;){e.preventDefault();handleInput();}});
-iStars();reset();loop();
-&lt;/script&gt;
-<div id=&quot;sc&quot; style=&quot;display:none&quot;>+0</div>
-</body></html>"
-      style="width:360px;height:540px;border:1px solid rgba(68,102,255,0.25);border-radius:8px;display:block;box-shadow:0 0 20px rgba(68,102,255,0.1);"
-      scrolling="no" sandbox="allow-scripts allow-same-origin">
-    </iframe>
-  </div>
-</div>
-
-<!-- NEXUS ENERGY GAME -->
-
-<!-- Games Hub Modal -->
-<div id="games-hub-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('games-hub-modal')">
-  <div class="modal" style="width:480px;">
-    <div class="modal-title">🎮 GAMES</div>
-    <button class="modal-close" onclick="N.closeModal('games-hub-modal')">✕</button>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">⌨️</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Type &amp; Earn</span>
-          <span class="game-btn-desc">Type words to earn messages · 15s to 120s modes</span>
-        </div>
-        <span class="game-btn-badge">MSGS</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openFlapGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#00aaff,#0044cc);">🐦</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Nexus Flap</span>
-          <span class="game-btn-desc">Flap through pipes · each point earns +2 messages</span>
-        </div>
-        <span class="game-btn-badge">MSGS</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openNexusGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#4466ff,#9933ff);">⬡</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Nexus Energy</span>
-          <span class="game-btn-desc">Cosmic clicker · redeem energy for messages</span>
-        </div>
-        <span class="game-btn-badge">MSGS</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriftGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff4500,#ff8800);">🚗</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Drift King</span>
-          <span class="game-btn-desc">Arcade drift racer · open plate or circuit track</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(255,255,255,0.06);color:var(--text-dim);">FUN</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openBlackjack()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#1a6b2a,#2ecc71);">🃏</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Blackjack</span>
-          <span class="game-btn-desc">1000 free chips daily · stack your bankroll · climb the leaderboard</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(46,204,113,0.15);color:#2ecc71;">CHIPS</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openShellGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">🎯</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Shell Game</span>
-          <span class="game-btn-desc">Track the ball · beat the shuffle · three difficulty levels</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(68,102,255,0.15);color:var(--accent);">REFLEX</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriveGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff6600,#ff2200);">🏎️</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Drive</span>
-          <span class="game-btn-desc">3D road racer · dodge traffic · beat your high score</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(255,102,0,0.15);color:#ff6600;">RACING</span>
-      </div>
-
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openLongestGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#c9a84c,#50c878);">🌍</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">The Longest Game Ever</span>
-          <span class="game-btn-desc">Civilisation idle · from Stone Age to Omega Point</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(201,168,76,0.15);color:#c9a84c;">IDLE</span>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- Blackjack Overlay -->
-<div id="bj-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;">
-
-  <!-- Top bar -->
-  <div style="width:100%;max-width:580px;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0;">
-    <div style="font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">BLACKJACK</div>
-    <button onclick="N.closeBlackjack()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">✕</button>
-  </div>
-
-  <!-- Chips bar -->
-  <div style="width:100%;max-width:580px;padding:10px 20px 0;">
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);"></div>
-      <div style="font-family:var(--font-mono);font-size:12px;display:flex;align-items:center;gap:7px;">
-        <span style="color:var(--text-dim);">CHIPS</span>
-        <span class="bj-chips-val" id="bj-chips-display">0</span>
-      </div>
-      <div style="width:1px;height:16px;background:var(--border);flex-shrink:0;"></div>
-      <div id="bj-daily-info" style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);"></div>
-    </div>
-  </div>
-
-  <!-- Table -->
-  <div style="width:100%;max-width:580px;padding:12px 20px;display:flex;flex-direction:column;gap:12px;">
-
-    <!-- Dealer hand -->
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);"></div>
-      <div class="bj-hand-label">DEALER <span id="bj-dealer-score"></span></div>
-      <div class="bj-cards-row" id="bj-dealer-cards"></div>
-    </div>
-
-    <!-- Player hand -->
-    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);"></div>
-      <div class="bj-hand-label">YOU <span id="bj-player-score"></span></div>
-      <div class="bj-cards-row" id="bj-player-cards"></div>
-    </div>
-
-    <!-- Result message -->
-    <div id="bj-message" class="bj-message" style="min-height:28px;"></div>
-
-    <!-- Bet phase -->
-    <div id="bj-bet-area" style="display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 18px 20px;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);"></div>
-
-      <!-- Chip tokens row -->
-      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:flex-end;">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token t10" onclick="N.bjAddBet(10)"><span class="bj-chip-val">10</span></button>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token t25" onclick="N.bjAddBet(25)"><span class="bj-chip-val">25</span></button>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token t50" onclick="N.bjAddBet(50)"><span class="bj-chip-val">50</span></button>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token t100" onclick="N.bjAddBet(100)"><span class="bj-chip-val">100</span></button>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token t250" onclick="N.bjAddBet(250)"><span class="bj-chip-val">250</span></button>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token tallin" onclick="N.bjBetAll()"><span class="bj-chip-val">ALL<br>IN</span></button>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
-          <button class="bj-chip-token tclear" onclick="N.bjClearBet()"><span class="bj-chip-val">CLR</span></button>
-        </div>
-      </div>
-
-      <!-- Bet tray (visual chips) -->
-      <div style="min-height:40px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;">
-        <div class="bj-section-title" id="bj-bet-label" style="opacity:0.5;">CLICK A CHIP TO BET</div>
-        <div class="bj-bet-tray" id="bj-bet-tray"></div>
-      </div>
-
-      <button class="bj-deal-btn" onclick="N.bjDeal()">DEAL</button>
-    </div>
-
-    <!-- Action buttons -->
-    <div id="bj-action-area" style="display:none;justify-content:center;gap:10px;">
-      <button class="bj-action-btn hit" onclick="N.bjHit()">HIT</button>
-      <button class="bj-action-btn stand" onclick="N.bjStand()">STAND</button>
-      <button class="bj-action-btn double" id="bj-double-btn" onclick="N.bjDouble()">DOUBLE</button>
-    </div>
-
-    <!-- Play again -->
-    <div id="bj-again-area" style="display:none;justify-content:center;">
-      <button class="bj-again-btn" onclick="N.bjPlayAgain()">PLAY AGAIN</button>
-    </div>
-
-  </div>
-</div>
-
-<!-- Shell Game Overlay -->
-<div id="sg-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding-bottom:24px;">
-
-  <!-- Top bar -->
-  <div style="width:100%;max-width:680px;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0;">
-    <div style="font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:sg-title-float 4s ease-in-out infinite;">SHELL GAME</div>
-    <button onclick="N.closeShellGame()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">✕</button>
-  </div>
-
-  <!-- Subtitle + difficulty -->
-  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;margin:6px 0 14px;">Three cups · One ball · All eyes on the prize</div>
-  <div style="display:flex;gap:6px;background:var(--panel);border:1px solid var(--border);padding:4px;border-radius:100px;margin-bottom:20px;" id="sg-diff-bar">
-    <button class="sg-diff-btn" data-diff="easy">Easy</button>
-    <button class="sg-diff-btn active" data-diff="medium">Medium</button>
-    <button class="sg-diff-btn" data-diff="hard">Hard</button>
-  </div>
-
-  <!-- Table -->
-  <div style="position:relative;">
-    <div class="sg-table" id="sg-table">
-      <canvas class="sg-particles" id="sg-canvas"></canvas>
-      <div class="sg-cups-area" id="sg-cups-area">
-
-        <div class="sg-cup-slot" id="sg-slot0">
-          <div class="sg-cup-wrap idle-0" id="sg-cup0">
-            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="sg-cg0" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
-                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
-                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
-                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
-                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
-                </linearGradient>
-              </defs>
-              <!-- Drop shadow -->
-              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
-              <!-- Cup body — solid accent colour -->
-              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
-              <!-- Shading overlay -->
-              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg0)"/>
-              <!-- Left highlight streak -->
-              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
-              <!-- Bottom rim -->
-              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
-              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
-              <!-- Top rim -->
-              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
-              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
-              <!-- Top cap -->
-              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
-              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
-              <!-- Mid band detail -->
-              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
-              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
-            </svg>
-          </div>
-          <div class="sg-shadow" id="sg-shadow0"></div>
-          <div class="sg-ball" id="sg-ball0"></div>
-        </div>
-
-        <div class="sg-cup-slot" id="sg-slot1">
-          <div class="sg-cup-wrap idle-1" id="sg-cup1">
-            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="sg-cg1" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
-                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
-                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
-                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
-                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
-                </linearGradient>
-              </defs>
-              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
-              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
-              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg1)"/>
-              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
-              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
-              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
-              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
-              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
-              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
-              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
-              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
-              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
-            </svg>
-          </div>
-          <div class="sg-shadow" id="sg-shadow1"></div>
-          <div class="sg-ball" id="sg-ball1"></div>
-        </div>
-
-        <div class="sg-cup-slot" id="sg-slot2">
-          <div class="sg-cup-wrap idle-2" id="sg-cup2">
-            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="sg-cg2" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
-                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
-                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
-                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
-                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
-                </linearGradient>
-              </defs>
-              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
-              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
-              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg2)"/>
-              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
-              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
-              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
-              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
-              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
-              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
-              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
-              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
-              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
-            </svg>
-          </div>
-          <div class="sg-shadow" id="sg-shadow2"></div>
-          <div class="sg-ball" id="sg-ball2"></div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- Scores -->
-  <div style="display:flex;gap:28px;margin-top:20px;margin-bottom:4px;align-items:flex-end;">
-    <div style="text-align:center;"><div class="sg-score-val" id="sg-wins">0</div><div class="sg-score-label">WINS</div></div>
-    <div style="text-align:center;"><div class="sg-score-val" id="sg-streak">0</div><div class="sg-score-label">STREAK <span id="sg-fire" style="opacity:0;transition:opacity 0.3s;">🔥</span></div></div>
-    <div style="text-align:center;"><div class="sg-score-val" id="sg-losses">0</div><div class="sg-score-label">LOSSES</div></div>
-    <div style="text-align:center;border-left:1px solid var(--border);padding-left:28px;">
-      <div class="sg-score-val" id="sg-pts" style="color:var(--accent2);font-size:1.4rem;">0</div>
-      <div class="sg-score-label">TOTAL PTS</div>
-    </div>
-  </div>
-
-  <!-- Status -->
-  <div style="min-height:56px;display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:10px;">
-    <div class="sg-status-msg" id="sg-msg">Ready to play?</div>
-    <div class="sg-status-sub" id="sg-sub">Choose difficulty and press start</div>
-  </div>
-
-  <!-- Main button -->
-  <button class="sg-main-btn" id="sg-btn">▶ &nbsp;START GAME</button>
-  <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-top:8px;min-height:14px;" id="sg-round-info"></div>
-
-</div>
-
-<!-- Drive Game Overlay -->
-<div id="drive-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
-  <button onclick="N.closeDriveGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,102,0,0.15);border:1px solid rgba(255,102,0,0.4);color:#ff6600;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10000;">✕ CLOSE</button>
-  <iframe id="drive-game-iframe"
-    style="width:100vw;height:100vh;border:none;display:block;"
-    sandbox="allow-scripts allow-same-origin">
-  </iframe>
-</div>
-
-<!-- Longest Game Ever Overlay -->
-<div id="longest-game-overlay" style="display:none;position:fixed;inset:0;background:#06080f;z-index:9999;flex-direction:column;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#06080f;border-bottom:1px solid rgba(201,168,76,0.2);flex-shrink:0;height:38px;">
-    <span style="font-family:'Cinzel Decorative',serif;font-size:11px;color:#c9a84c;letter-spacing:2px;">THE LONGEST GAME EVER</span>
-    <button onclick="N.closeLongestGame()" style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.35);color:#c9a84c;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:bold;font-family:monospace;transition:all 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.25)'" onmouseout="this.style.background='rgba(201,168,76,0.12)'">✕ CLOSE</button>
-  </div>
-  <iframe id="longest-game-iframe"
-    style="width:100%;flex:1;border:none;display:block;min-height:0;"
-    sandbox="allow-scripts allow-same-origin">
-  </iframe>
-</div>
-
-<!-- Drift King Overlay -->
-<div id="drift-game-overlay" style="display:none;position:fixed;inset:0;background:#0d0d0f;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
-  <button onclick="N.closeDriftGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,69,0,0.15);border:1px solid rgba(255,69,0,0.4);color:#ff4500;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10;">✕ CLOSE</button>
-  <iframe id="drift-game-iframe"
-    style="width:900px;height:650px;max-width:100vw;max-height:calc(100vh - 40px);border:none;display:block;"
-    sandbox="allow-scripts allow-same-origin">
-  </iframe>
-</div>
-
-
-<!-- Fullscreen Popup Announcement -->
-<div id="popup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9998;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
-  <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:520px;width:100%;position:relative;box-shadow:0 0 60px rgba(0,0,0,0.8);">
-    <div id="popup-title" style="font-family:var(--font-display);font-size:16px;letter-spacing:3px;color:var(--accent);margin-bottom:16px;text-align:center;"></div>
-    <div id="popup-text" style="font-family:var(--font-mono);font-size:13px;color:var(--text);line-height:1.7;text-align:center;margin-bottom:24px;white-space:pre-wrap;"></div>
-    <div style="text-align:center;">
-      <button id="popup-continue-btn" onclick="N.closePopupAnnounce()" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:var(--font-display);font-size:12px;letter-spacing:3px;padding:12px 32px;border-radius:8px;cursor:pointer;transition:opacity 0.15s;" disabled>
-        <span id="popup-countdown"></span>
-      </button>
-    </div>
-  </div>
-</div>
-
-<div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
-  <iframe id="nexus-game-iframe"
-    srcdoc="<!DOCTYPE html>
+var _NEXUS_SRCDOC = "<!DOCTYPE html>
 <html>
 <head>
 <meta charset=&quot;UTF-8&quot;>
@@ -10377,7 +9669,756 @@ renderAll();
 
 
 </body>
-</html>"
+</html>";
+
+function openNexusGame(){
+  const overlay=document.getElementById('nexus-game-overlay');
+  if(!overlay) return;
+  overlay.style.display='block';
+  // Lazy-load fresh every time
+  const iframe=document.getElementById('nexus-game-iframe');
+  if(iframe){
+    iframe.srcdoc='';
+    requestAnimationFrame(()=>{
+      iframe.srcdoc=_NEXUS_SRCDOC;
+      // After load, send saved state
+      iframe.addEventListener('load',function(){
+        try{
+          const _uid=localStorage.getItem('nexus_active_uid')||'default';
+          const saved=localStorage.getItem('nexus_energy_'+_uid);
+          if(saved&&iframe.contentWindow){
+            iframe.contentWindow.postMessage({type:'nexusLoad',v:4,state:JSON.parse(saved)},'*');
+          }
+        }catch{}
+      },{once:true});
+    });
+  }
+}
+
+function closeNexusGame(){
+  const overlay=document.getElementById('nexus-game-overlay');
+  if(overlay) overlay.style.display='none';
+  // Kill the iframe so it stops running in background
+  const iframe=document.getElementById('nexus-game-iframe');
+  if(iframe){try{iframe.contentWindow.location.replace('about:blank');}catch(e){}iframe.srcdoc='';}
+}
+
+window.addEventListener('message',async function(e){
+  if(!e.data) return;
+  if(e.data.type==='closeNexusGame'){
+    closeNexusGame();
+  }
+  if(e.data.type==='nexusSave'){
+    if(!cu||!cud||!e.data.state) return;
+    const _uid=cu.uid;
+    const _state=e.data.state;
+    // Save to uid-specific localStorage key (prevents cross-account bleed)
+    try{localStorage.setItem('nexus_energy_'+_uid, JSON.stringify(_state));}catch{}
+    // Build Firestore update
+    const _updates={nexusGameSave:JSON.stringify(_state)};
+    const _total=_state.total||0;
+    if(_total>(cud.nexusEnergy||0)){
+      _updates.nexusEnergy=_total;
+      cud={...cud,nexusEnergy:_total};
+      uCache[_uid]={...uCache[_uid],nexusEnergy:_total};
+    }
+    // Save full state to Firestore for cross-device restore
+    try{
+      await updateDoc(doc(db,'users',_uid),_updates);
+      cud={...cud,nexusGameSave:_updates.nexusGameSave};
+    }catch{}
+  }
+  if(e.data.type==='driftScore'&&cu&&cud){
+    const ds=e.data.score||0;
+    if(ds>(cud.driftBest||0)){
+      try{
+        await updateDoc(doc(db,'users',cu.uid),{driftBest:ds});
+        cud={...cud,driftBest:ds};
+        uCache[cu.uid]={...uCache[cu.uid],driftBest:ds};
+        toast('🚗 New drift record: '+ds.toLocaleString()+'!','success');
+        syncLeaderboardRoles().catch(()=>{});
+      }catch{}
+    }
+  }
+  if(e.data.type==='nexusLoad'){
+    // Reply directly to the source window (avoids stale contentWindow ref)
+    try{
+      const saved=localStorage.getItem('nexus_energy_save');
+      if(saved&&e.source){
+        const sv=JSON.parse(saved);
+        e.source.postMessage({type:'nexusLoad',v:3,state:sv},'*');
+      }
+    }catch{}
+  }
+  if(e.data.type==='nexusGameRedeem'&&cu&&cud){
+    const amount=e.data.amount||0;
+    if(amount<=0) return;
+    try{
+      const newCount=(cud.msgCount||0)+amount;
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount});
+      cud={...cud,msgCount:newCount};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+      renderProfile();
+      toast('⬡ +'+amount+' messages redeemed from Nexus Energy!','success');
+    }catch(err){toast('Could not save messages.','danger');}
+  }
+});
+
+// ── GLOBAL EVENTS ──────────────────────────────
+document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAllModals();$('emoji-picker-bar').classList.remove('open');}});
+
+// ── WIRE UP window.N (after all functions defined) ─
+window._N = {
+  switchTab, doLogin, doRegister, doLogout,
+  openModal, closeModal,
+  filterFeed: v=>{ffilter=v.toLowerCase();renderSidebar();},
+  openChat, sendMessage, handleInputKey, autoResize,
+  handleFileAttach, toggleEmojiPicker,
+  confirmWipe, doWipe, cancelWipe,
+  startDM, startCall, endCall, answerCall, rejectCall,
+  toggleMute, toggleCamera, toggleScreenShare, toggleFullscreen,
+  leaveCall, endCallForAll, updateCallButtons,
+  acceptInvite, declineInvite, toggleInvitee, createGroup,
+  confirmLeaveGroup, doLeaveGroup,
+  addRxn, applyTheme,
+  openProfileModal, saveBio,
+  applyBgUrl, applyBgFile, clearChatBg,
+  saveEmoji,
+  saveBanner, saveBannerUrl, saveBannerFile,
+  toggleSidebar, closeSidebar, setMobileMode,
+  toggleBlock, saveProfilePicUrl, saveProfilePicFile, clearProfilePic,
+  toggleRecording, stopRecording, cancelRecording, playVoice, cycleSpeed,
+  flipCamera,
+  openCreditsModal, sendHelp,
+  openChangelog, openFeedback, submitFeedback,
+  saveUserFont,
+  showChatContextMenu, clearChatHistory, clearCurrentChat,
+  adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
+  adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
+  showImpersonationBanner, returnToOwner,
+  adminRenameUser, adminChangePassword, adminDeleteAccount,
+  renderAnnouncePanel,
+  loadOwnerLeaderboards, olbTab, olbSave,
+  openTtt, tttSendChallenge, tttMove, tttOpenGame, tttNewGame, tttCleanup, tttClose,
+  showTnC, hideTnC,
+  setReply, clearReply, scrollToMsg,
+  openLightbox, closeLightbox, dlLightbox, deleteMessage,
+  openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
+  toggleMoreMenu, closeMoreMenu, filterUsers,
+  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
+  adminClearTickets, adminResetMsgs, openOwnerModal,
+  setStatus, toggleStatusPicker, updateMyStatusDot,
+  saveNote, clearNote,
+  setBgEffect, eggOpen, eggClose,
+  openAchievementsModal, unlockAch, syncAchCache,
+  lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
+  tgSetMode, tgRestart, tgStop, tgSaveEarned,
+  openGamesHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  adminSendPopup, adminClearPopup, closePopupAnnounce,
+  openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
+  openDriveGame, closeDriveGame,
+  openLongestGame, closeLongestGame,
+  openShellGame, closeShellGame,
+  toggleNotifications, updateNotifSettingsUI,
+  syncLeaderboardRoles,
+  openBlackjack, closeBlackjack, bjAddBet, bjClearBet, bjBetAll, bjDeal, bjHit, bjStand, bjDouble, bjPlayAgain, bjOpenLeaderboard,
+};
+window._DRIFT_SRCDOC = decodeURIComponent(escape(atob("PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9ImVuIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPHRpdGxlPkRSSUZUIEtJTkc8L3RpdGxlPgo8c3R5bGU+CkBpbXBvcnQgdXJsKCdodHRwczovL2ZvbnRzLmdvb2dsZWFwaXMuY29tL2NzczI/ZmFtaWx5PUJlYmFzK05ldWUmZmFtaWx5PVNwYWNlK01vbm86d2dodEA0MDA7NzAwJmRpc3BsYXk9c3dhcCcpOwoqe21hcmdpbjowO3BhZGRpbmc6MDtib3gtc2l6aW5nOmJvcmRlci1ib3h9Cmh0bWwsYm9keXt3aWR0aDoxMDAlO2hlaWdodDoxMDAlO292ZXJmbG93OmhpZGRlbjtiYWNrZ3JvdW5kOiMwZDBkMGY7ZGlzcGxheTpmbGV4O2FsaWduLWl0ZW1zOmNlbnRlcjtqdXN0aWZ5LWNvbnRlbnQ6Y2VudGVyO2ZvbnQtZmFtaWx5OidTcGFjZSBNb25vJyxtb25vc3BhY2U7Y29sb3I6I2ZmZn0KI3dyYXB7cG9zaXRpb246cmVsYXRpdmU7d2lkdGg6OTAwcHg7aGVpZ2h0OjY1MHB4O2ZsZXgtc2hyaW5rOjB9CmNhbnZhc3tkaXNwbGF5OmJsb2NrfQojaHVke3Bvc2l0aW9uOmFic29sdXRlO2luc2V0OjA7cG9pbnRlci1ldmVudHM6bm9uZX0KLmhse2ZvbnQtc2l6ZTo5cHg7bGV0dGVyLXNwYWNpbmc6NHB4O2NvbG9yOiMzYTNhM2E7dGV4dC10cmFuc2Zvcm06dXBwZXJjYXNlO21hcmdpbi1ib3R0b206MnB4fQouaHZ7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7bGluZS1oZWlnaHQ6MX0KI2h1ZC1zY29yZXtwb3NpdGlvbjphYnNvbHV0ZTt0b3A6MThweDtsZWZ0OjI0cHh9CiNodWQtc2NvcmUgLmh2e2ZvbnQtc2l6ZTo1NnB4O2NvbG9yOiNkZGR9CiNodWQtY29tYm97cG9zaXRpb246YWJzb2x1dGU7dG9wOjE4cHg7cmlnaHQ6MjRweDt0ZXh0LWFsaWduOnJpZ2h0fQojaHVkLWNvbWJvIC5odntmb250LXNpemU6NjBweDtjb2xvcjojZmY0NTAwO3RleHQtc2hhZG93OjAgMCAzMHB4IHJnYmEoMjU1LDgwLDAsMC4zNSk7dHJhbnNpdGlvbjp0cmFuc2Zvcm0gLjA4cyxjb2xvciAuMXN9CiNodWQtY29tYm8gLmh2LnBvcHt0cmFuc2Zvcm06c2NhbGUoMS41KTtjb2xvcjojZmZkZDAwfQojZG17cG9zaXRpb246YWJzb2x1dGU7Ym90dG9tOjI2cHg7bGVmdDo1MCU7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoLTUwJSk7d2lkdGg6MjYwcHg7dGV4dC1hbGlnbjpjZW50ZXJ9CiNkbS1iYXJ7aGVpZ2h0OjRweDtiYWNrZ3JvdW5kOiMxODE4MTg7Ym9yZGVyLXJhZGl1czoycHg7Ym9yZGVyOjFweCBzb2xpZCAjMjIyO292ZXJmbG93OmhpZGRlbjttYXJnaW4tdG9wOjVweH0KI2RtLWZpbGx7aGVpZ2h0OjEwMCU7d2lkdGg6MCU7YmFja2dyb3VuZDpsaW5lYXItZ3JhZGllbnQoOTBkZWcsI2ZmMzMwMCwjZmZjYzAwKTtib3JkZXItcmFkaXVzOjJweH0KI2Rwb3B7cG9zaXRpb246YWJzb2x1dGU7Ym90dG9tOjUwcHg7bGVmdDo1MCU7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoLTUwJSk7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7Zm9udC1zaXplOjI2cHg7Y29sb3I6I2ZmY2MwMDtsZXR0ZXItc3BhY2luZzoycHg7b3BhY2l0eTowO3doaXRlLXNwYWNlOm5vd3JhcDtwb2ludGVyLWV2ZW50czpub25lO3RleHQtc2hhZG93OjAgMCAxNHB4IHJnYmEoMjU1LDIxMCwwLC43KTt0cmFuc2l0aW9uOm9wYWNpdHkgLjE1c30KI2h1ZC1ibHtwb3NpdGlvbjphYnNvbHV0ZTtib3R0b206MjZweDtsZWZ0OjI0cHh9CiNodWQtYmwgLmh2e2ZvbnQtc2l6ZToyMHB4O2NvbG9yOiMyZTJlMmV9CiNodWQtYnJ7cG9zaXRpb246YWJzb2x1dGU7Ym90dG9tOjI2cHg7cmlnaHQ6MjRweDt0ZXh0LWFsaWduOnJpZ2h0fQojaHVkLWJyIC5odntmb250LXNpemU6MjBweDtjb2xvcjojMmUyZTJlfQojb3ZlcmxheXtwb3NpdGlvbjphYnNvbHV0ZTtpbnNldDowO2JhY2tncm91bmQ6cmdiYSg2LDYsOCwuOTIpO2Rpc3BsYXk6ZmxleDtmbGV4LWRpcmVjdGlvbjpjb2x1bW47YWxpZ24taXRlbXM6Y2VudGVyO2p1c3RpZnktY29udGVudDpjZW50ZXI7Z2FwOjE0cHg7cG9pbnRlci1ldmVudHM6YWxsfQojb3ZlcmxheSBoMXtmb250LWZhbWlseTonQmViYXMgTmV1ZScsc2Fucy1zZXJpZjtmb250LXNpemU6ODhweDtsZXR0ZXItc3BhY2luZzoxMnB4O2xpbmUtaGVpZ2h0OjF9CiNvdmVybGF5IGgxIGJ7Y29sb3I6I2ZmNDUwMDtmb250LXdlaWdodDo0MDB9CiNvdmVybGF5IHB7Zm9udC1zaXplOjEwcHg7Y29sb3I6IzU1NTtsZXR0ZXItc3BhY2luZzozcHg7dGV4dC1hbGlnbjpjZW50ZXI7bGluZS1oZWlnaHQ6Mi40fQojb3ZlcmxheSBwIGVte2NvbG9yOiNhYWE7Zm9udC1zdHlsZTpub3JtYWx9CiNmaW5hbHtmb250LWZhbWlseTonQmViYXMgTmV1ZScsc2Fucy1zZXJpZjtmb250LXNpemU6MzBweDtjb2xvcjojZmZjYzAwO2xldHRlci1zcGFjaW5nOjVweDtkaXNwbGF5Om5vbmV9CiNidG57cGFkZGluZzoxMnB4IDU0cHg7YmFja2dyb3VuZDojZmY0NTAwO2JvcmRlcjpub25lO2NvbG9yOiNmZmY7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7Zm9udC1zaXplOjIycHg7bGV0dGVyLXNwYWNpbmc6NnB4O2N1cnNvcjpwb2ludGVyO2JvcmRlci1yYWRpdXM6MnB4O21hcmdpbi10b3A6NnB4O3RyYW5zaXRpb246YmFja2dyb3VuZCAuMTJzLHRyYW5zZm9ybSAuMDdzfQojYnRuOmhvdmVye2JhY2tncm91bmQ6I2ZmNWMxYX0jYnRuOmFjdGl2ZXt0cmFuc2Zvcm06c2NhbGUoLjk3KX0KI2RpZmYtcm93e2Rpc3BsYXk6ZmxleDtnYXA6MTBweDttYXJnaW4tdG9wOjRweH0KLmRidG57cGFkZGluZzo5cHggMjJweDtib3JkZXI6MS41cHggc29saWQgIzMzMztiYWNrZ3JvdW5kOnRyYW5zcGFyZW50O2NvbG9yOiM1NTU7Zm9udC1mYW1pbHk6J0JlYmFzIE5ldWUnLHNhbnMtc2VyaWY7Zm9udC1zaXplOjE4cHg7bGV0dGVyLXNwYWNpbmc6NHB4O2N1cnNvcjpwb2ludGVyO2JvcmRlci1yYWRpdXM6MnB4O3RyYW5zaXRpb246YWxsIC4xMnN9Ci5kYnRuOmhvdmVye2JvcmRlci1jb2xvcjojODg4O2NvbG9yOiNjY2N9LmRidG4uc2Vse2JvcmRlci1jb2xvcjojZmY0NTAwO2NvbG9yOiNmZjQ1MDA7YmFja2dyb3VuZDpyZ2JhKDI1NSw2OSwwLDAuMDgpfQojZGlmZi1sYWJlbHtmb250LXNpemU6OXB4O2xldHRlci1zcGFjaW5nOjRweDtjb2xvcjojNDQ0O21hcmdpbi10b3A6MnB4fQojbm8tbXNncy1ub3RpY2V7cG9zaXRpb246YWJzb2x1dGU7dG9wOjE0cHg7bGVmdDo1MCU7dHJhbnNmb3JtOnRyYW5zbGF0ZVgoLTUwJSk7Zm9udC1zaXplOjlweDtsZXR0ZXItc3BhY2luZzozcHg7Y29sb3I6IzMzMztmb250LWZhbWlseTonU3BhY2UgTW9ubycsbW9ub3NwYWNlO3doaXRlLXNwYWNlOm5vd3JhcDtwb2ludGVyLWV2ZW50czpub25lfQo8L3N0eWxlPgo8L2hlYWQ+Cjxib2R5Pgo8ZGl2IGlkPSJ3cmFwIj4KICA8Y2FudmFzIGlkPSJjIiB3aWR0aD0iOTAwIiBoZWlnaHQ9IjY1MCI+PC9jYW52YXM+CiAgPGRpdiBpZD0iaHVkIj4KICAgIDxkaXYgaWQ9Imh1ZC1zY29yZSI+PGRpdiBjbGFzcz0iaGwiPnNjb3JlPC9kaXY+PGRpdiBjbGFzcz0iaHYiIGlkPSJlU2NvcmUiPjA8L2Rpdj48L2Rpdj4KICAgIDxkaXYgaWQ9Imh1ZC1jb21ibyI+PGRpdiBjbGFzcz0iaGwiPmNvbWJvPC9kaXY+PGRpdiBjbGFzcz0iaHYiIGlkPSJlQ29tYm8iPngxPC9kaXY+PC9kaXY+CiAgICA8ZGl2IGlkPSJkbSI+PGRpdiBjbGFzcz0iaGwiPmRyaWZ0PC9kaXY+PGRpdiBpZD0iZG0tYmFyIj48ZGl2IGlkPSJkbS1maWxsIj48L2Rpdj48L2Rpdj48L2Rpdj4KICAgIDxkaXYgaWQ9ImRwb3AiPjwvZGl2PgogICAgPGRpdiBpZD0iaHVkLWJsIj48ZGl2IGNsYXNzPSJobCI+c3BlZWQ8L2Rpdj48ZGl2IGNsYXNzPSJodiIgaWQ9ImVTcGQiPjAga20vaDwvZGl2PjwvZGl2PgogICAgPGRpdiBpZD0iaHVkLWJyIj48ZGl2IGNsYXNzPSJobCI+YmVzdCBjb21ibzwvZGl2PjxkaXYgY2xhc3M9Imh2IiBpZD0iZUJlc3QiPngxPC9kaXY+PC9kaXY+CiAgICA8ZGl2IGlkPSJuby1tc2dzLW5vdGljZSI+Tk8gTUVTU0FHRVMgRUFSTkVEPC9kaXY+CiAgPC9kaXY+CiAgPGRpdiBpZD0ib3ZlcmxheSI+CiAgICA8aDE+RFJJRlQgPGI+S0lORzwvYj48L2gxPgogICAgPHA+PGVtPlcv4oaRPC9lbT4gdGhyb3R0bGUgJm5ic3A7PGVtPlMv4oaTPC9lbT4gYnJha2U8YnI+PGVtPkEv4oaQIEQv4oaSPC9lbT4gc3RlZXI8YnI+PGVtPlNQQUNFPC9lbT4gaGFuZGJyYWtlPC9wPgogICAgPGRpdiBpZD0iZGlmZi1sYWJlbCI+dHJhY2s8L2Rpdj4KICAgIDxkaXYgaWQ9ImRpZmYtcm93Ij4KICAgICAgPGJ1dHRvbiBjbGFzcz0iZGJ0biBzZWwiIGRhdGEtdD0ib3BlbiI+T1BFTiBQTEFURTwvYnV0dG9uPgogICAgICA8YnV0dG9uIGNsYXNzPSJkYnRuIiBkYXRhLXQ9ImNpcmN1aXQiPkNJUkNVSVQ8L2J1dHRvbj4KICAgIDwvZGl2PgogICAgPGRpdiBpZD0iZmluYWwiPjwvZGl2PgogICAgPGJ1dHRvbiBpZD0iYnRuIj5TVEFSVCBFTkdJTkU8L2J1dHRvbj4KICA8L2Rpdj4KPC9kaXY+CjxzY3JpcHQ+Cid1c2Ugc3RyaWN0JzsKY29uc3QgY3Y9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2MnKSxjdHg9Y3YuZ2V0Q29udGV4dCgnMmQnKSxXPTkwMCxIPTY1MDsKbGV0IHRyYWNrTW9kZT0nb3Blbic7CmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJy5kYnRuJykuZm9yRWFjaChiPT57Yi5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsKCk9Pntkb2N1bWVudC5xdWVyeVNlbGVjdG9yQWxsKCcuZGJ0bicpLmZvckVhY2goeD0+eC5jbGFzc0xpc3QucmVtb3ZlKCdzZWwnKSk7Yi5jbGFzc0xpc3QuYWRkKCdzZWwnKTt0cmFja01vZGU9Yi5kYXRhc2V0LnQ7fSk7fSk7CmNvbnN0IGVTY29yZT1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZVNjb3JlJyksZUNvbWJvPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdlQ29tYm8nKSxlU3BkPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdlU3BkJyksZUJlc3Q9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2VCZXN0JyksZG1GaWxsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdkbS1maWxsJyksZHBvcD1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZHBvcCcpLG92ZXJsYXk9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ292ZXJsYXknKSxidG49ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bicpLGZpbmFsXz1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnZmluYWwnKTsKY29uc3QgSz17fTsKd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoJ2tleWRvd24nLGU9PntLW2UuY29kZV09MTtbJ1NwYWNlJywnQXJyb3dVcCcsJ0Fycm93RG93bicsJ0Fycm93TGVmdCcsJ0Fycm93UmlnaHQnXS5pbmNsdWRlcyhlLmNvZGUpJiZlLnByZXZlbnREZWZhdWx0KCk7fSk7CndpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdrZXl1cCcsZT0+e0tbZS5jb2RlXT0wO30pOwpjb25zdCBjYW09e3g6MCx5OjB9Owpjb25zdCBjYXI9e3g6MCx5OjAsYW5nbGU6MCx2eDowLHZ5OjAseWF3OjAsc3RlZXI6MH07CmNvbnN0IEFDQ0VMPTAuMjAsVE9QU1BEPTcuMCxGUklDVElPTj0wLjk5MixHUklQPTAuMDA4LEhCX0dSSVA9MC4wMDEsWUFXX0ZPUkNFPTAuMDAyOCxZQVdfREFNUD0wLjk2OCxTVEVFUl9NQVg9MS4wLFNURUVSX1JBVEU9MC4xMixTVEVFUl9SVE49MC4xMDsKbGV0IHNjb3JlPTAsY29tYm89MSxiZXN0Q29tYm89MSxkcmlmdFRpbWU9MCxkcmlmdEFjdGl2ZT1mYWxzZSxkcmlmdEFjYz0wLGNvbWJvRGVjYXk9MCxydW5uaW5nPWZhbHNlLHJhZj1udWxsLGJ1cm5vdXRUaW1lPTAscm9sbGJhY2tTbW9rZT0wOwpjb25zdCBzbW9rZT1bXSxzdHJpcHM9W107bGV0IGN1clN0cmlwPW51bGw7CmNvbnN0IFRZUkVfSEFMRj01LjUsQVhMRV9CQUNLPTIwLE1BUktfTElGRT0xODAwLE1BUktfQUxQSEE9MC44MjsKZnVuY3Rpb24gbWFya0F4bGVQb3MoKXtjb25zdCBjYT1NYXRoLmNvcyhjYXIuYW5nbGUpLHNhPU1hdGguc2luKGNhci5hbmdsZSksY3g9Y2FyLngtY2EqQVhMRV9CQUNLLGN5PWNhci55LXNhKkFYTEVfQkFDSyxyeD0tc2Escnk9Y2E7cmV0dXJue2x4OmN4LXJ4KlRZUkVfSEFMRixseTpjeS1yeSpUWVJFX0hBTEYscng6Y3grcngqVFlSRV9IQUxGLHJ5OmN5K3J5KlRZUkVfSEFMRn07fQpmdW5jdGlvbiBzdGFydFN0cmlwKCl7Y3VyU3RyaXA9e3B0czpbXSxhZ2U6MCxkb25lOmZhbHNlfTtzdHJpcHMucHVzaChjdXJTdHJpcCk7fQpmdW5jdGlvbiBhcHBlbmRNYXJrKCl7aWYoIWN1clN0cmlwKXN0YXJ0U3RyaXAoKTtjb25zdCBwPW1hcmtBeGxlUG9zKCk7Y3VyU3RyaXAucHRzLnB1c2goe2x4OnAubHgsbHk6cC5seSxyeDpwLnJ4LHJ5OnAucnl9KTt9CmZ1bmN0aW9uIGVuZFN0cmlwKCl7aWYoY3VyU3RyaXApe2N1clN0cmlwLmRvbmU9dHJ1ZTtjdXJTdHJpcD1udWxsO319CmZ1bmN0aW9uIHRpY2tNYXJrcygpe2ZvcihsZXQgaT1zdHJpcHMubGVuZ3RoLTE7aT49MDtpLS0pe3N0cmlwc1tpXS5hZ2UrKztpZihzdHJpcHNbaV0uYWdlPk1BUktfTElGRSlzdHJpcHMuc3BsaWNlKGksMSk7fXdoaWxlKHN0cmlwcy5sZW5ndGg+MTIwKXN0cmlwcy5zaGlmdCgpO30KZnVuY3Rpb24gYWRkU21va2Uobixzcyxhcyl7Y29uc3QgcmE9Y2FyLmFuZ2xlLGJ4PWNhci54LU1hdGguY29zKHJhKSoyMCxieT1jYXIueS1NYXRoLnNpbihyYSkqMjAsc3Z4PWNhci52eCowLjQsc3Z5PWNhci52eSowLjQ7Zm9yKGxldCBpPTA7aTxuO2krKyl7Y29uc3Qgc3A9NypzcyxveD0oTWF0aC5yYW5kb20oKS0uNSkqc3Asb3k9KE1hdGgucmFuZG9tKCktLjUpKnNwLGR2eD1zdngrKE1hdGgucmFuZG9tKCktLjUpKjAuOSpzcyxkdnk9c3Z5KyhNYXRoLnJhbmRvbSgpLS41KSowLjkqc3MtMC4xOCpzcztzbW9rZS5wdXNoKHt4OmJ4K294LHk6Ynkrb3ksdng6ZHZ4LHZ5OmR2eSx3eDooTWF0aC5yYW5kb20oKS0uNSkqMC4wNCx3eTooTWF0aC5yYW5kb20oKS0uNSkqMC4wNCxyOjIuNSpzcytNYXRoLnJhbmRvbSgpKjMuNSpzcyxncjowLjM4KnNzK01hdGgucmFuZG9tKCkqMC4yMipzcyxhOigwLjIyK01hdGgucmFuZG9tKCkqMC4xNCkqYXMsZGE6MC45NjgtTWF0aC5yYW5kb20oKSowLjAwOCxncmV5OjE3MCtNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkqNDApLGxpZmU6MCxtbDo1MCtNYXRoLnJhbmRvbSgpKjYwfSk7fX0KY29uc3QgVFJLQ1A9W3t4Oi05MDAseTo5MDB9LHt4OjAseTo5MDB9LHt4OjkwMCx5OjkwMH0se3g6MTMwMCx5OjcwMH0se3g6MTUwMCx5OjB9LHt4OjEzMDAseTotNzAwfSx7eDo5MDAseTotOTAwfSx7eDowLHk6LTkwMH0se3g6LTkwMCx5Oi05MDB9LHt4Oi0xMzAwLHk6LTcwMH0se3g6LTE1MDAseTowfSx7eDotMTMwMCx5OjcwMH1dOwpjb25zdCBUUktOPVRSS0NQLmxlbmd0aCxUUkFDS19XPTE2MCxLRVJCX1c9MTgsVFJLU1VCRElWPTIwOwpsZXQgdHJrU2FtcGxlcz1bXSx0cmtDYW52YXM9bnVsbDsKZnVuY3Rpb24gc2FtcGxlVHJhY2soKXt0cmtTYW1wbGVzPVtdO2ZvcihsZXQgaT0wO2k8VFJLTjtpKyspe2NvbnN0IHAwPVRSS0NQWyhpLTErVFJLTiklVFJLTl0scDE9VFJLQ1BbaV0scDI9VFJLQ1BbKGkrMSklVFJLTl0scDM9VFJLQ1BbKGkrMiklVFJLTl07Zm9yKGxldCBzPTA7czxUUktTVUJESVY7cysrKXtjb25zdCB0PXMvVFJLU1VCRElWLHQyPXQqdCx0Mz10Mip0LHg9MC41KigoMipwMS54KSsoLXAwLngrcDIueCkqdCsoMipwMC54LTUqcDEueCs0KnAyLngtcDMueCkqdDIrKC1wMC54KzMqcDEueC0zKnAyLngrcDMueCkqdDMpLHk9MC41KigoMipwMS55KSsoLXAwLnkrcDIueSkqdCsoMipwMC55LTUqcDEueSs0KnAyLnktcDMueSkqdDIrKC1wMC55KzMqcDEueS0zKnAyLnkrcDMueSkqdDMpLGR0PTAuMDEsdHg9MC41KigoMipwMS54KSsoLXAwLngrcDIueCkqKHQrZHQpKygyKnAwLngtNSpwMS54KzQqcDIueC1wMy54KSoodCtkdCkqKHQrZHQpKygtcDAueCszKnAxLngtMypwMi54K3AzLngpKih0K2R0KSoodCtkdCkqKHQrZHQpKSx0eT0wLjUqKCgyKnAxLnkpKygtcDAueStwMi55KSoodCtkdCkrKDIqcDAueS01KnAxLnkrNCpwMi55LXAzLnkpKih0K2R0KSoodCtkdCkrKC1wMC55KzMqcDEueS0zKnAyLnkrcDMueSkqKHQrZHQpKih0K2R0KSoodCtkdCkpLGR4PXR4LXgsZHk9dHkteSxkbD1NYXRoLnNxcnQoZHgqZHgrZHkqZHkpfHwxO3Rya1NhbXBsZXMucHVzaCh7eCx5LG54Oi1keS9kbCxueTpkeC9kbH0pO319fQpmdW5jdGlvbiBidWlsZFRyYWNrQ2FudmFzKCl7c2FtcGxlVHJhY2soKTtjb25zdCBTPXRya1NhbXBsZXMsU049Uy5sZW5ndGg7bGV0IG1pblg9SW5maW5pdHksbWluWT1JbmZpbml0eSxtYXhYPS1JbmZpbml0eSxtYXhZPS1JbmZpbml0eTtmb3IoY29uc3QgcCBvZiBTKXtjb25zdCBveD1wLngrcC5ueCooVFJBQ0tfVysyMCksb3k9cC55K3AubnkqKFRSQUNLX1crMjApLGl4PXAueC1wLm54KihUUkFDS19XKzIwKSxpeT1wLnktcC5ueSooVFJBQ0tfVysyMCk7bWluWD1NYXRoLm1pbihtaW5YLG94LGl4KTttaW5ZPU1hdGgubWluKG1pblksb3ksaXkpO21heFg9TWF0aC5tYXgobWF4WCxveCxpeCk7bWF4WT1NYXRoLm1heChtYXhZLG95LGl5KTt9Y29uc3QgUEFEPTQwLGN3PU1hdGguY2VpbChtYXhYLW1pblgpK1BBRCoyLGNoPU1hdGguY2VpbChtYXhZLW1pblkpK1BBRCoyLG9mZlg9LW1pblgrUEFELG9mZlk9LW1pblkrUEFEO3Rya0NhbnZhcz1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdjYW52YXMnKTt0cmtDYW52YXMud2lkdGg9Y3c7dHJrQ2FudmFzLmhlaWdodD1jaDt0cmtDYW52YXMuX29mZlg9b2ZmWDt0cmtDYW52YXMuX29mZlk9b2ZmWTtjb25zdCB0Yz10cmtDYW52YXMuZ2V0Q29udGV4dCgnMmQnKSx3eD1pPT5TW2ldLngrb2ZmWCx3eT1pPT5TW2ldLnkrb2ZmWSxseD0oaSx3KT0+U1tpXS54K1NbaV0ubngqdytvZmZYLGx5PShpLHcpPT5TW2ldLnkrU1tpXS5ueSp3K29mZlkscng9KGksdyk9PlNbaV0ueC1TW2ldLm54Kncrb2ZmWCxyeT0oaSx3KT0+U1tpXS55LVNbaV0ubnkqdytvZmZZO3RjLmJlZ2luUGF0aCgpO3RjLm1vdmVUbyhseCgwLFRSQUNLX1cpLGx5KDAsVFJBQ0tfVykpO2ZvcihsZXQgaT0xO2k8U047aSsrKXRjLmxpbmVUbyhseChpLFRSQUNLX1cpLGx5KGksVFJBQ0tfVykpO2ZvcihsZXQgaT1TTi0xO2k+PTA7aS0tKXRjLmxpbmVUbyhyeChpLFRSQUNLX1cpLHJ5KGksVFJBQ0tfVykpO3RjLmNsb3NlUGF0aCgpO3RjLmZpbGxTdHlsZT0nIzFjMWMyNCc7dGMuZmlsbCgpO3RjLnNhdmUoKTt0Yy5jbGlwKCk7dGMuYmVnaW5QYXRoKCk7dGMubW92ZVRvKGx4KDAsVFJBQ0tfVyksbHkoMCxUUkFDS19XKSk7Zm9yKGxldCBpPTE7aTxTTjtpKyspdGMubGluZVRvKGx4KGksVFJBQ0tfVyksbHkoaSxUUkFDS19XKSk7Zm9yKGxldCBpPVNOLTE7aT49MDtpLS0pdGMubGluZVRvKHJ4KGksVFJBQ0tfVykscnkoaSxUUkFDS19XKSk7dGMuY2xvc2VQYXRoKCk7dGMuY2xpcCgpO2ZvcihsZXQgaT0wO2k8MTgwMDtpKyspe2NvbnN0IHY9MTArTWF0aC5yYW5kb20oKSoxMjt0Yy5maWxsU3R5bGU9YHJnYmEoJHt2fSwke3Z9LCR7disyfSwwLjQpYDt0Yy5maWxsUmVjdChtaW5YLVBBRCtNYXRoLnJhbmRvbSgpKihjdykrb2ZmWCxtaW5ZLVBBRCtNYXRoLnJhbmRvbSgpKihjaCkrb2ZmWSwxLDEpO310Yy5yZXN0b3JlKCk7Zm9yKGxldCBpPTA7aTxTTjtpKyspe2NvbnN0IGo9KGkrMSklU04sY29sPU1hdGguZmxvb3IoaS8yKSUyPT09MD8ncmdiYSgyMTAsMzAsMjAsMC44NSknOidyZ2JhKDIzNSwyMzUsMjM1LDAuODApJzt0Yy5zdHJva2VTdHlsZT1jb2w7dGMubGluZVdpZHRoPUtFUkJfVzt0Yy5saW5lQ2FwPSdidXR0Jzt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8obHgoaSxUUkFDS19XLUtFUkJfVy8yKSxseShpLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5saW5lVG8obHgoaixUUkFDS19XLUtFUkJfVy8yKSxseShqLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5zdHJva2UoKTt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8ocngoaSxUUkFDS19XLUtFUkJfVy8yKSxyeShpLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5saW5lVG8ocngoaixUUkFDS19XLUtFUkJfVy8yKSxyeShqLFRSQUNLX1ctS0VSQl9XLzIpKTt0Yy5zdHJva2UoKTt9dGMuc3Ryb2tlU3R5bGU9J3JnYmEoMjU1LDI1NSwyNTUsMC4wOSknO3RjLmxpbmVXaWR0aD0yO3RjLmxpbmVDYXA9J3JvdW5kJzt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8obHgoMCxUUkFDS19XKSxseSgwLFRSQUNLX1cpKTtmb3IobGV0IGk9MTtpPFNOO2krKyl0Yy5saW5lVG8obHgoaSxUUkFDS19XKSxseShpLFRSQUNLX1cpKTt0Yy5jbG9zZVBhdGgoKTt0Yy5zdHJva2UoKTt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8ocngoMCxUUkFDS19XKSxyeSgwLFRSQUNLX1cpKTtmb3IobGV0IGk9MTtpPFNOO2krKyl0Yy5saW5lVG8ocngoaSxUUkFDS19XKSxyeShpLFRSQUNLX1cpKTt0Yy5jbG9zZVBhdGgoKTt0Yy5zdHJva2UoKTt0Yy5zdHJva2VTdHlsZT0ncmdiYSgyNTUsMjU1LDI1NSwwLjEwKSc7dGMubGluZVdpZHRoPTEuNTt0Yy5zZXRMaW5lRGFzaChbMjIsMzJdKTt0Yy5iZWdpblBhdGgoKTt0Yy5tb3ZlVG8od3goMCksd3koMCkpO2ZvcihsZXQgaT0xO2k8U047aSsrKXRjLmxpbmVUbyh3eChpKSx3eShpKSk7dGMuY2xvc2VQYXRoKCk7dGMuc3Ryb2tlKCk7dGMuc2V0TGluZURhc2goW10pO30KZnVuY3Rpb24gZHJhd1RyYWNrKCl7aWYoIXRya0NhbnZhcylyZXR1cm47Y3R4LmRyYXdJbWFnZSh0cmtDYW52YXMsLXRya0NhbnZhcy5fb2ZmWCwtdHJrQ2FudmFzLl9vZmZZKTt9CmNvbnN0IFNQQVdOX1g9LTYwMCxTUEFXTl9ZPTkwMCxTUEFXTl9BTkdMRT0wOwpsZXQgZmxvb3JQYXQ9bnVsbDsKZnVuY3Rpb24gZW5zdXJlRmxvb3IoKXtpZih0cmFja01vZGU9PT0nY2lyY3VpdCcmJiF0cmtDYW52YXMpYnVpbGRUcmFja0NhbnZhcygpO2lmKGZsb29yUGF0KXJldHVybjtjb25zdCBmYz1kb2N1bWVudC5jcmVhdGVFbGVtZW50KCdjYW52YXMnKTtmYy53aWR0aD0xNjA7ZmMuaGVpZ2h0PTE2MDtjb25zdCBmeD1mYy5nZXRDb250ZXh0KCcyZCcpO2Z4LmZpbGxTdHlsZT0nIzExMTExNSc7ZnguZmlsbFJlY3QoMCwwLDE2MCwxNjApO2ZvcihsZXQgaT0wO2k8NjAwO2krKyl7Y29uc3Qgdj04K01hdGgucmFuZG9tKCkqMTQ7ZnguZmlsbFN0eWxlPWByZ2JhKCR7dn0sJHt2fSwke3YrMn0sLjU1KWA7ZnguZmlsbFJlY3QoTWF0aC5yYW5kb20oKSoxNjAsTWF0aC5yYW5kb20oKSoxNjAsMSwxKTt9Znguc3Ryb2tlU3R5bGU9J3JnYmEoMjU1LDI1NSwyNTUsMC4wMjIpJztmeC5saW5lV2lkdGg9MTtmb3IobGV0IHg9MDt4PDE2MDt4Kz00MCl7ZnguYmVnaW5QYXRoKCk7ZngubW92ZVRvKHgsMCk7ZngubGluZVRvKHgsMTYwKTtmeC5zdHJva2UoKTt9Zm9yKGxldCB5PTA7eTwxNjA7eSs9NDApe2Z4LmJlZ2luUGF0aCgpO2Z4Lm1vdmVUbygwLHkpO2Z4LmxpbmVUbygxNjAseSk7Znguc3Ryb2tlKCk7fWZsb29yUGF0PWN0eC5jcmVhdGVQYXR0ZXJuKGZjLCdyZXBlYXQnKTt9CmZ1bmN0aW9uIHJlc2V0Q2FyKCl7aWYodHJhY2tNb2RlPT09J2NpcmN1aXQnKXtjYXIueD1TUEFXTl9YO2Nhci55PVNQQVdOX1k7Y2FyLmFuZ2xlPVNQQVdOX0FOR0xFO2NhbS54PVNQQVdOX1gtVy8yO2NhbS55PVNQQVdOX1ktSC8yO31lbHNle2Nhci54PTA7Y2FyLnk9MDtjYXIuYW5nbGU9MDtjYW0ueD0tVy8yO2NhbS55PS1ILzI7fWNhci52eD0wO2Nhci52eT0wO2Nhci55YXc9MDtjYXIuc3RlZXI9MDtzdHJpcHMubGVuZ3RoPTA7Y3VyU3RyaXA9bnVsbDtzbW9rZS5sZW5ndGg9MDt9CmZ1bmN0aW9uIHJlc2V0R2FtZSgpe3Njb3JlPTA7Y29tYm89MTtiZXN0Q29tYm89MTtkcmlmdFRpbWU9MDtkcmlmdEFjdGl2ZT1mYWxzZTtkcmlmdEFjYz0wO2NvbWJvRGVjYXk9MDtlU2NvcmUudGV4dENvbnRlbnQ9JzAnO2VDb21iby50ZXh0Q29udGVudD0neDEnO2VCZXN0LnRleHRDb250ZW50PSd4MSc7ZG1GaWxsLnN0eWxlLndpZHRoPScwJSc7ZHBvcC5zdHlsZS5vcGFjaXR5PScwJztyZXNldENhcigpO30KZnVuY3Rpb24gdXBkYXRlKCl7Y29uc3QgdXA9S1snQXJyb3dVcCddfHxLWydLZXlXJ10sZG49S1snQXJyb3dEb3duJ118fEtbJ0tleVMnXSxsZj1LWydBcnJvd0xlZnQnXXx8S1snS2V5QSddLHJ0PUtbJ0Fycm93UmlnaHQnXXx8S1snS2V5RCddLGhiPUtbJ1NwYWNlJ10sc3BkPU1hdGguc3FydChjYXIudngqY2FyLnZ4K2Nhci52eSpjYXIudnkpLGNvc0E9TWF0aC5jb3MoY2FyLmFuZ2xlKSxzaW5BPU1hdGguc2luKGNhci5hbmdsZSksZndkVj1jYXIudngqY29zQStjYXIudnkqc2luQTsKaWYobGYpY2FyLnN0ZWVyPU1hdGgubWF4KGNhci5zdGVlci1TVEVFUl9SQVRFLC1TVEVFUl9NQVgpO2Vsc2UgaWYocnQpY2FyLnN0ZWVyPU1hdGgubWluKGNhci5zdGVlcitTVEVFUl9SQVRFLFNURUVSX01BWCk7ZWxzZSBjYXIuc3RlZXIqPSgxLVNURUVSX1JUTik7CmNvbnN0IHN0ZWVyRGlyPWZ3ZFY+PTA/MTotMTtjYXIueWF3Kz1jYXIuc3RlZXIqWUFXX0ZPUkNFKnN0ZWVyRGlyKigwLjQrc3BkL1RPUFNQRCowLjYpO2Nhci55YXcqPVlBV19EQU1QO2Nhci5hbmdsZSs9Y2FyLnlhdzsKY29uc3QgYnVybm91dD11cCYmZG4mJnNwZDwyLjAscm9sbGJhY2s9dXAmJmZ3ZFY8LTAuOCYmc3BkPjAuODsKaWYoYnVybm91dCl7YnVybm91dFRpbWUrKztjYXIudngrPWNvc0EqMC4wMypNYXRoLnNpbihidXJub3V0VGltZSowLjM1KTtjYXIudnkrPXNpbkEqMC4wMypNYXRoLnNpbihidXJub3V0VGltZSowLjM1KTtjYXIudngqPTAuODA7Y2FyLnZ5Kj0wLjgwO3JvbGxiYWNrU21va2U9MDt9CmVsc2UgaWYocm9sbGJhY2spe2J1cm5vdXRUaW1lPTA7Y2FyLnZ4Kz1jb3NBKkFDQ0VMKjEuMzU7Y2FyLnZ5Kz1zaW5BKkFDQ0VMKjEuMzU7Y2FyLnlhdys9Y2FyLnN0ZWVyKllBV19GT1JDRSoyLjI7cm9sbGJhY2tTbW9rZT0yNTt9CmVsc2V7YnVybm91dFRpbWU9MDtpZih1cCl7Y29uc3QgZm9yY2U9QUNDRUwqKDEtc3BkL1RPUFNQRCowLjU1KTtjYXIudngrPWNvc0EqZm9yY2U7Y2FyLnZ5Kz1zaW5BKmZvcmNlO31pZihkbiYmc3BkPjAuMTUpe2Nhci52eCo9MC45NTI7Y2FyLnZ5Kj0wLjk1Mjt9fQppZihyb2xsYmFja1Ntb2tlPjApcm9sbGJhY2tTbW9rZS0tOwpjb25zdCBncmlwPWhiP0hCX0dSSVA6R1JJUCxyaWdodFg9LXNpbkEscmlnaHRZPWNvc0EsbGF0Vj1jYXIudngqcmlnaHRYK2Nhci52eSpyaWdodFk7Y2FyLnZ4LT1yaWdodFgqbGF0VipncmlwO2Nhci52eS09cmlnaHRZKmxhdFYqZ3JpcDtjYXIudngqPUZSSUNUSU9OO2Nhci52eSo9RlJJQ1RJT047CmNvbnN0IG5zPU1hdGguc3FydChjYXIudngqY2FyLnZ4K2Nhci52eSpjYXIudnkpO2lmKG5zPlRPUFNQRCl7Y2FyLnZ4PWNhci52eC9ucypUT1BTUEQ7Y2FyLnZ5PWNhci52eS9ucypUT1BTUEQ7fQpjYXIueCs9Y2FyLnZ4O2Nhci55Kz1jYXIudnk7Y2FtLngrPShjYXIueC1XLzItY2FtLngpKjAuMDg7Y2FtLnkrPShjYXIueS1ILzItY2FtLnkpKjAuMDg7CmNvbnN0IHZlbEFuZz1NYXRoLmF0YW4yKGNhci52eSxjYXIudngpO2xldCBzbGlwPXZlbEFuZy1jYXIuYW5nbGU7c2xpcD0oKHNsaXAlKE1hdGguUEkqMikpK01hdGguUEkqMyklKE1hdGguUEkqMiktTWF0aC5QSTsKY29uc3QgYWJzU2xpcD1NYXRoLmFicyhzbGlwKSxhYnNZYXc9TWF0aC5hYnMoY2FyLnlhdyksaXNTcGlubmluZz1hYnNZYXc+MC4wMjUsaXNEcmlmdD0oYWJzU2xpcD4wLjIwJiZucz4yLjApfHxpc1NwaW5uaW5nOwppZihpc0RyaWZ0KXtkcmlmdFRpbWUrKztkcmlmdEFjdGl2ZT10cnVlO2NvbWJvRGVjYXk9MDtjb25zdCBwdHM9TWF0aC5jZWlsKChhYnNTbGlwK2Fic1lhdyo4KSpucypjb21ibyo1KTtkcmlmdEFjYys9cHRzO3Njb3JlKz1wdHM7ZG1GaWxsLnN0eWxlLndpZHRoPU1hdGgubWluKDEwMCxkcmlmdFRpbWUqLjg1KSsnJSc7c2hvd1BvcChkcmlmdEFjYyxjb21ibyk7Y29uc3Qgc2k9TWF0aC5taW4oKGFic1NsaXArYWJzWWF3KjYpLzAuOCwxLjApO2lmKGRyaWZ0VGltZSUyPT09MCl7YXBwZW5kTWFyaygpO2FkZFNtb2tlKDIsMC42K3NpKjAuNSwwLjgpO31lbHNlIGlmKCFjdXJTdHJpcCl7c3RhcnRTdHJpcCgpO319CmVsc2V7aWYoZHJpZnRBY3RpdmUpe3Njb3JlKz1NYXRoLmZsb29yKGRyaWZ0VGltZSpjb21ibyozKTtjb21ibz1NYXRoLm1pbihjb21ibysxLDI1KTtpZihjb21ibz5iZXN0Q29tYm8pYmVzdENvbWJvPWNvbWJvO2VDb21iby50ZXh0Q29udGVudD0neCcrY29tYm87ZUJlc3QudGV4dENvbnRlbnQ9J3gnK2Jlc3RDb21ibztlQ29tYm8uY2xhc3NMaXN0LmFkZCgncG9wJyk7c2V0VGltZW91dCgoKT0+ZUNvbWJvLmNsYXNzTGlzdC5yZW1vdmUoJ3BvcCcpLDE0MCk7ZHJpZnRBY3RpdmU9ZmFsc2U7ZW5kU3RyaXAoKTt9ZHJpZnRUaW1lPTA7ZHJpZnRBY2M9MDtjb21ib0RlY2F5Kys7ZG1GaWxsLnN0eWxlLndpZHRoPScwJSc7aWYoY29tYm9EZWNheT4xMzAmJmNvbWJvPjEpe2NvbWJvPU1hdGgubWF4KDEsY29tYm8tMSk7ZUNvbWJvLnRleHRDb250ZW50PSd4Jytjb21ibztjb21ib0RlY2F5PTA7fX0KaWYoYnVybm91dCYmYnVybm91dFRpbWU+OCl7YWRkU21va2UoMywwLjkrTWF0aC5taW4oYnVybm91dFRpbWUvNjAsMSkqMC41LDAuOSk7aWYoYnVybm91dFRpbWUlMz09PTApYXBwZW5kTWFyaygpO31lbHNlIGlmKCFidXJub3V0JiZjdXJTdHJpcCYmIWRyaWZ0QWN0aXZlKXtlbmRTdHJpcCgpO30KaWYocm9sbGJhY2tTbW9rZT4wKXthZGRTbW9rZSg0LDEuMSsocm9sbGJhY2tTbW9rZS8yNSkqMC42LDEuMCk7aWYocm9sbGJhY2tTbW9rZSUyPT09MClhcHBlbmRNYXJrKCk7fQpmb3IobGV0IGk9c21va2UubGVuZ3RoLTE7aT49MDtpLS0pe2NvbnN0IHM9c21va2VbaV07cy52eCs9cy53eDtzLnZ5Kz1zLnd5O3MudngqPTAuOTg1O3MudnkqPTAuOTg1O3MueCs9cy52eDtzLnkrPXMudnk7cy5yKz1zLmdyO3MubGlmZSsrO3MuYSo9cy5kYTtpZihzLmxpZmU+PXMubWx8fHMuYTwwLjAwOClzbW9rZS5zcGxpY2UoaSwxKTt9CnRpY2tNYXJrcygpO2VTY29yZS50ZXh0Q29udGVudD1zY29yZS50b0xvY2FsZVN0cmluZygpO2VTcGQudGV4dENvbnRlbnQ9TWF0aC5yb3VuZChucyoyNCkrJyBrbS9oJzt9CmxldCBwb3BUO2Z1bmN0aW9uIHNob3dQb3AocHRzLGMpe2Rwb3AudGV4dENvbnRlbnQ9JysnK3B0cy50b0xvY2FsZVN0cmluZygpKyhjPjE/JyB4JytjOicnKTtkcG9wLnN0eWxlLm9wYWNpdHk9JzEnO2NsZWFyVGltZW91dChwb3BUKTtwb3BUPXNldFRpbWVvdXQoKCk9PmRwb3Auc3R5bGUub3BhY2l0eT0nMCcsODAwKTt9CmZ1bmN0aW9uIGRyYXcoKXtlbnN1cmVGbG9vcigpO2N0eC5jbGVhclJlY3QoMCwwLFcsSCk7Y3R4LnNhdmUoKTtjdHgudHJhbnNsYXRlKC1jYW0ueCwtY2FtLnkpO2N0eC5zYXZlKCk7aWYoZmxvb3JQYXQpe2N0eC5maWxsU3R5bGU9Zmxvb3JQYXQ7Y3R4LmZpbGxSZWN0KGNhbS54LTIwMCxjYW0ueS0yMDAsVys0MDAsSCs0MDApO31jdHgucmVzdG9yZSgpO2NvbnN0IEdTPTgwO2N0eC5zdHJva2VTdHlsZT0ncmdiYSgyNTUsMjU1LDI1NSwwLjAyNSknO2N0eC5saW5lV2lkdGg9MTtjb25zdCBneDA9TWF0aC5mbG9vcigoY2FtLngtMTAwKS9HUykqR1MsZ3kwPU1hdGguZmxvb3IoKGNhbS55LTEwMCkvR1MpKkdTO2ZvcihsZXQgZ3g9Z3gwO2d4PGNhbS54K1crMTAwO2d4Kz1HUyl7Y3R4LmJlZ2luUGF0aCgpO2N0eC5tb3ZlVG8oZ3gsY2FtLnktMTAwKTtjdHgubGluZVRvKGd4LGNhbS55K0grMTAwKTtjdHguc3Ryb2tlKCk7fWZvcihsZXQgZ3k9Z3kwO2d5PGNhbS55K0grMTAwO2d5Kz1HUyl7Y3R4LmJlZ2luUGF0aCgpO2N0eC5tb3ZlVG8oY2FtLngtMTAwLGd5KTtjdHgubGluZVRvKGNhbS54K1crMTAwLGd5KTtjdHguc3Ryb2tlKCk7fWlmKHRyYWNrTW9kZT09PSdjaXJjdWl0JylkcmF3VHJhY2soKTtjdHgubGluZUNhcD0ncm91bmQnO2N0eC5saW5lSm9pbj0ncm91bmQnO2Zvcihjb25zdCBzdHJpcCBvZiBzdHJpcHMpe2lmKHN0cmlwLnB0cy5sZW5ndGg8Miljb250aW51ZTtjb25zdCBhZj1NYXRoLm1heCgwLDEtc3RyaXAuYWdlL01BUktfTElGRSksaXQ9YWY+MC42PzE6YWYvMC42LGJhPU1BUktfQUxQSEEqaXQ7aWYoYmE8MC4wMSljb250aW51ZTtjdHguc3Ryb2tlU3R5bGU9YHJnYmEoOCw1LDMsJHtiYX0pYDtjdHgubGluZVdpZHRoPTMuNTtjdHguYmVnaW5QYXRoKCk7Y3R4Lm1vdmVUbyhzdHJpcC5wdHNbMF0ubHgsc3RyaXAucHRzWzBdLmx5KTtmb3IobGV0IGk9MTtpPHN0cmlwLnB0cy5sZW5ndGg7aSsrKWN0eC5saW5lVG8oc3RyaXAucHRzW2ldLmx4LHN0cmlwLnB0c1tpXS5seSk7Y3R4LnN0cm9rZSgpO2N0eC5iZWdpblBhdGgoKTtjdHgubW92ZVRvKHN0cmlwLnB0c1swXS5yeCxzdHJpcC5wdHNbMF0ucnkpO2ZvcihsZXQgaT0xO2k8c3RyaXAucHRzLmxlbmd0aDtpKyspY3R4LmxpbmVUbyhzdHJpcC5wdHNbaV0ucngsc3RyaXAucHRzW2ldLnJ5KTtjdHguc3Ryb2tlKCk7fQpmb3IoY29uc3QgcyBvZiBzbW9rZSl7aWYocy5hPDAuMDA4KWNvbnRpbnVlO2NvbnN0IGc9cy5ncmV5O2N0eC5iZWdpblBhdGgoKTtjdHguYXJjKHMueCxzLnkscy5yKjEuNiwwLE1hdGguUEkqMik7Y3R4LmZpbGxTdHlsZT1gcmdiYSgke2d9LCR7Z30sJHtnfSwke3MuYSowLjE4fSlgO2N0eC5maWxsKCk7Y3R4LmJlZ2luUGF0aCgpO2N0eC5hcmMocy54LHMueSxzLnIsMCxNYXRoLlBJKjIpO2N0eC5maWxsU3R5bGU9YHJnYmEoJHtnfSwke2d9LCR7Z30sJHtzLmEqMC41Mn0pYDtjdHguZmlsbCgpO2NvbnN0IGNBPXMuYSpNYXRoLm1heCgwLDEtcy5saWZlLzMwKSowLjc7aWYoY0E+MC4wMSl7Y3R4LmJlZ2luUGF0aCgpO2N0eC5hcmMocy54LHMueSxzLnIqMC40MiwwLE1hdGguUEkqMik7Y3R4LmZpbGxTdHlsZT1gcmdiYSg2MCw1Miw0NCwke2NBfSlgO2N0eC5maWxsKCk7fX0KZHJhd0NhcigpO2N0eC5yZXN0b3JlKCk7fQpmdW5jdGlvbiBkcmF3Q2FyKCl7Y29uc3QgdmVsQW5nPU1hdGguYXRhbjIoY2FyLnZ5LGNhci52eCk7bGV0IHNsaXA9dmVsQW5nLWNhci5hbmdsZTtzbGlwPSgoc2xpcCUoTWF0aC5QSSoyKSkrTWF0aC5QSSozKSUoTWF0aC5QSSoyKS1NYXRoLlBJO2NvbnN0IGlzRHJpZnQ9TWF0aC5hYnMoc2xpcCk+MC4yMCYmTWF0aC5zcXJ0KGNhci52eCpjYXIudngrY2FyLnZ5KmNhci52eSk+MjtjdHguc2F2ZSgpO2N0eC50cmFuc2xhdGUoY2FyLngsY2FyLnkpO2N0eC5yb3RhdGUoY2FyLmFuZ2xlKTtjb25zdCBITD0yMCxIVz05O2N0eC5zYXZlKCk7Y3R4LnRyYW5zbGF0ZSgzLDMuNSk7Y3R4LmZpbGxTdHlsZT0ncmdiYSgwLDAsMCwuMjgpJztjdHguYmVnaW5QYXRoKCk7Y3R4LnJvdW5kUmVjdCgtSEwsLUhXLEhMKjIsSFcqMiwzKTtjdHguZmlsbCgpO2N0eC5yZXN0b3JlKCk7Y3R4LmZpbGxTdHlsZT1pc0RyaWZ0PycjZDQyMDAwJzonI2JiMWQwMCc7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoLUhMLC1IVyxITCoyLEhXKjIsMyk7Y3R4LmZpbGwoKTtjdHguZmlsbFN0eWxlPSdyZ2JhKDAsMCwwLC4yMCknO2N0eC5iZWdpblBhdGgoKTtjdHgucm91bmRSZWN0KC1ITCwtSFcsMTEsSFcqMiwyKTtjdHguZmlsbCgpO2N0eC5maWxsU3R5bGU9J3JnYmEoMjU1LDI1NSwyNTUsLjA2KSc7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoMSwtSFcrMiwxMyxIVyoyLTQsMik7Y3R4LmZpbGwoKTtjdHguZmlsbFN0eWxlPSdyZ2JhKDEyNSwyMDUsMjU1LC43OCknO2N0eC5iZWdpblBhdGgoKTtjdHgucm91bmRSZWN0KDIsLUhXKzEuNSwxMCw1LjUsMSk7Y3R4LmZpbGwoKTtjdHguYmVnaW5QYXRoKCk7Y3R4LnJvdW5kUmVjdCgyLEhXLTcsMTAsNS41LDEpO2N0eC5maWxsKCk7Y3R4LmZpbGxTdHlsZT0ncmdiYSgyNTUsMjQ4LDE1NSwuOTUpJztjdHguZmlsbFJlY3QoSEwtMiwtSFcrMSwyLjUsMy41KTtjdHguZmlsbFJlY3QoSEwtMixIVy00LjUsMi41LDMuNSk7Y3R4LmZpbGxTdHlsZT1pc0RyaWZ0PydyZ2JhKDI1NSw4MCwwLC45NSknOidyZ2JhKDIwMCwyMCwxMCwuODUpJztjdHguZmlsbFJlY3QoLUhMLTAuNSwtSFcrMSwyLjUsMy41KTtjdHguZmlsbFJlY3QoLUhMLTAuNSxIVy00LjUsMi41LDMuNSk7Y29uc3QgZHc9KGx4LGx5LGEpPT57Y3R4LnNhdmUoKTtjdHgudHJhbnNsYXRlKGx4LGx5KTtjdHgucm90YXRlKGEpO2N0eC5maWxsU3R5bGU9JyMxMzEzMTMnO2N0eC5iZWdpblBhdGgoKTtjdHgucm91bmRSZWN0KC00LC0xLjYsOCwzLjIsMSk7Y3R4LmZpbGwoKTtjdHguZmlsbFN0eWxlPScjMmEyYTJhJztjdHguYmVnaW5QYXRoKCk7Y3R4LnJvdW5kUmVjdCgtMi41LC0uOSw1LDEuOCwuNSk7Y3R4LmZpbGwoKTtjdHgucmVzdG9yZSgpO307ZHcoLUhMKzUsLUhXLTIsMCk7ZHcoLUhMKzUsSFcrMiwwKTtkdyhITC01LC1IVy0yLGNhci5zdGVlcioxLjYpO2R3KEhMLTUsSFcrMixjYXIuc3RlZXIqMS42KTtpZihpc0RyaWZ0KXtjb25zdCB0PURhdGUubm93KCkqLjAyMjtjdHguc3Ryb2tlU3R5bGU9YHJnYmEoMjU1LCR7MTAwK01hdGguc2luKHQpKjUwfSwxMCwkey40NStNYXRoLnNpbih0KjEuNCkqLjJ9KWA7Y3R4LmxpbmVXaWR0aD0yLjU7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoLUhMLC1IVyxITCoyLEhXKjIsMyk7Y3R4LnN0cm9rZSgpO31jdHgucmVzdG9yZSgpO30KZnVuY3Rpb24gbG9vcCgpe3VwZGF0ZSgpO2RyYXcoKTtyYWY9cmVxdWVzdEFuaW1hdGlvbkZyYW1lKGxvb3ApO30KYnRuLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJywoKT0+e292ZXJsYXkuc3R5bGUuZGlzcGxheT0nbm9uZSc7ZmluYWxfLnN0eWxlLmRpc3BsYXk9J25vbmUnO3Jlc2V0R2FtZSgpO3J1bm5pbmc9dHJ1ZTtpZihyYWYpY2FuY2VsQW5pbWF0aW9uRnJhbWUocmFmKTtsb29wKCk7fSk7CndpbmRvdy5hZGRFdmVudExpc3RlbmVyKCdrZXlkb3duJyxlPT57aWYoIXJ1bm5pbmd8fGUuY29kZSE9PSdFc2NhcGUnKXJldHVybjtydW5uaW5nPWZhbHNlO2NhbmNlbEFuaW1hdGlvbkZyYW1lKHJhZik7ZmluYWxfLnRleHRDb250ZW50PSdGSU5BTDogJytzY29yZS50b0xvY2FsZVN0cmluZygpO2ZpbmFsXy5zdHlsZS5kaXNwbGF5PSdibG9jayc7YnRuLnRleHRDb250ZW50PSdQTEFZIEFHQUlOJztvdmVybGF5LnN0eWxlLmRpc3BsYXk9J2ZsZXgnO30pOwo8L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+")))
+// Also copy onto N directly in case Proxy isn't supported
+Object.assign(window.N, window._N);
+// Replay any calls that were queued before module was ready
+if(window._N_queue){
+  window._N_queue.forEach(([k,args])=>{try{if(window._N[k])window._N[k](...args);}catch(e){}});
+  window._N_queue=[];
+}
+// Expose game fns globally for modal onclicks
+window._setBubbleEffect=async function(eff){
+  const root=document.documentElement;
+  // Update cud immediately so renderSettings shows selected state
+  if(cud) cud={...cud,bubbleEffect:eff};
+  // Apply effect - works on any bubble colour
+  const _animMap={pulse:'bubblePulse 1.5s ease-in-out infinite',bounce:'bubbleBounce 0.8s ease-in-out infinite',shimmer:'bubbleShimmer 2s linear infinite',glow:'bubbleGlow 2s ease-in-out infinite',ripple:'bubbleRipple 1.2s ease-out infinite',wave:'bubbleWave 2s ease-in-out infinite'};
+  root.style.setProperty('--bubble-own-anim', _animMap[eff]||'none');
+  // Re-render settings immediately
+  if(window._N&&window._N.renderSettings) window._N.renderSettings();
+  // Save to Firestore
+  if(cu&&cud){
+    try{
+      await updateDoc(doc(db,'users',cu.uid),{bubbleEffect:eff});
+      uCache[cu.uid]={...uCache[cu.uid],bubbleEffect:eff};
+    }catch{}
+  }
+};
+window._setBubbleColour=async function(col){
+  const root=document.documentElement;
+  // Update cud immediately so renderSettings shows correct selected state
+  if(cud) cud={...cud,bubbleColour:col};
+  if(!col){
+    root.style.removeProperty('--bubble-own');root.style.removeProperty('--bubble-own-border');
+    root.style.removeProperty('--bubble-own-anim');
+  } else {
+    const r2=parseInt(col.slice(1,3),16),g2=parseInt(col.slice(3,5),16),b2=parseInt(col.slice(5,7),16);
+    root.style.setProperty('--bubble-own','rgba('+r2+','+g2+','+b2+',0.6)');
+    root.style.setProperty('--bubble-own-border','rgba('+r2+','+g2+','+b2+',0.4)');
+    // Keep existing effect animation when changing colour
+    const curEff=cud?.bubbleEffect||'';
+    if(curEff){
+      const _am={pulse:'bubblePulse 1.5s ease-in-out infinite',bounce:'bubbleBounce 0.8s ease-in-out infinite',shimmer:'bubbleShimmer 2s linear infinite',glow:'bubbleGlow 2s ease-in-out infinite',ripple:'bubbleRipple 1.2s ease-out infinite',wave:'bubbleWave 2s ease-in-out infinite'};
+      if(_am[curEff]) root.style.setProperty('--bubble-own-anim',_am[curEff]);
+    }
+  }
+  // Re-render settings immediately to show selected state
+  if(window._N&&window._N.renderSettings) window._N.renderSettings();
+  // Save to Firestore
+  if(cu&&cud){
+    try{
+      await updateDoc(doc(db,'users',cu.uid),{bubbleColour:col});
+      uCache[cu.uid]={...uCache[cu.uid],bubbleColour:col};
+    }catch{}
+  }
+};
+window._setTextCol=function(col){
+  const root=document.documentElement;
+  if(!col){
+    root.style.removeProperty('--text');
+    localStorage.removeItem('nexus_text_colour');
+  } else {
+    root.style.setProperty('--text',col);
+    localStorage.setItem('nexus_text_colour',col);
+  }
+  if(window._N&&window._N.renderSettings) window._N.renderSettings();
+};
+window._setBgCol=async function(col){
+  const root=document.documentElement;
+  if(col==='default'){
+    ['--bg','--bg2','--bg3','--panel','--app-bg'].forEach(v=>root.style.removeProperty(v));
+    localStorage.removeItem('nexus_bg_colour');
+    if(cu&&cud){try{await updateDoc(doc(db,'users',cu.uid),{bgColour:''});cud={...cud,bgColour:''};uCache[cu.uid]={...uCache[cu.uid],bgColour:''};}catch{}}
+  } else {
+    const r=parseInt(col.slice(1,3),16),g=parseInt(col.slice(3,5),16),b=parseInt(col.slice(5,7),16);
+    const mk=(dr,dg,db)=>'rgb('+Math.min(255,r+dr)+','+Math.min(255,g+dg)+','+Math.min(255,b+db)+')';
+    root.style.setProperty('--bg',col);root.style.setProperty('--app-bg',col);
+    root.style.setProperty('--bg2',mk(5,5,8));root.style.setProperty('--bg3',mk(10,10,18));
+    root.style.setProperty('--panel',mk(3,3,5));
+    localStorage.setItem('nexus_bg_colour',col);
+    if(cu&&cud){try{await updateDoc(doc(db,'users',cu.uid),{bgColour:col});cud={...cud,bgColour:col};uCache[cu.uid]={...uCache[cu.uid],bgColour:col};}catch{}}
+  }
+  if(window._N&&window._N.renderSettings) setTimeout(()=>window._N.renderSettings(),50);
+};
+// Apply on load
+(function(){
+  const saved=localStorage.getItem('nexus_bg_colour');
+  if(saved&&saved!=='default') window._setBgCol(saved);
+  const savedTxt=localStorage.getItem('nexus_text_colour');
+  if(savedTxt) document.documentElement.style.setProperty('--text',savedTxt);
+})();
+window.sendTyping=function(){
+  if(!cu||!acid) return;
+  updateDoc(doc(db,'chats',acid),{['typing.'+cu.uid]:Date.now()}).catch(()=>{});
+  clearTimeout(window._typingTimer);
+  window._typingTimer=setTimeout(()=>{
+    updateDoc(doc(db,'chats',acid),{['typing.'+cu.uid]:0}).catch(()=>{});
+  },3000);
+};
+window.tgRestart=tgRestart;window.tgStop=tgStop;window.tgSetMode=tgSetMode;window.tgInit=tgInit;
+// Expose lightbox fns globally (used in HTML onclick attributes)
+window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=eggClose;
+
+</script>
+<!-- TTT MODAL -->
+<div class="modal-overlay" id="ttt-modal">
+  <div class="modal" style="width:340px;">
+    <div class="modal-title">🎮 TIC-TAC-TOE</div>
+    <button class="modal-close" onclick="N.closeModal('ttt-modal');N.tttCleanup()">✕</button>
+    <div id="ttt-content"></div>
+  </div>
+</div>
+
+<!-- EASTER EGG MINI GAME -->
+<div id="egg-modal">
+  <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:4px;color:rgba(255,255,255,0.3);margin-bottom:-6px;">🐣 SECRET DISCOVERED</div>
+  <canvas id="egg-canvas" width="500" height="320"></canvas>
+  <div class="egg-ui">
+    <div>TRIES</div>
+    <div class="egg-tries">
+      <div class="egg-try" id="egg-t1"></div>
+      <div class="egg-try" id="egg-t2"></div>
+      <div class="egg-try" id="egg-t3"></div>
+    </div>
+    <div id="egg-timer" style="display:none;font-size:10px;"></div>
+  </div>
+  <div id="egg-msg">Click anywhere on the canvas to launch the ball!</div>
+  <button class="egg-close" onclick="N.eggClose()">CLOSE</button>
+</div>
+
+<!-- TYPE & EARN GAME MODAL -->
+<div class="modal-overlay" id="typegame-modal" style="align-items:center;justify-content:center;">
+  <div style="background:#0d0d0f;border:1px solid rgba(68,102,255,0.25);border-radius:16px;padding:28px 32px;width:min(820px,96vw);max-height:95vh;overflow-y:auto;position:relative;box-shadow:0 0 60px rgba(68,102,255,0.15);">
+    <div style="font-family:'Orbitron',monospace;font-size:12px;letter-spacing:4px;background:linear-gradient(135deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;">NEXUS TYPE</div>
+    <div style="font-size:10px;font-family:'JetBrains Mono',monospace;color:#5a5a7a;letter-spacing:2px;margin-bottom:20px;">EVERY CORRECT WORD = +1 MESSAGE</div>
+    <button onclick="N.closeModal('typegame-modal');tgStop()" style="position:absolute;top:16px;right:16px;background:none;border:1px solid rgba(100,100,255,0.15);border-radius:6px;color:#5a5a7a;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">✕</button>
+
+    <!-- Stats row -->
+    <div style="display:flex;gap:28px;margin-bottom:20px;align-items:flex-end;">
+      <div>
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">WPM</div>
+        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#f0c060;line-height:1;" id="tg-wpm">0</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">ACC</div>
+        <div style="font-family:'Orbitron',monospace;font-size:1.4rem;font-weight:700;color:#7dd3b0;line-height:1;" id="tg-acc">100%</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">TIME</div>
+        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#f0c060;line-height:1;" id="tg-timer">60</div>
+      </div>
+      <div style="margin-left:auto;text-align:right;">
+        <div style="font-size:9px;color:#3a3a45;text-transform:uppercase;letter-spacing:2px;margin-bottom:2px;">EARNED</div>
+        <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:700;color:#00d4ff;line-height:1;" id="tg-earned">+0</div>
+      </div>
+    </div>
+
+    <!-- Mode buttons -->
+    <div style="display:flex;gap:6px;margin-bottom:16px;">
+      <button class="tg-mode-btn" data-secs="15" onclick="tgSetMode(15)">15s</button>
+      <button class="tg-mode-btn" data-secs="30" onclick="tgSetMode(30)">30s</button>
+      <button class="tg-mode-btn active" data-secs="60" onclick="tgSetMode(60)">60s</button>
+      <button class="tg-mode-btn" data-secs="120" onclick="tgSetMode(120)">120s</button>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="height:2px;background:#2a2a30;border-radius:2px;margin-bottom:16px;overflow:hidden;">
+      <div id="tg-progress" style="height:100%;background:#f0c060;border-radius:2px;width:0%;transition:width 0.3s;"></div>
+    </div>
+
+    <!-- Words -->
+    <div id="tg-words-wrapper" style="background:#16161a;border:1px solid #2a2a30;border-radius:10px;padding:24px 28px;cursor:text;height:132px;overflow:hidden;position:relative;">
+      <div id="tg-words" style="font-family:'Space Mono',monospace;font-size:1.25rem;line-height:2.1;display:flex;flex-wrap:wrap;gap:0 14px;will-change:transform;"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#16161a);pointer-events:none;"></div>
+    </div>
+
+    <!-- Bottom -->
+    <div style="display:flex;align-items:center;margin-top:14px;gap:12px;">
+      <span style="font-size:10px;color:#3a3a45;font-family:'JetBrains Mono',monospace;">click to focus · <kbd style="background:#16161a;border:1px solid #2a2a30;border-radius:3px;padding:1px 5px;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:10px;">tab</kbd> restart</span>
+      <button onclick="tgRestart()" style="margin-left:auto;background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 14px;border-radius:5px;cursor:pointer;">↺ restart</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .tg-mode-btn{background:none;border:1px solid #2a2a30;color:#5a5a7a;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border-radius:4px;cursor:pointer;transition:all 0.15s;}
+  .tg-mode-btn:hover,.tg-mode-btn.active{border-color:#f0c060;color:#f0c060;}
+  .tg-word{display:inline-flex;position:relative;}
+  #tg-words{transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);}
+  .tg-letter{color:#3a3a45;transition:color 0.06s;position:relative;}
+  .tg-letter.correct{color:#7dd3b0;}
+  .tg-letter.wrong{color:#e06c75;text-decoration:underline;text-decoration-color:#e06c75;}
+  .tg-letter.extra{color:#e06c75;opacity:0.7;}
+  .tg-cursor::before{content:'';position:absolute;left:-2px;top:0;bottom:0;width:2px;background:#f0c060;border-radius:2px;animation:blink 0.9s step-end infinite;}
+</style>
+
+<input id="tg-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position:fixed;top:-999px;left:-999px;opacity:0;">
+
+<!-- NEXUS FLAP MODAL -->
+
+<!-- NEXUS FLAP MODAL -->
+<div class="modal-overlay" id="flap-modal" style="align-items:center;justify-content:center;">
+  <div style="background:#050508;border:1px solid rgba(68,102,255,0.3);border-radius:16px;padding:20px;position:relative;box-shadow:0 0 40px rgba(68,102,255,0.2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:20px;">
+      <div>
+        <div style="font-family:'Orbitron',monospace;font-size:13px;letter-spacing:4px;background:linear-gradient(135deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">NEXUS FLAP</div>
+        <div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:#5a5a7a;letter-spacing:2px;margin-top:2px;">EVERY POINT = +2 MESSAGES</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="text-align:right;">
+          <div style="font-size:8px;color:#3a3a45;font-family:'JetBrains Mono',monospace;letter-spacing:2px;">EARNED</div>
+          <div id="flap-earned" style="font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:700;color:#00d4ff;">+0</div>
+        </div>
+        <button onclick="N.closeFlapGame()" style="background:none;border:1px solid rgba(100,100,255,0.2);border-radius:6px;color:#5a5a7a;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;">&#10005;</button>
+      </div>
+    </div>
+    <iframe id="flap-iframe"
+      style="width:100%;height:100%;border:none;display:block;"
+      sandbox="allow-scripts">
+    </iframe>
+  </div>
+</div>
+
+<!-- NEXUS ENERGY GAME -->
+
+<!-- Games Hub Modal -->
+<div id="games-hub-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('games-hub-modal')">
+  <div class="modal" style="width:480px;">
+    <div class="modal-title">🎮 GAMES</div>
+    <button class="modal-close" onclick="N.closeModal('games-hub-modal')">✕</button>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">⌨️</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Type &amp; Earn</span>
+          <span class="game-btn-desc">Type words to earn messages · 15s to 120s modes</span>
+        </div>
+        <span class="game-btn-badge">MSGS</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openFlapGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#00aaff,#0044cc);">🐦</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Nexus Flap</span>
+          <span class="game-btn-desc">Flap through pipes · each point earns +2 messages</span>
+        </div>
+        <span class="game-btn-badge">MSGS</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openNexusGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#4466ff,#9933ff);">⬡</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Nexus Energy</span>
+          <span class="game-btn-desc">Cosmic clicker · redeem energy for messages</span>
+        </div>
+        <span class="game-btn-badge">MSGS</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriftGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff4500,#ff8800);">🚗</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Drift King</span>
+          <span class="game-btn-desc">Arcade drift racer · open plate or circuit track</span>
+        </div>
+        <span class="game-btn-badge" style="background:rgba(255,255,255,0.06);color:var(--text-dim);">FUN</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openBlackjack()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#1a6b2a,#2ecc71);">🃏</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Blackjack</span>
+          <span class="game-btn-desc">1000 free chips daily · stack your bankroll · climb the leaderboard</span>
+        </div>
+        <span class="game-btn-badge" style="background:rgba(46,204,113,0.15);color:#2ecc71;">CHIPS</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openShellGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">🎯</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Shell Game</span>
+          <span class="game-btn-desc">Track the ball · beat the shuffle · three difficulty levels</span>
+        </div>
+        <span class="game-btn-badge" style="background:rgba(68,102,255,0.15);color:var(--accent);">REFLEX</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriveGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff6600,#ff2200);">🏎️</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">Drive</span>
+          <span class="game-btn-desc">3D road racer · dodge traffic · beat your high score</span>
+        </div>
+        <span class="game-btn-badge" style="background:rgba(255,102,0,0.15);color:#ff6600;">RACING</span>
+      </div>
+
+      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openLongestGame()">
+        <div class="game-btn-icon" style="background:linear-gradient(135deg,#c9a84c,#50c878);">🌍</div>
+        <div class="game-btn-info">
+          <span class="game-btn-name">The Longest Game Ever</span>
+          <span class="game-btn-desc">Civilisation idle · from Stone Age to Omega Point</span>
+        </div>
+        <span class="game-btn-badge" style="background:rgba(201,168,76,0.15);color:#c9a84c;">IDLE</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Blackjack Overlay -->
+<div id="bj-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;">
+
+  <!-- Top bar -->
+  <div style="width:100%;max-width:580px;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0;">
+    <div style="font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">BLACKJACK</div>
+    <button onclick="N.closeBlackjack()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">✕</button>
+  </div>
+
+  <!-- Chips bar -->
+  <div style="width:100%;max-width:580px;padding:10px 20px 0;">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);"></div>
+      <div style="font-family:var(--font-mono);font-size:12px;display:flex;align-items:center;gap:7px;">
+        <span style="color:var(--text-dim);">CHIPS</span>
+        <span class="bj-chips-val" id="bj-chips-display">0</span>
+      </div>
+      <div style="width:1px;height:16px;background:var(--border);flex-shrink:0;"></div>
+      <div id="bj-daily-info" style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);"></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div style="width:100%;max-width:580px;padding:12px 20px;display:flex;flex-direction:column;gap:12px;">
+
+    <!-- Dealer hand -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);"></div>
+      <div class="bj-hand-label">DEALER <span id="bj-dealer-score"></span></div>
+      <div class="bj-cards-row" id="bj-dealer-cards"></div>
+    </div>
+
+    <!-- Player hand -->
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);"></div>
+      <div class="bj-hand-label">YOU <span id="bj-player-score"></span></div>
+      <div class="bj-cards-row" id="bj-player-cards"></div>
+    </div>
+
+    <!-- Result message -->
+    <div id="bj-message" class="bj-message" style="min-height:28px;"></div>
+
+    <!-- Bet phase -->
+    <div id="bj-bet-area" style="display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 18px 20px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);"></div>
+
+      <!-- Chip tokens row -->
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:flex-end;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token t10" onclick="N.bjAddBet(10)"><span class="bj-chip-val">10</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token t25" onclick="N.bjAddBet(25)"><span class="bj-chip-val">25</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token t50" onclick="N.bjAddBet(50)"><span class="bj-chip-val">50</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token t100" onclick="N.bjAddBet(100)"><span class="bj-chip-val">100</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token t250" onclick="N.bjAddBet(250)"><span class="bj-chip-val">250</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token tallin" onclick="N.bjBetAll()"><span class="bj-chip-val">ALL<br>IN</span></button>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <button class="bj-chip-token tclear" onclick="N.bjClearBet()"><span class="bj-chip-val">CLR</span></button>
+        </div>
+      </div>
+
+      <!-- Bet tray (visual chips) -->
+      <div style="min-height:40px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;">
+        <div class="bj-section-title" id="bj-bet-label" style="opacity:0.5;">CLICK A CHIP TO BET</div>
+        <div class="bj-bet-tray" id="bj-bet-tray"></div>
+      </div>
+
+      <button class="bj-deal-btn" onclick="N.bjDeal()">DEAL</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div id="bj-action-area" style="display:none;justify-content:center;gap:10px;">
+      <button class="bj-action-btn hit" onclick="N.bjHit()">HIT</button>
+      <button class="bj-action-btn stand" onclick="N.bjStand()">STAND</button>
+      <button class="bj-action-btn double" id="bj-double-btn" onclick="N.bjDouble()">DOUBLE</button>
+    </div>
+
+    <!-- Play again -->
+    <div id="bj-again-area" style="display:none;justify-content:center;">
+      <button class="bj-again-btn" onclick="N.bjPlayAgain()">PLAY AGAIN</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Shell Game Overlay -->
+<div id="sg-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:9998;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;padding-bottom:24px;">
+
+  <!-- Top bar -->
+  <div style="width:100%;max-width:680px;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0;">
+    <div style="font-family:var(--font-display);font-size:18px;font-weight:900;letter-spacing:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:sg-title-float 4s ease-in-out infinite;">SHELL GAME</div>
+    <button onclick="N.closeShellGame()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.2s;" onmouseover="this.style.color='var(--danger)';this.style.borderColor='var(--danger)'" onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">✕</button>
+  </div>
+
+  <!-- Subtitle + difficulty -->
+  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;margin:6px 0 14px;">Three cups · One ball · All eyes on the prize</div>
+  <div style="display:flex;gap:6px;background:var(--panel);border:1px solid var(--border);padding:4px;border-radius:100px;margin-bottom:20px;" id="sg-diff-bar">
+    <button class="sg-diff-btn" data-diff="easy">Easy</button>
+    <button class="sg-diff-btn active" data-diff="medium">Medium</button>
+    <button class="sg-diff-btn" data-diff="hard">Hard</button>
+  </div>
+
+  <!-- Table -->
+  <div style="position:relative;">
+    <div class="sg-table" id="sg-table">
+      <canvas class="sg-particles" id="sg-canvas"></canvas>
+      <div class="sg-cups-area" id="sg-cups-area">
+
+        <div class="sg-cup-slot" id="sg-slot0">
+          <div class="sg-cup-wrap idle-0" id="sg-cup0">
+            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sg-cg0" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
+                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
+                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
+                </linearGradient>
+              </defs>
+              <!-- Drop shadow -->
+              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <!-- Cup body — solid accent colour -->
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
+              <!-- Shading overlay -->
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg0)"/>
+              <!-- Left highlight streak -->
+              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
+              <!-- Bottom rim -->
+              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
+              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <!-- Top rim -->
+              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
+              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <!-- Top cap -->
+              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
+              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
+              <!-- Mid band detail -->
+              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
+              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
+            </svg>
+          </div>
+          <div class="sg-shadow" id="sg-shadow0"></div>
+          <div class="sg-ball" id="sg-ball0"></div>
+        </div>
+
+        <div class="sg-cup-slot" id="sg-slot1">
+          <div class="sg-cup-wrap idle-1" id="sg-cup1">
+            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sg-cg1" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
+                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
+                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg1)"/>
+              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
+              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
+              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
+              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
+              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
+              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
+              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
+            </svg>
+          </div>
+          <div class="sg-shadow" id="sg-shadow1"></div>
+          <div class="sg-ball" id="sg-ball1"></div>
+        </div>
+
+        <div class="sg-cup-slot" id="sg-slot2">
+          <div class="sg-cup-wrap idle-2" id="sg-cup2">
+            <svg class="sg-cup-svg" viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="sg-cg2" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#000" stop-opacity="0.7"/>
+                  <stop offset="18%" stop-color="#fff" stop-opacity="0.18"/>
+                  <stop offset="45%" stop-color="#000" stop-opacity="0"/>
+                  <stop offset="75%" stop-color="#000" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#000" stop-opacity="0.6"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="50" cy="128" rx="44" ry="6" fill="rgba(0,0,0,0.55)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="var(--accent)"/>
+              <path d="M18 20 L8 122 L92 122 L82 20 Z" fill="url(#sg-cg2)"/>
+              <path d="M28 22 L22 120 L30 120 L35 22 Z" fill="rgba(255,255,255,0.18)"/>
+              <rect x="6" y="120" width="88" height="10" rx="5" fill="var(--accent2)"/>
+              <rect x="6" y="120" width="88" height="3" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <rect x="12" y="11" width="76" height="12" rx="5" fill="var(--accent2)"/>
+              <rect x="12" y="11" width="76" height="4" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <ellipse cx="50" cy="11" rx="38" ry="6" fill="var(--accent2)"/>
+              <ellipse cx="50" cy="10" rx="34" ry="4" fill="rgba(255,255,255,0.25)"/>
+              <rect x="13" y="66" width="74" height="4" rx="2" fill="rgba(0,0,0,0.2)"/>
+              <rect x="13" y="67" width="74" height="1.5" fill="rgba(255,255,255,0.12)"/>
+            </svg>
+          </div>
+          <div class="sg-shadow" id="sg-shadow2"></div>
+          <div class="sg-ball" id="sg-ball2"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Scores -->
+  <div style="display:flex;gap:28px;margin-top:20px;margin-bottom:4px;align-items:flex-end;">
+    <div style="text-align:center;"><div class="sg-score-val" id="sg-wins">0</div><div class="sg-score-label">WINS</div></div>
+    <div style="text-align:center;"><div class="sg-score-val" id="sg-streak">0</div><div class="sg-score-label">STREAK <span id="sg-fire" style="opacity:0;transition:opacity 0.3s;">🔥</span></div></div>
+    <div style="text-align:center;"><div class="sg-score-val" id="sg-losses">0</div><div class="sg-score-label">LOSSES</div></div>
+    <div style="text-align:center;border-left:1px solid var(--border);padding-left:28px;">
+      <div class="sg-score-val" id="sg-pts" style="color:var(--accent2);font-size:1.4rem;">0</div>
+      <div class="sg-score-label">TOTAL PTS</div>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div style="min-height:56px;display:flex;flex-direction:column;align-items:center;gap:5px;margin-top:10px;">
+    <div class="sg-status-msg" id="sg-msg">Ready to play?</div>
+    <div class="sg-status-sub" id="sg-sub">Choose difficulty and press start</div>
+  </div>
+
+  <!-- Main button -->
+  <button class="sg-main-btn" id="sg-btn">▶ &nbsp;START GAME</button>
+  <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-top:8px;min-height:14px;" id="sg-round-info"></div>
+
+</div>
+
+<!-- Drive Game Overlay -->
+<div id="drive-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
+  <button onclick="N.closeDriveGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,102,0,0.15);border:1px solid rgba(255,102,0,0.4);color:#ff6600;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10000;">✕ CLOSE</button>
+  <iframe id="drive-game-iframe"
+    style="width:100vw;height:100vh;border:none;display:block;"
+    sandbox="allow-scripts allow-same-origin">
+  </iframe>
+</div>
+
+<!-- Longest Game Ever Overlay -->
+<div id="longest-game-overlay" style="display:none;position:fixed;inset:0;background:#06080f;z-index:9999;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#06080f;border-bottom:1px solid rgba(201,168,76,0.2);flex-shrink:0;height:38px;">
+    <span style="font-family:'Cinzel Decorative',serif;font-size:11px;color:#c9a84c;letter-spacing:2px;">THE LONGEST GAME EVER</span>
+    <button onclick="N.closeLongestGame()" style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.35);color:#c9a84c;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:bold;font-family:monospace;transition:all 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.25)'" onmouseout="this.style.background='rgba(201,168,76,0.12)'">✕ CLOSE</button>
+  </div>
+  <iframe id="longest-game-iframe"
+    style="width:100%;flex:1;border:none;display:block;min-height:0;"
+    sandbox="allow-scripts allow-same-origin">
+  </iframe>
+</div>
+
+<!-- Drift King Overlay -->
+<div id="drift-game-overlay" style="display:none;position:fixed;inset:0;background:#0d0d0f;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
+  <button onclick="N.closeDriftGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,69,0,0.15);border:1px solid rgba(255,69,0,0.4);color:#ff4500;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10;">✕ CLOSE</button>
+  <iframe id="drift-game-iframe"
+    style="width:900px;height:650px;max-width:100vw;max-height:calc(100vh - 40px);border:none;display:block;"
+    sandbox="allow-scripts allow-same-origin">
+  </iframe>
+</div>
+
+
+<!-- Fullscreen Popup Announcement -->
+<div id="popup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9998;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:520px;width:100%;position:relative;box-shadow:0 0 60px rgba(0,0,0,0.8);">
+    <div id="popup-title" style="font-family:var(--font-display);font-size:16px;letter-spacing:3px;color:var(--accent);margin-bottom:16px;text-align:center;"></div>
+    <div id="popup-text" style="font-family:var(--font-mono);font-size:13px;color:var(--text);line-height:1.7;text-align:center;margin-bottom:24px;white-space:pre-wrap;"></div>
+    <div style="text-align:center;">
+      <button id="popup-continue-btn" onclick="N.closePopupAnnounce()" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:var(--font-display);font-size:12px;letter-spacing:3px;padding:12px 32px;border-radius:8px;cursor:pointer;transition:opacity 0.15s;" disabled>
+        <span id="popup-countdown"></span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
+    <iframe id="nexus-game-iframe"
     style="width:100%;height:100%;border:none;display:block;"
     scrolling="no"
     sandbox="allow-scripts allow-same-origin">
