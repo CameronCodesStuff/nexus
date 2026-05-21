@@ -908,7 +908,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
         <button class="icon-btn" title="Settings" onclick="N.openModal('settings-modal')">⚙️</button>
         <div style="position:relative;">
           <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
-          <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:160px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+          <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:180px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);max-height:calc(100vh - 60px);overflow-y:auto;">
             <button onclick="N.openModal('lb-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏅 Leaderboard</button>
             <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
             <button onclick="N.openModal('credits-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">✦ Credits</button>
@@ -2998,14 +2998,21 @@ function openModal(id){
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
   if(id==='achievements-modal')openAchievementsModal();
-  if(id==='lb-modal'){lbCurrentTab='msgs';lbTab('msgs');syncLeaderboardRoles();}
+  if(id==='lb-modal'){lbCurrentTab='msgs';lbTab('msgs');syncLeaderboardRoles();
+    // Auto-refresh leaderboard every 30s while open
+    window._lbRefreshInterval=setInterval(function(){
+      if(document.getElementById('lb-modal')?.classList.contains('active')){
+        renderLeaderboard(lbCurrentTab);
+      }
+    },30000);
+  }
   if(id==='typegame-modal'){
     // Save any earned messages before closing
     if(tgStarted&&!tgFinished&&tgEarned>0) tgSaveEarned();
     tgStop();tgInit();
   }
 }
-const closeModal=id=>{$(id).classList.remove('open');};
+const closeModal=id=>{$(id).classList.remove('open');if(id==='lb-modal'&&window._lbRefreshInterval){clearInterval(window._lbRefreshInterval);window._lbRefreshInterval=null;}};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
 
 let usersFilterQuery='';
@@ -7409,6 +7416,8 @@ function lbTab(tab){
   document.getElementById('lb-tab-drive')?.classList.toggle('active',tab==='drive');
   document.getElementById('lb-tab-longest')?.classList.toggle('active',tab==='longest');
   renderLeaderboard(tab);
+  // Kick off a second render after 1s to catch any in-flight Firestore writes
+  if(tab==='longest') setTimeout(()=>{if(lbCurrentTab==='longest')renderLeaderboard('longest');},1500);
 }
 
 function fmtEnergy(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
@@ -8093,7 +8102,12 @@ window.addEventListener('message', function(e){
       if(d.eraName) updates.longestEraName=d.eraName;
       if(d.techsResearched) updates.longestTechs=d.techsResearched;
       import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js').then(function(m){
-        m.updateDoc(m.doc(db,'users',cu.uid),updates).catch(function(){});
+        m.updateDoc(m.doc(db,'users',cu.uid),updates).then(function(){
+          // Refresh leaderboard live if it's currently open on longest tab
+          if(lbCurrentTab==='longest' && document.getElementById('lb-modal')?.classList.contains('active')){
+            renderLeaderboard('longest');
+          }
+        }).catch(function(){});
       }).catch(function(){});
     }
   }catch(_){}
@@ -9892,10 +9906,13 @@ iStars();reset();loop();
 </div>
 
 <!-- Longest Game Ever Overlay -->
-<div id="longest-game-overlay" style="display:none;position:fixed;inset:0;background:#06080f;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
-  <button onclick="N.closeLongestGame()" style="position:absolute;top:16px;right:20px;background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:#c9a84c;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10000;">✕ CLOSE</button>
+<div id="longest-game-overlay" style="display:none;position:fixed;inset:0;background:#06080f;z-index:9999;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#06080f;border-bottom:1px solid rgba(201,168,76,0.2);flex-shrink:0;height:38px;">
+    <span style="font-family:'Cinzel Decorative',serif;font-size:11px;color:#c9a84c;letter-spacing:2px;">THE LONGEST GAME EVER</span>
+    <button onclick="N.closeLongestGame()" style="background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.35);color:#c9a84c;padding:4px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:bold;font-family:monospace;transition:all 0.15s;" onmouseover="this.style.background='rgba(201,168,76,0.25)'" onmouseout="this.style.background='rgba(201,168,76,0.12)'">✕ CLOSE</button>
+  </div>
   <iframe id="longest-game-iframe"
-    style="width:100vw;height:100vh;border:none;display:block;"
+    style="width:100%;flex:1;border:none;display:block;min-height:0;"
     sandbox="allow-scripts allow-same-origin">
   </iframe>
 </div>
