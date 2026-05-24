@@ -17,7 +17,7 @@
 ## 🚀 Getting Started
 
 ### 1. Clone the repository
-(You will need to change the api)
+( You will need to change the API )
 ```bash
 git clone https://github.com/CameronCodesStuff/nexus.git
 cd nexus
