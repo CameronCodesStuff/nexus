@@ -9156,7 +9156,7 @@ var _NEXUS_SRCDOC = "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=&quot;UTF-8&
 function openNexusGame(){
   const overlay=document.getElementById('nexus-game-overlay');
   if(!overlay) return;
-  overlay.style.display='block';
+  overlay.style.display='flex';
   // Lazy-load fresh every time
   const iframe=document.getElementById('nexus-game-iframe');
   if(iframe){
@@ -9521,8 +9521,8 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
       </div>
     </div>
     <iframe id="flap-iframe"
-      style="width:100%;height:100%;border:none;display:block;"
-      sandbox="allow-scripts">
+      style="width:360px;height:540px;border:none;display:block;"
+      sandbox="allow-scripts allow-same-origin">
     </iframe>
   </div>
 </div>
@@ -9899,7 +9899,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
   </div>
 </div>
 
-<div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;">
+<div id="nexus-game-overlay" style="display:none;position:fixed;inset:0;background:#050508;z-index:9999;flex-direction:column;">
     <iframe id="nexus-game-iframe"
     style="width:100%;height:100%;border:none;display:block;"
     scrolling="no"
