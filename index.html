@@ -637,8 +637,8 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
   /* ── NAME ANIMATIONS ── */
   /* Fire name */
-  @keyframes name-fire{0%{text-shadow:0 0 4px #ff4400,0 0 12px #ff2200,0 0 24px #ff0000,0 0 40px #ff6600;}33%{text-shadow:0 0 6px #ff6600,0 0 16px #ff4400,0 0 28px #ff2200,0 0 44px #ffaa00;}66%{text-shadow:0 0 4px #ff3300,0 0 10px #ff1100,0 0 22px #ff4400,0 0 38px #ff8800;}100%{text-shadow:0 0 4px #ff4400,0 0 12px #ff2200,0 0 24px #ff0000,0 0 40px #ff6600;}}
-  .name-anim-fire{color:#ff6622 !important;-webkit-text-fill-color:#ff6622 !important;animation:name-fire 1.2s ease-in-out infinite;}
+  @keyframes name-fire{0%{text-shadow:0 0 4px #ff4400,0 0 12px #ff2200,0 0 24px rgba(255,0,0,0.5),0 0 40px rgba(255,100,0,0.2);transform:scale(1);}33%{text-shadow:0 0 8px #ff6600,0 0 20px #ff4400,0 0 40px rgba(255,60,0,0.6),0 0 70px rgba(255,140,0,0.25);transform:scale(1.06);}66%{text-shadow:0 0 5px #ff3300,0 0 14px #ff1100,0 0 30px rgba(255,80,0,0.5),0 0 55px rgba(255,60,0,0.15);transform:scale(1.02);}100%{text-shadow:0 0 4px #ff4400,0 0 12px #ff2200,0 0 24px rgba(255,0,0,0.5),0 0 40px rgba(255,100,0,0.2);transform:scale(1);}}
+  .name-anim-fire{color:#ff6622 !important;-webkit-text-fill-color:#ff6622 !important;animation:name-fire 1.2s ease-in-out infinite;display:inline-block;}
 
   /* Pulse name */
   @keyframes name-pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.08);opacity:0.85;}}
@@ -657,16 +657,16 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .name-anim-rainbow{background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:name-rainbow 2s linear infinite;font-weight:700;}
 
   /* Ice name */
-  @keyframes name-ice{0%,100%{text-shadow:0 0 6px #88eeff,0 0 16px #00c8ff,0 0 28px rgba(0,200,255,0.4);}50%{text-shadow:0 0 10px #ccf8ff,0 0 22px #00eeff,0 0 40px rgba(0,238,255,0.6);}}
-  .name-anim-ice{color:#88eeff !important;-webkit-text-fill-color:#88eeff !important;animation:name-ice 2s ease-in-out infinite;}
+  @keyframes name-ice{0%,100%{text-shadow:0 0 5px #88eeff,0 0 14px rgba(0,200,255,0.5),0 0 28px rgba(0,180,255,0.2);transform:scale(1);}50%{text-shadow:0 0 10px #ccf8ff,0 0 26px rgba(0,240,255,0.7),0 0 52px rgba(0,200,255,0.4),0 0 80px rgba(0,180,240,0.15);transform:scale(1.05);}}
+  .name-anim-ice{color:#88eeff !important;-webkit-text-fill-color:#88eeff !important;animation:name-ice 2s ease-in-out infinite;display:inline-block;}
 
   /* Gold shimmer name */
   @keyframes name-gold{0%,100%{background-position:0% center;}50%{background-position:200% center;}}
   .name-anim-gold{background:linear-gradient(90deg,#b8860b,#ffd700,#fff8c0,#ffd700,#b8860b);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:name-gold 2s linear infinite;font-weight:700;}
 
   /* Void / dark pulse name */
-  @keyframes name-void{0%,100%{text-shadow:0 0 8px #9933ff,0 0 20px #6600cc,0 0 40px rgba(153,51,255,0.4);}50%{text-shadow:0 0 14px #cc66ff,0 0 32px #9933ff,0 0 60px rgba(204,102,255,0.5);}}
-  .name-anim-void{color:#cc66ff !important;-webkit-text-fill-color:#cc66ff !important;animation:name-void 2s ease-in-out infinite;}
+  @keyframes name-void{0%,100%{text-shadow:0 0 6px #9933ff,0 0 16px rgba(153,51,255,0.6),0 0 32px rgba(120,0,200,0.25),0 0 50px rgba(100,0,180,0.1);transform:scale(1);}50%{text-shadow:0 0 12px #cc66ff,0 0 30px rgba(200,100,255,0.8),0 0 60px rgba(153,51,255,0.5),0 0 100px rgba(120,0,200,0.2);transform:scale(1.06);}}
+  .name-anim-void{color:#cc66ff !important;-webkit-text-fill-color:#cc66ff !important;animation:name-void 2s ease-in-out infinite;display:inline-block;}
 
   /* ── NAME COLOUR PICKER ── */
   .nc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
@@ -969,6 +969,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
         <div style="position:relative;">
           <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
           <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:180px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);max-height:calc(100vh - 60px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;">
+            <button onclick="N.openDailyModal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⚡ Daily Challenges</button>
             <button onclick="N.openModal('lb-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏅 Leaderboard</button>
             <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
             <button onclick="N.openModal('credits-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">✦ Credits</button>
@@ -1226,6 +1227,15 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
     <div id="op-panel-admin" style="display:none;"></div>
     <div id="op-panel-announce" style="display:none;"></div>
     <div id="op-panel-leaderboards" style="display:none;max-height:420px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- DAILY CHALLENGES MODAL -->
+<div class="modal-overlay" id="daily-modal">
+  <div class="modal" style="width:460px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title">⚡ DAILY CHALLENGES</div>
+    <button class="modal-close" onclick="N.closeModal('daily-modal')">✕</button>
+    <div id="daily-modal-content"></div>
   </div>
 </div>
 
@@ -3086,6 +3096,7 @@ function openModal(id){
   if(id==='bg-modal')openModal_bg();
   if(id==='credits-modal')openCreditsModal();
   if(id==='owner-modal'){ownerTab('tickets');}
+  if(id==='daily-modal') renderDailyModal();
   if(id==='gc-members-modal'){}  // rendered by openGcMembers()
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
@@ -6693,6 +6704,142 @@ function showFontLockInfo(fontId){
 // DAILY STREAK & CHALLENGE SYSTEM
 // ══════════════════════════════════════════════════
 
+// ── DAILY CHALLENGES MODAL ──────────────────────────
+function openDailyModal(){
+  openModal('daily-modal');
+}
+
+function renderDailyModal(){
+  const el=document.getElementById('daily-modal-content');
+  if(!el) return;
+  const today=getDailyKey();
+  const done=Array.isArray(cud?.dailyChallengesDone)?cud.dailyChallengesDone:[];
+  const streak=cud?.loginStreak||0;
+  const totalDays=cud?.totalCompleteDays||0;
+  const weekDays=Array.isArray(cud?.dailyOpsWeek)?cud.dailyOpsWeek.filter(d=>d>=getWeekKey()):[];
+  const allDone=DAILY_CHALLENGES.every(c=>done.includes(c.id));
+  const totalReward=DAILY_CHALLENGES.reduce((s,c)=>s+c.reward,0);
+  const earnedReward=DAILY_CHALLENGES.filter(c=>done.includes(c.id)).reduce((s,c)=>s+c.reward,0);
+
+  // Reset time
+  const now=new Date();
+  const midnight=new Date(now);midnight.setHours(24,0,0,0);
+  const msLeft=midnight-now;
+  const hLeft=Math.floor(msLeft/3600000);
+  const mLeft=Math.floor((msLeft%3600000)/60000);
+  const resetStr=hLeft+'h '+mLeft+'m';
+
+  let html='';
+
+  // Top streak card
+  html+=`<div style="background:linear-gradient(135deg,rgba(68,102,255,0.1),rgba(0,212,255,0.06));border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;gap:16px;align-items:center;">
+    <div style="text-align:center;flex-shrink:0;">
+      <div style="font-family:var(--font-display);font-size:28px;font-weight:900;color:var(--accent2);line-height:1;">${streak}</div>
+      <div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);letter-spacing:2px;margin-top:2px;">DAY STREAK</div>
+    </div>
+    <div style="width:1px;background:var(--border);align-self:stretch;"></div>
+    <div style="flex:1;">
+      <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:4px;">WEEK PROGRESS</div>
+      <div style="display:flex;gap:5px;margin-bottom:6px;">
+        ${['M','T','W','T','F','S','S'].map((_,i)=>{
+          const dayDate=new Date(getWeekKey());dayDate.setDate(dayDate.getDate()+i);
+          const dayKey=dayDate.toISOString().slice(0,10);
+          const filled=weekDays.includes(dayKey);
+          const isToday=dayKey===today;
+          return `<div style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--font-display);font-weight:700;border:1px solid ${filled?'var(--accent)':isToday?'rgba(68,102,255,0.4)':'var(--border)'};background:${filled?'rgba(68,102,255,0.25)':isToday?'rgba(68,102,255,0.08)':'transparent'};color:${filled?'var(--accent2)':isToday?'var(--accent)':'var(--text-dim)'};">${filled?'✓':['M','T','W','T','F','S','S'][i]}</div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${weekDays.length}/7 days complete this week${weekDays.length>=7?' 👑':''}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0;">
+      <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">RESETS IN</div>
+      <div style="font-family:var(--font-display);font-size:14px;color:var(--accent);margin-top:2px;">${resetStr}</div>
+    </div>
+  </div>`;
+
+  // Progress bar
+  const pct=Math.round((earnedReward/totalReward)*100);
+  html+=`<div style="margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+      <div style="font-family:var(--font-display);font-size:10px;letter-spacing:2px;color:var(--text-dim);">TODAY'S PROGRESS</div>
+      <div style="font-size:11px;font-family:var(--font-mono);color:var(--accent2);">+${earnedReward} / +${totalReward} msgs</div>
+    </div>
+    <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width 0.4s;"></div>
+    </div>
+  </div>`;
+
+  // Challenge cards
+  html+='<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">';
+  DAILY_CHALLENGES.forEach(ch=>{
+    const isDone=done.includes(ch.id);
+    html+=`<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:${isDone?'rgba(0,255,136,0.05)':'var(--bg3)'};border:1px solid ${isDone?'rgba(0,255,136,0.3)':'var(--border)'};border-radius:10px;transition:all 0.2s;">
+      <div style="width:28px;height:28px;border-radius:8px;background:${isDone?'rgba(0,255,136,0.15)':'var(--bg2)'};border:1px solid ${isDone?'rgba(0,255,136,0.4)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${isDone?'✓':'○'}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:${isDone?'rgba(200,255,220,0.8)':'var(--text)'};${isDone?'text-decoration:line-through;opacity:0.7;':''}">${esc(ch.label)}</div>
+      </div>
+      <div style="font-family:var(--font-display);font-size:11px;color:${isDone?'var(--success)':'var(--accent)'};letter-spacing:1px;flex-shrink:0;">+${ch.reward} msgs</div>
+    </div>`;
+  });
+  html+='</div>';
+
+  if(allDone){
+    html+=`<div style="text-align:center;padding:14px;background:rgba(0,255,136,0.06);border:1px solid rgba(0,255,136,0.25);border-radius:10px;margin-bottom:16px;">
+      <div style="font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:var(--success);margin-bottom:4px;">ALL DONE! ✦</div>
+      <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);">Come back tomorrow for a new set</div>
+    </div>`;
+  }
+
+  // Unlock progress section
+  html+=`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:4px;">
+    <div style="font-family:var(--font-display);font-size:10px;letter-spacing:3px;color:var(--text-dim);margin-bottom:12px;">UNLOCK PROGRESS</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">`;
+
+  // Name anim unlocks via challenges
+  const challengeUnlocks=[
+    {days:1, label:'💓 Pulse name effect', done:totalDays>=1},
+    {days:7, label:'🔥 Fire name effect',  done:totalDays>=7},
+    {days:14,label:'⚡ Neon name effect',  done:totalDays>=14},
+    {days:21,label:'❄️ Ice name effect',   done:totalDays>=21},
+    {days:30,label:'👾 Glitch name effect',done:totalDays>=30},
+  ];
+  challengeUnlocks.forEach(u=>{
+    const pct2=Math.min(100,Math.round((totalDays/u.days)*100));
+    html+=`<div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-size:11px;font-family:var(--font-mono);color:${u.done?'var(--success)':'var(--text)'};">${u.done?'✓ ':''} ${esc(u.label)}</div>
+        <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${u.done?'UNLOCKED':totalDays+'/'+u.days+' days'}</div>
+      </div>
+      <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;">
+        <div style="height:100%;width:${pct2}%;background:${u.done?'var(--success)':'linear-gradient(90deg,var(--accent),var(--accent2))'};border-radius:2px;"></div>
+      </div>
+    </div>`;
+  });
+
+  // Streak unlocks
+  const streakUnlocks=[
+    {days:7,  label:'🔵 Streak Blue name colour + 🌈 Rainbow anim', done:streak>=7},
+    {days:30, label:'🟡 Veteran Amber colour + ✨ Gold anim + 🎖 VETERAN role', done:streak>=30},
+    {days:100,label:'🔴 Devoted Crimson colour + 🌑 Void anim + ❤️‍🔥 DEVOTED role', done:streak>=100},
+  ];
+  streakUnlocks.forEach(u=>{
+    const pct2=Math.min(100,Math.round((streak/u.days)*100));
+    html+=`<div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-size:11px;font-family:var(--font-mono);color:${u.done?'var(--success)':'var(--text)'};">${u.done?'✓ ':''} ${esc(u.label)}</div>
+        <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${u.done?'UNLOCKED':streak+'/'+u.days+' days'}</div>
+      </div>
+      <div style="height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;">
+        <div style="height:100%;width:${pct2}%;background:${u.done?'var(--success)':'linear-gradient(90deg,#ffaa00,#ff6600)'};border-radius:2px;"></div>
+      </div>
+    </div>`;
+  });
+
+  html+='</div></div>';
+
+  el.innerHTML=html;
+}
+
 const DAILY_CHALLENGES=[
   {id:'dc_send5',    label:'Send 5 messages',          reward:15,  check:()=>(cud?.dailyMsgCount||0)>=5},
   {id:'dc_react3',   label:'React to 3 messages',      reward:10,  check:()=>(cud?.dailyReactCount||0)>=3},
@@ -6958,7 +7105,6 @@ const NAME_COLOURS=[
   {id:'nc-ice',     label:'❄️ Ice',         cssClass:'name-anim-ice', preview:'ice',    unlockType:'challenges', unlockVal:21,   swatch:'#88eeff'},
   {id:'nc-void',    label:'🌑 Void',        cssClass:'name-anim-void',preview:'void',   unlockType:'challenges', unlockVal:30,   swatch:'#cc66ff'},
   {id:'nc-gold',    label:'✨ Gold',        cssClass:'name-anim-gold',preview:'gold',   unlockType:'streak',     unlockVal:30,   swatch:'gold-grad'},
-  {id:'nc-rainbow-anim',label:'🌈 Animated',cssClass:'name-anim-rainbow',preview:'rainbow-anim',unlockType:'streak',unlockVal:7,swatch:'rainbow'},
 ];
 
 // Extra CSS for streak-locked colours (not rank classes — need their own CSS)
@@ -6966,9 +7112,14 @@ function ensureStreakColourCSS(){
   if(document.getElementById('nc-extra-css')) return;
   const s=document.createElement('style');s.id='nc-extra-css';
   s.textContent=`
-    .nc-streak7{color:#00aaff !important;-webkit-text-fill-color:#00aaff !important;text-shadow:0 0 8px rgba(0,170,255,0.5);}
-    .nc-streak30{color:#ffb300 !important;-webkit-text-fill-color:#ffb300 !important;text-shadow:0 0 8px rgba(255,179,0,0.5);}
-    .nc-streak100{color:#ff2244 !important;-webkit-text-fill-color:#ff2244 !important;text-shadow:0 0 8px rgba(255,34,68,0.6);}
+    .nc-streak7{color:#00aaff !important;-webkit-text-fill-color:#00aaff !important;animation:nc-s7-pulse 2s ease-in-out infinite;display:inline-block;}
+    @keyframes nc-s7-pulse{0%,100%{text-shadow:0 0 4px #00aaff,0 0 10px rgba(0,170,255,0.5),0 0 20px rgba(0,170,255,0.2);transform:scale(1);}50%{text-shadow:0 0 8px #44ccff,0 0 20px rgba(0,200,255,0.7),0 0 40px rgba(0,200,255,0.4),0 0 60px rgba(0,170,255,0.15);transform:scale(1.04);}}
+
+    .nc-streak30{color:#ffb300 !important;-webkit-text-fill-color:#ffb300 !important;animation:nc-s30-pulse 1.8s ease-in-out infinite;display:inline-block;}
+    @keyframes nc-s30-pulse{0%,100%{text-shadow:0 0 5px #ffb300,0 0 14px rgba(255,179,0,0.6),0 0 28px rgba(255,140,0,0.25),0 0 48px rgba(255,100,0,0.1);transform:scale(1);}40%{text-shadow:0 0 10px #ffd700,0 0 24px rgba(255,215,0,0.8),0 0 50px rgba(255,180,0,0.5),0 0 80px rgba(255,140,0,0.2);transform:scale(1.05);}70%{text-shadow:0 0 6px #ff9900,0 0 18px rgba(255,153,0,0.7),0 0 36px rgba(255,120,0,0.3);transform:scale(1.02);}}
+
+    .nc-streak100{color:#ff2244 !important;-webkit-text-fill-color:#ff2244 !important;animation:nc-s100-pulse 1.5s ease-in-out infinite;display:inline-block;}
+    @keyframes nc-s100-pulse{0%,100%{text-shadow:0 0 6px #ff2244,0 0 16px rgba(255,34,68,0.7),0 0 32px rgba(200,0,40,0.4),0 0 56px rgba(160,0,30,0.15);transform:scale(1);}35%{text-shadow:0 0 12px #ff4466,0 0 28px rgba(255,60,90,0.9),0 0 56px rgba(220,20,50,0.6),0 0 90px rgba(180,0,30,0.25);transform:scale(1.07);}65%{text-shadow:0 0 8px #ff0033,0 0 20px rgba(255,0,51,0.8),0 0 40px rgba(200,0,30,0.45);transform:scale(1.03);}}
   `;
   document.head.appendChild(s);
 }
@@ -9905,6 +10056,7 @@ window._N = {
   saveNameColour,
   loadStreaksPanel,
   opResetStreakKing,
+  openDailyModal,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
   adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
