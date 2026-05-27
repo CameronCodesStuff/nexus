@@ -1435,7 +1435,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile,
-  sendPasswordResetEmail, GoogleAuthProvider, linkWithPopup, fetchSignInMethodsForEmail, unlink
+  sendPasswordResetEmail, GoogleAuthProvider, linkWithPopup, signInWithPopup, fetchSignInMethodsForEmail, unlink
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
@@ -2265,9 +2265,7 @@ async function signInWithGoogle(){
   if(err) err.textContent='';
   try{
     const provider=new GoogleAuthProvider();
-    const {signInWithPopup}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
     await signInWithPopup(auth,provider);
-    // onAuthStateChanged will handle the rest
   }catch(e){
     if(e.code==='auth/popup-closed-by-user') return;
     if(err) err.textContent=e.code==='auth/account-exists-with-different-credential'
