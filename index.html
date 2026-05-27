@@ -2381,7 +2381,8 @@ async function enterApp(){
     }catch{}
     startTimeTracking();
   }
-  // nexus energy persists across logins
+  // Apply saved display preferences
+  applyAllDisplayPrefs();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
   // Dismiss loading screen
@@ -2733,6 +2734,8 @@ function renderMsgs(cid){
       const hd=document.createElement('div');hd.className='msg-header';
       hd.innerHTML=`<div class="msg-avatar" style="cursor:pointer;overflow:hidden;padding:0;" onclick="N.openProfileModal('${msg.senderUid}')">${avatarHtml(msg.senderUid,'28px')}</div><div class="msg-sender"><span class="${getNameColourClass(msg.senderUid)||rank.c} ${animCls2}" style="cursor:pointer;${getUserFontStyle(msg.senderUid)}" onclick="N.openProfileModal('${msg.senderUid}')">${esc(sn)}</span>${getRoleBadge(msg.senderUid)}</div><div class="msg-time-stamp">${fmtT(ts)}</div>`;
       if(animCls2) maybeAttachParticles(hd.querySelector('.msg-sender span'));
+      // Apply current display prefs to newly rendered name
+      requestAnimationFrame(applyAllDisplayPrefs);
       gEl.appendChild(hd);area.insertBefore(gEl,wipe);ls=msg.senderUid;
     }
     const wr=document.createElement('div');wr.className='msg-bubble-wrap';
@@ -3821,6 +3824,8 @@ function renderSettings(){
       +(rawPic?' &nbsp;<button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.clearProfilePic()">× REMOVE</button>':'');
   }
   renderNameColourSection();
+  renderDisplayPrefsSection();
+  renderRestoreDefaultsSection();
 }
 
 async function saveEmoji(emoji){
@@ -7304,6 +7309,182 @@ function maybeAttachParticles(spanEl){
   }
 }
 
+// ══════════════════════════════════════════════════
+// DISPLAY PREFERENCES — how you see others
+// Stored in localStorage so they're instant and local-only
+// ══════════════════════════════════════════════════
+const DISP_DEFAULTS={
+  showRoles:       true,
+  showNameEffects: true,
+  showParticles:   true,
+  showNameColours: true,
+  showBubbleEffects:true,
+  showAvatars:     true,
+};
+
+function getDisplayPrefs(){
+  try{
+    const raw=localStorage.getItem('nexus_display_prefs');
+    return raw?{...DISP_DEFAULTS,...JSON.parse(raw)}:{...DISP_DEFAULTS};
+  }catch{return {...DISP_DEFAULTS};}
+}
+
+function setDisplayPref(key,val){
+  const p=getDisplayPrefs();
+  p[key]=val;
+  localStorage.setItem('nexus_display_prefs',JSON.stringify(p));
+}
+
+// Call after any pref change to refresh visible names/messages
+function applyDisplayPrefs(){
+  const p=getDisplayPrefs();
+  // Roles: show/hide all role badge spans
+  document.querySelectorAll('.role-veteran,.role-devoted,.role-streak-king,.role-daily-ops,.role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-easter,.role-referral,.role-beginner-tester,.role-referral').forEach(el=>{
+    el.style.display=p.showRoles?'':'none';
+  });
+  // Particles: stop/start particle canvases
+  if(!p.showParticles){
+    document.querySelectorAll('.name-particle-wrap canvas').forEach(c=>{ c.style.display='none'; });
+  } else {
+    document.querySelectorAll('.name-particle-wrap canvas').forEach(c=>{ c.style.display=''; });
+  }
+  // Name effects: mute CSS animations on name spans
+  document.querySelectorAll('.msg-sender span, .feed-name span, .my-name span, #ch-name span').forEach(span=>{
+    const animClasses=['name-anim-fire','name-anim-pulse','name-anim-neon','name-anim-glitch','name-anim-rainbow','name-anim-ice','name-anim-gold','name-anim-void'];
+    const hasAnim=animClasses.some(c=>span.classList.contains(c));
+    if(hasAnim) span.style.animationPlayState=p.showNameEffects?'running':'paused';
+  });
+  // Streak colour pulses
+  document.querySelectorAll('.nc-streak7,.nc-streak30,.nc-streak100').forEach(el=>{
+    el.style.animationPlayState=p.showNameEffects?'running':'paused';
+  });
+  // Bubble effects: pause bubble animations
+  document.querySelectorAll('.msg-group.own .msg-bubble').forEach(b=>{
+    b.style.animationPlayState=p.showBubbleEffects?'running':'paused';
+  });
+}
+
+// Inject a <style> block that enforces name-colour stripping when showNameColours is off
+function applyNameColourPref(){
+  const p=getDisplayPrefs();
+  let s=document.getElementById('nexus-nc-override');
+  if(!p.showNameColours){
+    if(!s){s=document.createElement('style');s.id='nexus-nc-override';document.head.appendChild(s);}
+    // Override all rank/name colour classes back to default text colour
+    s.textContent='.rank-e1,.rank-e2,.rank-e3,.rank-e4,.rank-0,.rank-1,.rank-2,.rank-3,.rank-4,.rank-5,.rank-6,.rank-7,.rank-8,.rank-9,.rank-10,.rank-11,.rank-12,.rank-rainbow,.nc-streak7,.nc-streak30,.nc-streak100,.name-anim-fire,.name-anim-ice,.name-anim-void,.name-anim-gold,.name-anim-rainbow{color:var(--text)!important;-webkit-text-fill-color:var(--text)!important;background:none!important;text-shadow:none!important;filter:none!important;}';
+  } else {
+    if(s) s.textContent='';
+  }
+}
+
+function applyAllDisplayPrefs(){
+  applyDisplayPrefs();
+  applyNameColourPref();
+}
+
+function renderDisplayPrefsSection(){
+  const modal=document.querySelector('#settings-modal .modal');
+  if(!modal) return;
+  let sec=document.getElementById('settings-display-prefs');
+  if(!sec){
+    sec=document.createElement('div');
+    sec.id='settings-display-prefs';
+    sec.className='settings-section';
+    // Insert before the restore section (or at end)
+    const restoreSec=document.getElementById('settings-restore');
+    if(restoreSec) modal.insertBefore(sec,restoreSec);
+    else modal.appendChild(sec);
+  }
+  const p=getDisplayPrefs();
+  const mkToggle=(key,label,desc)=>{
+    const on=p[key];
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${label}</div>
+        <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">${desc}</div>
+      </div>
+      <div onclick="N.toggleDisplayPref('${key}')" style="width:40px;height:22px;border-radius:11px;background:${on?'var(--accent)':'var(--bg2)'};border:1px solid ${on?'var(--accent)':'var(--border)'};cursor:pointer;position:relative;transition:all 0.2s;flex-shrink:0;">
+        <div style="position:absolute;top:3px;left:${on?'19px':'3px'};width:14px;height:14px;border-radius:50%;background:${on?'#fff':'var(--text-dim)'};transition:left 0.2s;"></div>
+      </div>
+    </div>`;
+  };
+  sec.innerHTML=`
+    <div class="settings-label">HOW YOU SEE OTHERS</div>
+    ${mkToggle('showRoles',        'Role Badges',        'Show role tags like VETERAN, TESTER, OG etc.')}
+    ${mkToggle('showNameColours',  'Name Colours',       'Show rank colours and earned name colours.')}
+    ${mkToggle('showNameEffects',  'Name Animations',    'Play CSS glow/flicker effects on names.')}
+    ${mkToggle('showParticles',    'Name Particles',     'Show floating fire, ice, and sparkle particles.')}
+    ${mkToggle('showBubbleEffects','Bubble Effects',     'Animate chat bubble glow and pulse effects.')}
+    ${mkToggle('showAvatars',      'Custom Avatars',     'Show profile pictures. Disable to show emoji only.')}
+  `;
+}
+
+function toggleDisplayPref(key){
+  const p=getDisplayPrefs();
+  setDisplayPref(key,!p[key]);
+  applyAllDisplayPrefs();
+  renderDisplayPrefsSection();
+  // Re-render feed and messages for avatar/colour changes
+  if(key==='showAvatars'||key==='showNameColours') renderSidebar();
+}
+
+function renderRestoreDefaultsSection(){
+  const modal=document.querySelector('#settings-modal .modal');
+  if(!modal) return;
+  let sec=document.getElementById('settings-restore');
+  if(!sec){
+    sec=document.createElement('div');
+    sec.id='settings-restore';
+    sec.className='settings-section';
+    modal.appendChild(sec);
+  }
+  sec.innerHTML=`
+    <div class="settings-label">RESET</div>
+    <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:12px;line-height:1.6;">Restore every setting to its default — theme, fonts, bubble colours, background, display preferences, and name colour. Your account, messages, achievements and streak are not affected.</div>
+    <button onclick="N.restoreAllDefaults()" style="width:100%;padding:12px;background:rgba(255,51,85,0.08);border:1px solid rgba(255,51,85,0.35);border-radius:8px;color:var(--danger);font-family:var(--font-display);font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,51,85,0.15)'" onmouseout="this.style.background='rgba(255,51,85,0.08)'">↺ &nbsp;RESTORE DEFAULTS</button>
+  `;
+}
+
+async function restoreAllDefaults(){
+  if(!confirm('Restore all settings to default? This cannot be undone.')) return;
+  // localStorage
+  localStorage.removeItem('nexus_theme');
+  localStorage.removeItem('nexus_bg_effect');
+  localStorage.removeItem('nexus_bg_colour');
+  localStorage.removeItem('nexus_text_colour');
+  localStorage.removeItem('nexus_display_prefs');
+  localStorage.removeItem('nexus_bg');
+  // Apply theme reset
+  curTheme='default';
+  document.documentElement.removeAttribute('data-theme');
+  BgEffects.start('stars');
+  // Apply bg colour reset
+  document.body.style.setProperty('--app-bg','');
+  document.body.style.background='';
+  // Apply text colour reset
+  document.documentElement.style.removeProperty('--text');
+  document.documentElement.style.removeProperty('color');
+  // Remove name colour override
+  const ncOver=document.getElementById('nexus-nc-override');
+  if(ncOver) ncOver.textContent='';
+  // Firestore — reset user cosmetics
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{
+      fontId:0,
+      nameColour:'auto',
+      bubbleColour:'',
+      bubbleEffect:'',
+    });
+    cud={...cud,fontId:0,nameColour:'auto',bubbleColour:'',bubbleEffect:''};
+    uCache[cu.uid]={...uCache[cu.uid],fontId:0,nameColour:'auto',bubbleColour:'',bubbleEffect:''};
+  }catch(e){console.warn('Reset Firestore prefs failed',e);}
+  // Re-render everything
+  applyAllDisplayPrefs();
+  renderSettings();
+  renderSidebar();
+  toast('✓ All settings restored to default','success');
+}
+
 function getUserFontStyle(uid){
   const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
   const f=USER_FONTS.find(x=>x.id===(u.fontId||0));
@@ -10300,6 +10481,8 @@ window._N = {
   loadStreaksPanel,
   opResetStreakKing,
   openDailyModal,
+  toggleDisplayPref,
+  restoreAllDefaults,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
   adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
