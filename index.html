@@ -315,6 +315,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .fb-status{display:flex;align-items:center;gap:6px;font-size:11px;font-family:var(--font-mono);color:var(--text-dim);}
   .fb-dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);flex-shrink:0;}
   .modal::-webkit-scrollbar{width:3px;}.modal::-webkit-scrollbar-thumb{background:var(--border);}
+  #profile-modal-content::-webkit-scrollbar{width:3px;}
+  #profile-modal-content::-webkit-scrollbar-track{background:transparent;}
+  #profile-modal-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  #profile-modal-content{scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
   .typing-indicator{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);padding:4px 0 0;height:18px;}
   .modal-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:13px;outline:none;width:100%;}
   .modal-input:focus{border-color:var(--accent);}
