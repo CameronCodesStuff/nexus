@@ -7641,45 +7641,60 @@ function renderLinkedAccountsSection(){
     if(restoreSec) modal.insertBefore(sec,restoreSec);
     else modal.appendChild(sec);
   }
-  const providers=(auth.currentUser?.providerData||[]).map(p=>p.providerId);
-  const hasGoogle=providers.includes('google.com');
-  const hasEmail=providers.includes('password');
-  // Filter out the synthetic @nexus.local email — it's not a real email
   const rawEmail=auth.currentUser?.email||cud?.email||'';
   const email=rawEmail.endsWith('@nexus.local')?'':rawEmail;
-  const googleEmail=auth.currentUser?.providerData.find(p=>p.providerId==='google.com')?.email||'';
+  const hasEmail=!!email;
 
   sec.innerHTML=`
     <div class="settings-label">ACCOUNT &amp; SECURITY</div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
-      <div style="font-size:11px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">LINKED ACCOUNTS</div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-        <div style="width:32px;height:32px;border-radius:8px;background:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#444;flex-shrink:0;">G</div>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:600;">Google</div>
-          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${hasGoogle?'Connected · '+googleEmail:'Not linked'}</div>
-        </div>
-        <button class="btn-small ${hasGoogle?'':'primary'}" onclick="N.${hasGoogle?'unlinkGoogle':'linkGoogle'}()" style="${hasGoogle?'border-color:var(--danger);color:var(--danger);':''}">${hasGoogle?'UNLINK':'LINK'}</button>
+      <div style="font-size:11px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">EMAIL ADDRESS</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.6;">Link a real email to your account for password recovery. Only you can see this.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+        <input type="email" id="set-email-input" placeholder="${hasEmail?email:'add your email…'}" value="${hasEmail?email:''}" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;border-radius:7px;">
+        <button class="btn-small primary" onclick="N.saveLinkedEmail()" style="flex-shrink:0;">SAVE</button>
+        ${hasEmail?`<button class="btn-small" onclick="N.removeLinkedEmail()" style="flex-shrink:0;border-color:var(--danger);color:var(--danger);">REMOVE</button>`:''}
       </div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;">
-        <div style="width:32px;height:32px;border-radius:8px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">✉️</div>
-        <div style="flex:1;">
-          <div style="font-size:13px;font-weight:600;">Email / Password</div>
-          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${email||'Not set'}</div>
-        </div>
-        <div style="font-size:9px;font-family:var(--font-mono);color:${hasEmail?'var(--success)':'var(--text-dim)'};">${hasEmail?'✓ ACTIVE':'—'}</div>
-      </div>
+      <div id="set-email-status" style="font-size:11px;font-family:var(--font-mono);margin-top:4px;display:none;"></div>
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
       <div style="font-size:11px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">FORGOT PASSWORD</div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.5;">Send a password reset link to your account email.</div>
       <div style="display:flex;gap:8px;align-items:center;">
-      <input type="email" id="reset-email-input" placeholder="${email||'your@email.com'}" value="${email}" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;border-radius:7px;">
+        <input type="email" id="reset-email-input" placeholder="${email||'your@email.com'}" value="${email}" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;border-radius:7px;">
         <button class="btn-small primary" onclick="N.sendPasswordReset()" style="flex-shrink:0;">SEND LINK</button>
       </div>
       <div id="reset-status" style="font-size:11px;font-family:var(--font-mono);margin-top:8px;display:none;"></div>
     </div>
   `;
+}
+
+async function saveLinkedEmail(){
+  const inp=document.getElementById('set-email-input');
+  const status=document.getElementById('set-email-status');
+  const email=(inp?.value||'').trim().toLowerCase();
+  if(!email){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Please enter an email address.';}return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Invalid email address.';}return;}
+  try{
+    // Store in Firestore — used for password reset and display
+    await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:email});
+    cud={...cud,recoveryEmail:email};
+    if(status){status.style.display='block';status.style.color='var(--success)';status.textContent='✓ Email saved.';}
+    toast('Recovery email saved.','success');
+    setTimeout(()=>renderLinkedAccountsSection(),800);
+  }catch(e){
+    if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Failed: '+e.message;}
+  }
+}
+
+async function removeLinkedEmail(){
+  if(!confirm('Remove your linked email?')) return;
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:''});
+    cud={...cud,recoveryEmail:''};
+    toast('Email removed.','success');
+    renderLinkedAccountsSection();
+  }catch(e){toast('Failed: '+e.message,'danger');}
 }
 
 async function linkGoogle(){
@@ -7707,7 +7722,10 @@ async function unlinkGoogle(){
 async function sendPasswordReset(){
   const inp=document.getElementById('reset-email-input');
   const status=document.getElementById('reset-status');
-  const email=(inp?.value||'').trim();
+  // Use recovery email from Firestore if the input is empty or nexus.local
+  const rawInput=(inp?.value||'').trim();
+  const email=rawInput&&!rawInput.endsWith('@nexus.local')?rawInput:(cud?.recoveryEmail||'');
+  if(inp&&email) inp.value=email;
   if(!email){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Please enter an email address.';}return;}
   try{
     await sendPasswordResetEmail(auth,email);
@@ -10943,6 +10961,8 @@ window._N = {
   signInWithGoogle,
   showForgotPassword,
   doForgotPassword,
+  saveLinkedEmail,
+  removeLinkedEmail,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
   adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
