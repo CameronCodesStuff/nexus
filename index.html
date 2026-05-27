@@ -7739,6 +7739,7 @@ async function sendPasswordReset(){
 }
 
 function renderRestoreDefaultsSection(){
+  const modal=document.querySelector('#settings-modal .modal');
   if(!modal) return;
   let sec=document.getElementById('settings-restore');
   if(!sec){
