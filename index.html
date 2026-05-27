@@ -3384,7 +3384,7 @@ function renderSettings(){
     let fHTML='<div class="settings-label">YOUR NAME FONT</div><div class="font-pick-grid">';
     USER_FONTS.forEach(f=>{
       const isAnim=!!f.animClass;
-      const isLocked=isAnim&&!unlockedAnims.includes(f.id);
+      const isLocked=isAnim&&!isAnimFontUnlocked(f);
       const previewClass=isAnim&&!isLocked?f.animClass:'';
       fHTML+='<div class="font-pick-btn'+(f.id===curFont?' selected':'')+(isLocked?' locked-font':'')
         +'" onclick="'+(isLocked?'N.showFontLockInfo('+f.id+')':'N.saveUserFont('+f.id+')')+'">'
@@ -6698,23 +6698,29 @@ const USER_FONTS=[
   {id:21, name:'Permanent Marker', preview:'Hello', tag:'MARKER', style:"font-family:'Permanent Marker',cursive;"},
   {id:22, name:'Special Elite', preview:'Hello',  tag:'TYPEWRITER',style:"font-family:'Special Elite',cursive;letter-spacing:1px;"},
   // ── Animated (earned via daily rewards) ──
-  {id:30, name:'🔥 Fire',       preview:'Fire',   tag:'ANIMATED', style:'', animClass:'name-anim-fire',    earnDesc:'Complete 7 daily challenges'},
-  {id:31, name:'💓 Pulse',      preview:'Pulse',  tag:'ANIMATED', style:'', animClass:'name-anim-pulse',   earnDesc:'3-day login streak'},
-  {id:32, name:'⚡ Neon',       preview:'Neon',   tag:'ANIMATED', style:'', animClass:'name-anim-neon',    earnDesc:'Complete 14 daily challenges'},
-  {id:33, name:'👾 Glitch',     preview:'Glitch', tag:'ANIMATED', style:'', animClass:'name-anim-glitch',  earnDesc:'Complete 30 daily challenges'},
-  {id:34, name:'🌈 Rainbow',    preview:'Wave',   tag:'ANIMATED', style:'', animClass:'name-anim-rainbow', earnDesc:'7-day login streak'},
-  {id:35, name:'❄️ Ice',        preview:'Ice',    tag:'ANIMATED', style:'', animClass:'name-anim-ice',     earnDesc:'Complete 21 daily challenges'},
-  {id:36, name:'✨ Gold',       preview:'Gold',   tag:'ANIMATED', style:'', animClass:'name-anim-gold',    earnDesc:'30-day login streak (VETERAN)'},
-  {id:37, name:'🌑 Void',       preview:'Void',   tag:'ANIMATED', style:'', animClass:'name-anim-void',    earnDesc:'100-day login streak (DEVOTED)'},
+  {id:30, name:'🔥 Fire',       preview:'Fire',   tag:'ANIMATED', style:'', animClass:'name-anim-fire',    earnDesc:'Complete 7 daily challenge days',  unlockCheck:()=>(cud?.totalCompleteDays||0)>=7},
+  {id:31, name:'💓 Pulse',      preview:'Pulse',  tag:'ANIMATED', style:'', animClass:'name-anim-pulse',   earnDesc:'3-day login streak',               unlockCheck:()=>(cud?.loginStreak||0)>=3},
+  {id:32, name:'⚡ Neon',       preview:'Neon',   tag:'ANIMATED', style:'', animClass:'name-anim-neon',    earnDesc:'Complete 14 daily challenge days', unlockCheck:()=>(cud?.totalCompleteDays||0)>=14},
+  {id:33, name:'👾 Glitch',     preview:'Glitch', tag:'ANIMATED', style:'', animClass:'name-anim-glitch',  earnDesc:'Complete 30 daily challenge days', unlockCheck:()=>(cud?.totalCompleteDays||0)>=30},
+  {id:34, name:'🌈 Rainbow',    preview:'Wave',   tag:'ANIMATED', style:'', animClass:'name-anim-rainbow', earnDesc:'7-day login streak',               unlockCheck:()=>(cud?.loginStreak||0)>=7},
+  {id:35, name:'❄️ Ice',        preview:'Ice',    tag:'ANIMATED', style:'', animClass:'name-anim-ice',     earnDesc:'Complete 21 daily challenge days', unlockCheck:()=>(cud?.totalCompleteDays||0)>=21},
+  {id:36, name:'✨ Gold',       preview:'Gold',   tag:'ANIMATED', style:'', animClass:'name-anim-gold',    earnDesc:'30-day login streak',              unlockCheck:()=>(cud?.loginStreak||0)>=30},
+  {id:37, name:'🌑 Void',       preview:'Void',   tag:'ANIMATED', style:'', animClass:'name-anim-void',    earnDesc:'100-day login streak',             unlockCheck:()=>(cud?.loginStreak||0)>=100},
 ];
+
+function isAnimFontUnlocked(f){
+  if(!f?.animClass) return true; // not an anim font, always available
+  if(typeof f.unlockCheck==='function') return f.unlockCheck();
+  // Fallback: check stored array
+  return Array.isArray(cud?.unlockedNameAnims)&&cud.unlockedNameAnims.includes(f.id);
+}
 
 async function saveUserFont(fontId){
   try{
-    // Block locked animated fonts
     const f=USER_FONTS.find(x=>x.id===fontId);
-    if(f?.animClass){
-      const unlocked=Array.isArray(cud?.unlockedNameAnims)?cud.unlockedNameAnims:[];
-      if(!unlocked.includes(fontId)){toast('🔒 '+f.name+' is locked. '+f.earnDesc,'danger');return;}
+    if(f?.animClass && !isAnimFontUnlocked(f)){
+      toast('🔒 '+f.name+' — '+f.earnDesc,'danger');
+      return;
     }
     unlockAch('set_font');
     await updateDoc(doc(db,'users',cu.uid),{fontId});
