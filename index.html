@@ -1356,9 +1356,9 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
 <!-- PROFILE MODAL -->
 <div class="modal-overlay" id="profile-modal">
-  <div class="modal" style="width:400px;padding:0;overflow:hidden;">
+  <div class="modal" style="width:400px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:90vh;">
     <button class="modal-close" onclick="N.closeModal('profile-modal')" style="top:10px;right:10px;z-index:10;border-color:rgba(255,255,255,0.3);color:#fff;">✕</button>
-    <div id="profile-modal-content"></div>
+    <div id="profile-modal-content" style="overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;"></div>
   </div>
 </div>
 
