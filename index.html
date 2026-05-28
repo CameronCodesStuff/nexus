@@ -1431,7 +1431,8 @@ import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile,
   sendPasswordResetEmail, GoogleAuthProvider, linkWithPopup, signInWithPopup,
-  fetchSignInMethodsForEmail, unlink, updateEmail
+  fetchSignInMethodsForEmail, unlink, updateEmail,
+  EmailAuthProvider, reauthenticateWithCredential
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
@@ -2459,8 +2460,9 @@ async function enterApp(){
       onSnapshot(doc(db,'users',uid),snap=>{
         if(!snap.exists()) return;
         const d=snap.data();
-        if(d.referralCount!==undefined&&d.referralCount!==cud.referralCount){
-          cud={...cud,referralCount:d.referralCount,roles:d.roles||cud.roles||[]};
+        if(!d) return;
+        if(d.referralCount!==undefined&&d.referralCount!==cud?.referralCount){
+          cud={...cud,referralCount:d.referralCount,roles:d.roles||cud?.roles||[]};
           uCache[uid]={...uCache[uid],referralCount:d.referralCount,roles:d.roles||[]};
           if(window._N&&window._N.renderSettings) window._N.renderSettings();
           if(window._N&&window._N.renderSidebar) renderSidebar();
@@ -7764,29 +7766,28 @@ async function saveLinkedEmail(){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Invalid email address.';}return;}
   if(status){status.style.display='block';status.style.color='var(--text-dim)';status.textContent='Saving…';}
   try{
-    // Update Firebase Auth email so sendPasswordResetEmail actually works
-    await updateEmail(auth.currentUser, email);
-    // Also store in Firestore for display and fallback
+    // Reauthenticate with current nexus.local password so Firebase allows email update
+    const pw=prompt('Enter your Nexus password to confirm:');
+    if(!pw){if(status){status.textContent='Cancelled.';} return;}
+    const currentEmail=toEmail(cud?.username||auth.currentUser?.email?.split('@')[0]||'');
+    const cred=EmailAuthProvider.credential(currentEmail,pw);
+    await reauthenticateWithCredential(auth.currentUser,cred);
+    // Now update the Firebase Auth email to the real one
+    await updateEmail(auth.currentUser,email);
+    // Store in Firestore too
     await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:email});
     cud={...cud,recoveryEmail:email};
-    if(status){status.style.display='block';status.style.color='var(--success)';status.textContent='✓ Email saved. Password reset emails will now go here.';}
-    toast('Recovery email saved.','success');
-    setTimeout(()=>renderLinkedAccountsSection(),800);
+    if(status){status.style.display='block';status.style.color='var(--success)';status.textContent='✓ Email saved. Forgot password will now send to this address.';}
+    toast('Recovery email saved — password reset will work now!','success');
+    setTimeout(()=>renderLinkedAccountsSection(),1000);
   }catch(e){
-    // auth/requires-recent-login means they need to re-authenticate first
-    const msg=e.code==='auth/requires-recent-login'
-      ?'Please log out and back in, then try again (Firebase requires a recent login to change email).'
-      :e.code==='auth/email-already-in-use'
-      ?'That email is already used by another account.'
-      :e.code==='auth/invalid-email'
-      ?'Invalid email address.'
+    const msg=e.code==='auth/wrong-password'?'Wrong password.'
+      :e.code==='auth/email-already-in-use'?'That email is already used by another account.'
+      :e.code==='auth/invalid-email'?'Invalid email address.'
       :'Failed: '+e.message;
-    // Even if Firebase Auth update fails, save to Firestore as fallback
-    try{
-      await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:email});
-      cud={...cud,recoveryEmail:email};
-    }catch{}
-    if(status){status.style.display='block';status.style.color=e.code==='auth/requires-recent-login'?'var(--danger)':'var(--success)';status.textContent=e.code==='auth/requires-recent-login'?msg:'✓ Saved to account (Firebase email update requires re-login).';}
+    // Save to Firestore as fallback even if Auth update failed
+    try{await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:email});cud={...cud,recoveryEmail:email};}catch{}
+    if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent=msg;}
   }
 }
 
@@ -9308,6 +9309,15 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.followerCount||0)>0).sort((a,b)=>(b.followerCount||0)-(a.followerCount||0)).slice(0,20);
     } else if(tab==='streak'){
       users=users.filter(u=>(u.loginStreak||0)>0).sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0)).slice(0,20);
+      // Auto-assign streak_king role to whoever is #1
+      if(users.length){
+        const king=users[0];
+        const currentKingId=(await getDoc(doc(db,'config','streakKing')).catch(()=>null))?.data()?.uid||'';
+        if(king.id!==currentKingId){
+          // Crown the new king
+          checkStreakKing(king.loginStreak||0).catch(()=>{});
+        }
+      }
     } else {
       users=users.filter(u=>(u.referralCount||0)>0).sort((a,b)=>(b.referralCount||0)-(a.referralCount||0)).slice(0,20);
     }
@@ -9417,9 +9427,10 @@ async function renderLeaderboard(tab){
         row.appendChild(badge);
       } else if(tab==='streak'){
         const s=u.loginStreak||0;
+        const isKing=(Array.isArray(u.roles)&&u.roles.includes('streak_king'));
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:'+(s>=100?'#ff2244':s>=30?'#ffb300':s>=7?'#00aaff':'var(--accent2)')+';';
-        badge.textContent='🔥 '+s+' day'+(s!==1?'s':'');
+        badge.textContent=(isKing?'👑 ':''+'🔥 ')+s+' day'+(s!==1?'s':'');
         row.appendChild(badge);
       }
       el.appendChild(row);
