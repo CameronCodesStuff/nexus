@@ -6395,28 +6395,30 @@ async function openChangelog(){
     <div>Session: <span style="color:var(--text);">${new Date().toLocaleString()}</span></div>`;
   el.appendChild(buildInfo);
 
-  // ── Secret button ──
-  const secret=document.createElement('div');
-  secret.id='sfn-secret-btn';
-  secret.style.cssText='margin-top:10px;text-align:center;';
-  secret.innerHTML=`<button id="sfn-secret-inner" style="background:none;border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:9px;letter-spacing:2px;padding:6px 18px;border-radius:6px;cursor:pointer;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(255,255,255,0.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.08)'">...</button>`;
-  el.appendChild(secret);
-  document.getElementById('sfn-secret-inner')?.addEventListener('click',async function(){
-    this.disabled=true;
-    this.textContent='✓';
-    this.style.color='rgba(0,255,136,0.6)';
-    this.style.borderColor='rgba(0,255,136,0.3)';
-    secret.style.display='none';
-    if(cu&&cud){
-      const bonus=5000;
-      const newCount=(cud.msgCount||0)+bonus;
-      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount}).catch(()=>{});
-      cud={...cud,msgCount:newCount};
-      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
-      renderProfile?.();
-      toast('🤫 +5,000 messages','success');
-    }
-  });
+  // ── Secret button ── (only shown if not already claimed)
+  if(!cud?.easterClaimed){
+    const secret=document.createElement('div');
+    secret.id='sfn-secret-btn';
+    secret.style.cssText='margin-top:10px;text-align:center;';
+    secret.innerHTML=`<button id="sfn-secret-inner" style="background:none;border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:9px;letter-spacing:2px;padding:6px 18px;border-radius:6px;cursor:pointer;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(255,255,255,0.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.08)'">...</button>`;
+    el.appendChild(secret);
+    document.getElementById('sfn-secret-inner')?.addEventListener('click',async function(){
+      this.disabled=true;
+      this.textContent='✓';
+      this.style.color='rgba(0,255,136,0.6)';
+      this.style.borderColor='rgba(0,255,136,0.3)';
+      secret.style.display='none';
+      if(cu&&cud){
+        const bonus=5000;
+        const newCount=(cud.msgCount||0)+bonus;
+        await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,easterClaimed:true}).catch(()=>{});
+        cud={...cud,msgCount:newCount,easterClaimed:true};
+        uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,easterClaimed:true};
+        renderProfile?.();
+        toast('🤫 +5,000 messages','success');
+      }
+    });
+  }
 }
 let selectedRating=0;
 
