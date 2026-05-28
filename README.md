@@ -2,7 +2,7 @@
 
 ---
 
-## 🌐 Live Demo
+## 🌐 Site
 
 [Nexus](https://cameroncodesstuff.github.io/nexus/)
 
