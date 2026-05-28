@@ -2235,21 +2235,21 @@ async function doRegister(){
 }
 
 function doLoginCloaked(){
-  const tab=window.open('about:blank','_blank');
+  const user=document.getElementById('login-user')?.value||'';
+  const pass=document.getElementById('login-pass')?.value||'';
+  const tab=window.open(location.href,'_blank');
   if(!tab){alert('Allow pop-ups for this site first.');return;}
-  const user=document.getElementById('login-username')?.value||'';
-  const pass=document.getElementById('login-password')?.value||'';
-  const html=document.documentElement.outerHTML;
-  tab.document.open();tab.document.write(html);tab.document.close();
-  setTimeout(()=>{
+  // Pre-fill login fields once the new tab's module script is ready
+  const attempt=()=>{
     try{
-      const u=tab.document.getElementById('login-username');
-      const p=tab.document.getElementById('login-password');
-      if(u)u.value=user;
-      if(p)p.value=pass;
-      if(tab.N&&tab.N.doLogin)tab.N.doLogin();
+      if(tab.closed) return;
+      const u=tab.document.getElementById('login-user');
+      const p=tab.document.getElementById('login-pass');
+      if(u&&p){u.value=user;p.value=pass;if(tab.N&&tab.N.doLogin)tab.N.doLogin();return;}
     }catch(e){}
-  },1200);
+    setTimeout(attempt,300);
+  };
+  setTimeout(attempt,800);
 }
 
 async function signInWithGoogle(){
@@ -9137,7 +9137,7 @@ function setLiveGameScore(field,score){
   _liveGameScores[field]=score;
 }
 
-if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
+function fmtEnergy(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
 
 // ── #1 ROLE SYNC ─────────────────────────────────
 const LB_FIELDS_FOR_ROLE=[
@@ -9251,7 +9251,7 @@ async function renderLeaderboard(tab){
         statVal=u.followerCount||0;statLabel=statVal.toLocaleString()+' follower'+(statVal!==1?'s':'');
       } else if(tab==='referrals'){
         statVal=u.referralCount||0;statLabel=statVal+' referral'+(statVal!==1?'s':'');
-      } else {
+      }
       row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
       row.appendChild(avEl);
       const info=document.createElement('div');info.className='lb-info';
