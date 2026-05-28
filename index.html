@@ -2013,6 +2013,8 @@ await signOut(auth).catch(()=>{});
 // ── STATE ──────────────────────────────────────
 let hiddenChats=new Set(JSON.parse(localStorage.getItem('nexus_hidden_chats')||'[]'));
 function saveHiddenChats(){localStorage.setItem('nexus_hidden_chats',JSON.stringify([...hiddenChats]));}
+// Clean up any stale cloak keys (older than 1 minute)
+try{Object.keys(localStorage).filter(k=>k.startsWith('nexus_cloak_')).forEach(k=>{try{const d=JSON.parse(localStorage.getItem(k));if(!d||Date.now()-d.t>60000)localStorage.removeItem(k);}catch{localStorage.removeItem(k);}});}catch{}
 let cu=null,cud=null,acid=null,pf=null;
 let ctimer=null,csecs=0,cstreams={},sstream=null,micOn=true,camOn=true;
 let ginvitees=[],clsnrs={},acunsub=null,uCache={},aChats={},mCache={},ffilter='';
@@ -2171,16 +2173,26 @@ onAuthStateChanged(auth, async user=>{
     $('app-screen').classList.remove('active');
     // Auto-login if launched via CLOAK button
     try{
-      const cloakUser=sessionStorage.getItem('nexus_cloak_user');
-      const cloakPass=sessionStorage.getItem('nexus_cloak_pass');
-      if(cloakUser&&cloakPass){
-        sessionStorage.removeItem('nexus_cloak_user');
-        sessionStorage.removeItem('nexus_cloak_pass');
-        const uEl=document.getElementById('login-user');
-        const pEl=document.getElementById('login-pass');
-        if(uEl) uEl.value=cloakUser;
-        if(pEl) pEl.value=cloakPass;
-        setTimeout(()=>window._N?.doLogin?.(),300);
+      const hash=location.hash;
+      const cloakMatch=hash.match(/[#&]cloak=([^&]+)/);
+      if(cloakMatch){
+        const key=decodeURIComponent(cloakMatch[1]);
+        const raw=localStorage.getItem(key);
+        localStorage.removeItem(key); // clean up immediately
+        // Clear hash without triggering reload
+        history.replaceState(null,'',location.pathname+location.search);
+        if(raw){
+          const creds=JSON.parse(raw);
+          // Only use if less than 30 seconds old (prevent replay)
+          if(creds&&creds.u&&creds.p&&(Date.now()-creds.t)<30000){
+            const uEl=document.getElementById('login-user');
+            const pEl=document.getElementById('login-pass');
+            if(uEl) uEl.value=creds.u;
+            if(pEl) pEl.value=creds.p;
+            // Wait for Firebase to finish initialising before logging in
+            setTimeout(()=>{ if(window._N?.doLogin) window._N.doLogin(); },400);
+          }
+        }
       }
     }catch(e){}
   }
@@ -2250,17 +2262,11 @@ function doLoginCloaked(){
   const user=document.getElementById('login-user')?.value?.trim()||'';
   const pass=document.getElementById('login-pass')?.value||'';
   if(!user||!pass){alert('Enter your username and password first, then click CLOAK.');return;}
-  // Pass creds via sessionStorage so new tab can auto-login without DOM polling
-  try{
-    sessionStorage.setItem('nexus_cloak_user',user);
-    sessionStorage.setItem('nexus_cloak_pass',pass);
-  }catch(e){}
-  const tab=window.open(location.href,'_blank');
-  if(!tab){
-    sessionStorage.removeItem('nexus_cloak_user');
-    sessionStorage.removeItem('nexus_cloak_pass');
-    alert('Allow pop-ups for this site first.');
-  }
+  // Use localStorage with a timestamp key — readable by new tab, cleaned up on use
+  const key='nexus_cloak_'+Date.now();
+  try{localStorage.setItem(key,JSON.stringify({u:user,p:pass,t:Date.now()}));}catch(e){}
+  const tab=window.open(location.href+'#cloak='+encodeURIComponent(key),'_blank');
+  if(!tab) alert('Allow pop-ups for this site first.');
 }
 
 async function signInWithGoogle(){
