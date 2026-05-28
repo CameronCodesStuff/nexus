@@ -756,6 +756,9 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .time-rainbow{background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:role-rainbow 2s linear infinite;font-weight:700;}
   /* Leaderboard */
   .lb-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;}
+  #lb-subtabs::-webkit-scrollbar{height:3px;}
+  #lb-subtabs::-webkit-scrollbar-track{background:transparent;}
+  #lb-subtabs::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
   .lb-tab{flex:1;padding:8px 4px;text-align:center;cursor:pointer;font-family:var(--font-display);font-size:9px;letter-spacing:1px;color:var(--text-dim);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all 0.2s;}
   .lb-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
   .lb-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:6px;transition:border-color 0.2s;}
@@ -1304,7 +1307,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
       <div class="lb-tab"        id="lb-sec-games" onclick="N.lbSection('games')" style="font-size:10px;padding:10px 14px;">🎮 GAMES</div>
     </div>
     <!-- Sub-tabs -->
-    <div id="lb-subtabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;flex-shrink:0;scrollbar-width:none;">
+    <div id="lb-subtabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;flex-shrink:0;scrollbar-width:thin;scrollbar-color:var(--border) transparent;-webkit-overflow-scrolling:touch;">
     </div>
     <div id="lb-content" style="overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding:0 20px 20px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;"></div>
   </div>
