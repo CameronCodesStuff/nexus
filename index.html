@@ -6395,29 +6395,29 @@ async function openChangelog(){
     <div>Session: <span style="color:var(--text);">${new Date().toLocaleString()}</span></div>`;
   el.appendChild(buildInfo);
 
-  // ── Secret button ── (only shown if not already claimed)
-  if(!cud?.easterClaimed){
-    const secret=document.createElement('div');
-    secret.id='sfn-secret-btn';
-    secret.style.cssText='margin-top:10px;text-align:center;';
-    secret.innerHTML=`<button id="sfn-secret-inner" style="background:none;border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:9px;letter-spacing:2px;padding:6px 18px;border-radius:6px;cursor:pointer;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(255,255,255,0.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.08)'">...</button>`;
-    el.appendChild(secret);
-    document.getElementById('sfn-secret-inner')?.addEventListener('click',async function(){
-      this.disabled=true;
-      this.textContent='✓';
-      this.style.color='rgba(0,255,136,0.6)';
-      this.style.borderColor='rgba(0,255,136,0.3)';
-      secret.style.display='none';
-      if(cu&&cud){
-        const bonus=5000;
-        const newCount=(cud.msgCount||0)+bonus;
-        await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,easterClaimed:true}).catch(()=>{});
-        cud={...cud,msgCount:newCount,easterClaimed:true};
-        uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,easterClaimed:true};
+  // ── Secret button (one-time per account) — fetch fresh to avoid stale cud ──
+  if(cu){
+    getDoc(doc(db,'users',cu.uid)).then(snap=>{
+      const freshData=snap.exists()?snap.data():{};
+      if(freshData.sfnSecretClaimed) return; // already claimed
+      const secret=document.createElement('div');
+      secret.style.cssText='margin-top:10px;text-align:center;';
+      secret.innerHTML=`<button id="sfn-secret-inner" style="background:none;border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:9px;letter-spacing:2px;padding:6px 18px;border-radius:6px;cursor:pointer;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(255,255,255,0.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.08)'">...</button>`;
+      el.appendChild(secret);
+      document.getElementById('sfn-secret-inner')?.addEventListener('click',async function(){
+        this.disabled=true;
+        // Double-check Firestore before granting (prevents rapid re-open exploit)
+        const check=await getDoc(doc(db,'users',cu.uid)).catch(()=>null);
+        if(check?.data()?.sfnSecretClaimed){secret.remove();return;}
+        secret.style.display='none';
+        const newCount=(cud?.msgCount||0)+5000;
+        await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount,sfnSecretClaimed:true}).catch(()=>{});
+        cud={...cud,msgCount:newCount,sfnSecretClaimed:true};
+        uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount,sfnSecretClaimed:true};
         renderProfile?.();
         toast('🤫 +5,000 messages','success');
-      }
-    });
+      });
+    }).catch(()=>{});
   }
 }
 let selectedRating=0;
@@ -7271,34 +7271,51 @@ function showStreakMilestone(streak){
   },1000);
 }
 
-async function checkStreakKing(myStreak){
-  // Read global streak-king record
+async function checkStreakKing(myStreak, forceUid){
+  // forceUid: explicitly crown this uid (used by leaderboard which knows true #1)
+  // Otherwise just checks if current user deserves it
   try{
     const skRef=doc(db,'config','streakKing');
-    const skSnap=await getDocs?null:null; // use getDoc
-    const skDoc=await (window.getDoc||getDoc)(skRef).catch(()=>null);
+    const skDoc=await getDoc(skRef).catch(()=>null);
     const skData=skDoc?.exists?.()?skDoc.data():{};
     const currentKingStreak=skData.streak||0;
     const currentKingUid=skData.uid||'';
-    if(myStreak>currentKingStreak||(myStreak===currentKingStreak&&currentKingUid===cu.uid)){
-      // We are / remain the king
-      await setDoc(skRef,{uid:cu.uid,streak:myStreak,username:cud.username||cud.displayName,ts:serverTimestamp()},{merge:true});
-      if(currentKingUid!==cu.uid){
-        // Newly crowned
-        const roles=Array.isArray(cud.roles)?[...cud.roles]:[];
-        if(!roles.includes('streak_king')){
-          roles.push('streak_king');
-          await updateDoc(doc(db,'users',cu.uid),{roles});
-          cud={...cud,roles};uCache[cu.uid]={...uCache[cu.uid],roles};
-          toast('👑 You are the STREAK KING! Longest streak on the server!','success');
+    const candidateUid=forceUid||cu?.uid;
+    const candidateStreak=myStreak||0;
+    if(!candidateUid) return;
+    if(candidateStreak>currentKingStreak||(candidateStreak===currentKingStreak&&currentKingUid===candidateUid)){
+      await setDoc(skRef,{uid:candidateUid,streak:candidateStreak,ts:serverTimestamp()},{merge:true});
+      if(currentKingUid!==candidateUid){
+        // Crown new king in Firestore
+        const newKingRef=doc(db,'users',candidateUid);
+        const newKingSnap=await getDoc(newKingRef).catch(()=>null);
+        if(newKingSnap?.exists?.()){
+          const nRoles=Array.isArray(newKingSnap.data().roles)?[...newKingSnap.data().roles]:[];
+          if(!nRoles.includes('streak_king')){
+            nRoles.push('streak_king');
+            await updateDoc(newKingRef,{roles:nRoles}).catch(()=>{});
+          }
+        }
+        // Update local state if we are the one being crowned
+        if(candidateUid===cu?.uid&&cud){
+          const roles=Array.isArray(cud.roles)?[...cud.roles]:[];
+          if(!roles.includes('streak_king')){
+            roles.push('streak_king');
+            cud={...cud,roles};uCache[cu.uid]={...uCache[cu.uid],roles};
+            toast('👑 You are the STREAK KING!','success');
+          }
         }
         // Dethrone old king
-        if(currentKingUid&&currentKingUid!==cu.uid){
+        if(currentKingUid&&currentKingUid!==candidateUid){
           const oldRef=doc(db,'users',currentKingUid);
-          const oldSnap=await (window.getDoc||getDoc)(oldRef).catch(()=>null);
+          const oldSnap=await getDoc(oldRef).catch(()=>null);
           if(oldSnap?.exists?.()){
             const oldRoles=(oldSnap.data().roles||[]).filter(r=>r!=='streak_king');
             await updateDoc(oldRef,{roles:oldRoles}).catch(()=>{});
+          }
+          if(currentKingUid===cu?.uid&&cud){
+            const newRoles=(cud.roles||[]).filter(r=>r!=='streak_king');
+            cud={...cud,roles:newRoles};uCache[cu.uid]={...uCache[cu.uid],roles:newRoles};
           }
         }
       }
@@ -9415,7 +9432,7 @@ async function renderLeaderboard(tab){
         const currentKingId=(await getDoc(doc(db,'config','streakKing')).catch(()=>null))?.data()?.uid||'';
         if(king.id!==currentKingId){
           // Crown the new king
-          checkStreakKing(king.loginStreak||0).catch(()=>{});
+          checkStreakKing(king.loginStreak||0, king.id).catch(()=>{});
         }
       }
     } else {
