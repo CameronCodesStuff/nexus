@@ -1012,14 +1012,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
             <button onclick="window.open('https://cameroncodesstuff.github.io/hub/','_blank');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🌐 Cameron's Hub</button>
             <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
-            <button onclick="N.openModal('typegame-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⌨️ Type &amp; Earn</button>
-            <button onclick="N.openFlapGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐦 Nexus Flap</button>
             <button onclick="N.openGamesHub();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎮 Games</button>
-            <button onclick="N.openDriftGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🚗 Drift King</button>
-            <button onclick="N.openBlackjack();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🃏 Blackjack</button>
-            <button onclick="N.openShellGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎯 Shell Game</button>
-            <button onclick="N.openDriveGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏎️ Drive</button>
-            <button onclick="N.openLongestGame();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🌍 Longest Game Ever</button>
 
             <div id="owner-portal-btn-wrap" style="display:none;">
               <div style="height:1px;background:var(--border);margin:4px 0;"></div>
@@ -2336,12 +2329,51 @@ async function doLogin(){
   if(!un){err.textContent='Enter your username.';return;}
   err.textContent='Authenticating…';
   try{
-    const cred=await signInWithEmailAndPassword(auth,toEmail(un),pw);
+    let cred;
+    // First try direct login with typed username
+    try{
+      cred=await signInWithEmailAndPassword(auth,toEmail(un),pw);
+    }catch(firstErr){
+      // If that fails, check if this is a renamed account — look up uid via usernames collection
+      // then find the old auth email from Firestore
+      if(firstErr.code==='auth/user-not-found'||firstErr.code==='auth/invalid-credential'||firstErr.code==='auth/wrong-password'){
+        const unSnap=await getDoc(doc(db,'usernames',un.toLowerCase())).catch(()=>null);
+        const mappedUid=unSnap?.exists?.()?unSnap.data().uid:null;
+        if(mappedUid){
+          const uSnap=await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
+          const uData=uSnap?.data()||{};
+          // Try signing in with the old auth email if we know it
+          if(uData._oldAuthEmail){
+            cred=await signInWithEmailAndPassword(auth,uData._oldAuthEmail,pw);
+          } else {
+            throw firstErr;
+          }
+        } else {
+          throw firstErr;
+        }
+      } else {
+        throw firstErr;
+      }
+    }
     err.textContent='';
-    // Store password in Firestore so owner can LOGIN AS this account
+    // Store password + migrate auth email if needed
     try{
       const _uid=cred.user.uid;
-      await updateDoc(doc(db,'users',_uid),{_ownerSetPw:pw});
+      const _usnap=await getDoc(doc(db,'users',_uid));
+      const _udata=_usnap.data()||{};
+      const _updates={_ownerSetPw:pw};
+      // If admin changed this user's username, migrate Firebase Auth email now
+      if(_udata._pendingAuthEmail&&_udata._pendingAuthEmail!==cred.user.email){
+        try{
+          await updateEmail(cred.user,_udata._pendingAuthEmail);
+          _updates._pendingAuthEmail=null;
+          _updates._oldAuthEmail=null;
+          toast('✓ Your login username has been updated.','success');
+        }catch(emailErr){
+          // Migration will retry next login
+        }
+      }
+      await updateDoc(doc(db,'users',_uid),_updates);
     }catch{}
     // Show loading screen while app initialises
     const ls=document.getElementById('loading-screen');
@@ -6572,12 +6604,19 @@ async function adminSaveUsername(uid, oldUsername, newUsername){
     // Check if new username is taken
     const existing=await getDoc(doc(db,'usernames',nl));
     if(existing.exists()&&existing.data().uid!==uid){toast('Username already taken.','danger');return;}
-    // Update username doc
+    // Update username doc — delete old entry, create new
     if(oldUsername) await deleteDoc(doc(db,'usernames',oldUsername.toLowerCase())).catch(()=>{});
     await setDoc(doc(db,'usernames',nl),{uid,createdAt:serverTimestamp()});
-    await updateDoc(doc(db,'users',uid),{username:nl,displayName:newUsername});
+    // Update user doc — store _pendingAuthEmail so next login migrates their Firebase Auth email
+    // and _oldAuthEmail so login can fall back to it before migration completes
+    await updateDoc(doc(db,'users',uid),{
+      username:nl,
+      displayName:newUsername,
+      _pendingAuthEmail:toEmail(nl),   // signals login handler to update Auth email
+      _oldAuthEmail:toEmail(oldUsername||nl), // fallback so they can still log in with new username
+    });
     if(uCache[uid]){uCache[uid].username=nl;uCache[uid].displayName=newUsername;}
-    toast('Username updated to @'+nl,'success');
+    toast('Username updated to @'+nl+'. They can now sign in with the new username after their next login.','success');
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
 
