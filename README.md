@@ -25,11 +25,3 @@
 - **Hosting / Assets:** GitHub Deployments (changelog fetches from GitHub API), FontAwesome (via emoji icons)
 
 ---
-
-## 🚀 Getting Started
-
-### 1. Clone the repository
-( You will need to change the API )
-```bash
-git clone https://github.com/CameronCodesStuff/nexus.git
-cd nexus
