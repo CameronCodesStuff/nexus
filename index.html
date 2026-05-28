@@ -1295,23 +1295,18 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
 <!-- LEADERBOARD MODAL -->
 <div class="modal-overlay" id="lb-modal">
-  <div class="modal" style="width:660px;max-width:96vw;">
-    <div class="modal-title">🏅 LEADERBOARD</div>
+  <div class="modal" style="width:680px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;padding:0;overflow:hidden;">
+    <div class="modal-title" style="padding:18px 20px 0;">🏅 LEADERBOARD</div>
     <button class="modal-close" onclick="N.closeModal('lb-modal')">✕</button>
-    <div class="lb-tabs">
-      <div class="lb-tab active" id="lb-tab-msgs" onclick="N.lbTab('msgs')">MESSAGES</div>
-      <div class="lb-tab" id="lb-tab-time" onclick="N.lbTab('time')">TIME ON SITE</div>
-      <div class="lb-tab" id="lb-tab-energy" onclick="N.lbTab('energy')">NEXUS ENERGY</div>
-      <div class="lb-tab" id="lb-tab-flap" onclick="N.lbTab('flap')">NEXUS FLAP</div>
-      <div class="lb-tab" id="lb-tab-wpm" onclick="N.lbTab('wpm')">TYPING WPM</div>
-      <div class="lb-tab" id="lb-tab-drift" onclick="N.lbTab('drift')">DRIFT KING</div>
-      <div class="lb-tab" id="lb-tab-referrals" onclick="N.lbTab('referrals')">REFERRALS</div>
-      <div class="lb-tab" id="lb-tab-blackjack" onclick="N.lbTab('blackjack')">BLACKJACK</div>
-      <div class="lb-tab" id="lb-tab-shell" onclick="N.lbTab('shell')">SHELL GAME</div>
-      <div class="lb-tab" id="lb-tab-drive" onclick="N.lbTab('drive')">DRIVE</div>
-      <div class="lb-tab" id="lb-tab-longest" onclick="N.lbTab('longest')">LONGEST GAME</div>
+    <!-- Section tabs -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;flex-shrink:0;">
+      <div class="lb-tab active" id="lb-sec-main"  onclick="N.lbSection('main')"  style="font-size:10px;padding:10px 14px;">📊 MAIN</div>
+      <div class="lb-tab"        id="lb-sec-games" onclick="N.lbSection('games')" style="font-size:10px;padding:10px 14px;">🎮 GAMES</div>
     </div>
-    <div id="lb-content"></div>
+    <!-- Sub-tabs -->
+    <div id="lb-subtabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;flex-shrink:0;scrollbar-width:none;">
+    </div>
+    <div id="lb-content" style="overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding:0 20px 20px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;"></div>
   </div>
 </div>
 
@@ -2414,6 +2409,12 @@ async function enterApp(){
     checkReferralRole();
     checkLoginStreak();
     checkDailyOpsReset();
+    startGameAutosave();
+    // Check streak king every 5 minutes
+    if(window._streakKingInterval) clearInterval(window._streakKingInterval);
+    window._streakKingInterval=setInterval(()=>{
+      if(cu&&cud) checkStreakKing(cud.loginStreak||0);
+    },5*60*1000);
     // Generate referral code if user doesn't have one
     (async()=>{
       const uid=cu.uid;
@@ -3005,11 +3006,14 @@ async function sendMessage(){
     const hr=new Date().getHours();
     if(hr>=0&&hr<4) achToCheck.push('night_owl');
     unlockAch(...achToCheck);
-    // Daily challenge tracking — persist count to Firestore so it survives reloads
-    const newDailyMsgCount=(cud?.dailyMsgCount||0)+1;
-    const dailyUpdates={dailyMsgCount:newDailyMsgCount};
-    cud={...cud,dailyMsgCount:newDailyMsgCount};
-    uCache[cu.uid]={...uCache[cu.uid],dailyMsgCount:newDailyMsgCount};
+    // Daily challenge tracking — atomic increment persisted to Firestore
+    const today=getDailyKey();
+    const lastDay=cud?.lastChallengeDay||'';
+    const baseCount=lastDay===today?(cud?.dailyMsgCount||0):0;
+    const newDailyMsgCount=baseCount+1;
+    const dailyUpdates={dailyMsgCount:newDailyMsgCount,lastChallengeDay:today};
+    cud={...cud,dailyMsgCount:newDailyMsgCount,lastChallengeDay:today};
+    uCache[cu.uid]={...uCache[cu.uid],dailyMsgCount:newDailyMsgCount,lastChallengeDay:today};
     if(newDailyMsgCount>=5) markDailyChallengeDone('dc_send5');
     // Emoji check
     if(/[\u{1F300}-\u{1FFFF}]|[\u{2600}-\u{27BF}]/u.test(text)){markDailyChallengeDone('dc_emoji');dailyUpdates.dailyEmojiMsg=true;}
@@ -3212,7 +3216,7 @@ function openModal(id){
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
   if(id==='achievements-modal')openAchievementsModal();
-  if(id==='lb-modal'){lbCurrentTab='msgs';lbTab('msgs');syncLeaderboardRoles();
+  if(id==='lb-modal'){lbCurrentTab='msgs';lbCurrentSection='main';lbSection('main');syncLeaderboardRoles();
     // Auto-refresh leaderboard every 30s while open
     window._lbRefreshInterval=setInterval(function(){
       if(document.getElementById('lb-modal')?.classList.contains('active')){
@@ -9076,25 +9080,64 @@ function fmtTime(mins){
 // ── LEADERBOARD ──────────────────────────────────
 let lbCurrentTab='msgs';
 
+const LB_SECTIONS={
+  main:  [{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'energy',label:'NEXUS ENERGY'}],
+  games: [{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'}],
+};
+let lbCurrentSection='main';
+
+function lbSection(sec){
+  lbCurrentSection=sec;
+  document.getElementById('lb-sec-main')?.classList.toggle('active',sec==='main');
+  document.getElementById('lb-sec-games')?.classList.toggle('active',sec==='games');
+  // Build sub-tabs
+  const subTabs=document.getElementById('lb-subtabs');
+  if(subTabs){
+    const tabs=LB_SECTIONS[sec]||[];
+    subTabs.innerHTML=tabs.map(t=>`<div class="lb-tab${t.id===lbCurrentTab?' active':''}" id="lb-tab-${t.id}" onclick="N.lbTab('${t.id}')" style="font-size:9px;padding:8px 12px;white-space:nowrap;">${t.label}</div>`).join('');
+  }
+  // Default to first tab in section
+  const firstTab=(LB_SECTIONS[sec]||[])[0];
+  if(firstTab) lbTab(firstTab.id);
+}
+
 function lbTab(tab){
   lbCurrentTab=tab;
-  document.getElementById('lb-tab-msgs')?.classList.toggle('active',tab==='msgs');
-  document.getElementById('lb-tab-time')?.classList.toggle('active',tab==='time');
-  document.getElementById('lb-tab-energy')?.classList.toggle('active',tab==='energy');
-  document.getElementById('lb-tab-flap')?.classList.toggle('active',tab==='flap');
-  document.getElementById('lb-tab-wpm')?.classList.toggle('active',tab==='wpm');
-  document.getElementById('lb-tab-drift')?.classList.toggle('active',tab==='drift');
-  document.getElementById('lb-tab-referrals')?.classList.toggle('active',tab==='referrals');
-  document.getElementById('lb-tab-blackjack')?.classList.toggle('active',tab==='blackjack');
-  document.getElementById('lb-tab-shell')?.classList.toggle('active',tab==='shell');
-  document.getElementById('lb-tab-drive')?.classList.toggle('active',tab==='drive');
-  document.getElementById('lb-tab-longest')?.classList.toggle('active',tab==='longest');
+  // Update sub-tab active states
+  Object.values(LB_SECTIONS).flat().forEach(t=>{
+    document.getElementById('lb-tab-'+t.id)?.classList.toggle('active',t.id===tab);
+  });
   renderLeaderboard(tab);
-  // Kick off a second render after 1s to catch any in-flight Firestore writes
   if(tab==='longest') setTimeout(()=>{if(lbCurrentTab==='longest')renderLeaderboard('longest');},1500);
 }
 
-function fmtEnergy(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
+// ── GAME AUTOSAVE (every 30s if current score beats stored best) ──
+let _gameAutosaveInterval=null;
+let _liveGameScores={}; // {field: currentScore} updated by games in real-time
+
+function startGameAutosave(){
+  if(_gameAutosaveInterval) clearInterval(_gameAutosaveInterval);
+  _gameAutosaveInterval=setInterval(async()=>{
+    if(!cu||!cud) return;
+    const updates={};
+    for(const [field,score] of Object.entries(_liveGameScores)){
+      if(score>0&&score>(cud[field]||0)){
+        updates[field]=score;
+      }
+    }
+    if(Object.keys(updates).length){
+      Object.assign(cud,updates);
+      Object.assign(uCache[cu.uid]||{},updates);
+      await updateDoc(doc(db,'users',cu.uid),updates).catch(()=>{});
+    }
+  },30000);
+}
+
+function setLiveGameScore(field,score){
+  _liveGameScores[field]=score;
+}
+
+if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
 
 // ── #1 ROLE SYNC ─────────────────────────────────
 const LB_FIELDS_FOR_ROLE=[
@@ -9162,6 +9205,8 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.driveBest||0)>0).sort((a,b)=>(b.driveBest||0)-(a.driveBest||0)).slice(0,20);
     } else if(tab==='longest'){
       users=users.filter(u=>(u.longestEra||0)>0).sort((a,b)=>(b.longestEra||0)-(a.longestEra||0)).slice(0,20);
+    } else if(tab==='followers'){
+      users=users.filter(u=>(u.followerCount||0)>0).sort((a,b)=>(b.followerCount||0)-(a.followerCount||0)).slice(0,20);
     } else {
       users=users.filter(u=>(u.referralCount||0)>0).sort((a,b)=>(b.referralCount||0)-(a.referralCount||0)).slice(0,20);
     }
@@ -9202,9 +9247,11 @@ async function renderLeaderboard(tab){
         statVal=u.driveBest||0;statLabel=statVal.toLocaleString()+' pts';
       } else if(tab==='longest'){
         statVal=u.longestEra||0;statLabel=(u.longestEraName||'Era '+statVal)+(u.longestCiv?' · '+u.longestCiv:'');
-      } else {
+      } else if(tab==='followers'){
+        statVal=u.followerCount||0;statLabel=statVal.toLocaleString()+' follower'+(statVal!==1?'s':'');
+      } else if(tab==='referrals'){
         statVal=u.referralCount||0;statLabel=statVal+' referral'+(statVal!==1?'s':'');
-      }
+      } else {
       row.innerHTML='<div class="lb-pos '+posClass+'">'+posDisplay+'</div>';
       row.appendChild(avEl);
       const info=document.createElement('div');info.className='lb-info';
@@ -9559,6 +9606,7 @@ async function tgEnd(){
   if(cu&&cud&&finalWpm>0){
     try{
       const prevBest=cud.bestWpm||0;
+      setLiveGameScore('bestWpm',finalWpm);
       if(finalWpm>prevBest){
         await updateDoc(doc(db,'users',cu.uid),{bestWpm:finalWpm});
         cud={...cud,bestWpm:finalWpm};
@@ -9712,6 +9760,7 @@ window.addEventListener('message',async function(e){
   // Track flap score (score = earned/2 since each point = +2 msgs)
   const flapScore=Math.floor(totalEarned/2);
   if(flapScore>_flapSessionBest) _flapSessionBest=flapScore;
+  setLiveGameScore('flapBest',flapScore); // autosave every 30s
   if(cu&&cud){
     try{
       const newCount=(cud.msgCount||0)+delta;
@@ -9909,6 +9958,7 @@ function closeDriveGame(){
 window.addEventListener('message',async function(e){
   if(e.data&&e.data.type==='driveScore'&&cu&&cud){
     const s=Math.floor(e.data.score)||0;
+    setLiveGameScore('driveBest',s);
     if(s>(cud.driveBest||0)){
       try{
         await updateDoc(doc(db,'users',cu.uid),{driveBest:s});
@@ -10315,6 +10365,7 @@ async function bjLoadState(){
 async function bjSaveChips(){
   if(!cu) return;
   try{
+    setLiveGameScore('bjChips',bjChips);
     await updateDoc(doc(db,'users',cu.uid),{bjChips,bjDailyTs});
     cud={...cud,bjChips,bjDailyTs};
     uCache[cu.uid]={...uCache[cu.uid],bjChips,bjDailyTs};
@@ -10770,6 +10821,7 @@ async function sgHandlePick(pos){
     const pts={easy:1,medium:3,hard:5}[sgDiff]||1;
     if(cu&&!cud?._impersonated){
       const newScore=(cud?.shellScore||0)+pts;
+      setLiveGameScore('shellScore',newScore);
       updateDoc(doc(db,'users',cu.uid),{shellScore:newScore}).then(()=>{
         if(cud) cud.shellScore=newScore;
         if(uCache[cu.uid]) uCache[cu.uid].shellScore=newScore;
@@ -10880,6 +10932,7 @@ window.addEventListener('message',async function(e){
   }
   if(e.data.type==='driftScore'&&cu&&cud){
     const ds=e.data.score||0;
+    setLiveGameScore('driftBest',ds);
     if(ds>(cud.driftBest||0)){
       try{
         await updateDoc(doc(db,'users',cu.uid),{driftBest:ds});
@@ -10983,7 +11036,7 @@ window._N = {
   saveNote, clearNote,
   setBgEffect, eggOpen, eggClose,
   openAchievementsModal, unlockAch, syncAchCache,
-  lbTab, renderLeaderboard, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
+  lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
   openGamesHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
