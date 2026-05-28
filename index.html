@@ -2262,11 +2262,30 @@ function doLoginCloaked(){
   const user=document.getElementById('login-user')?.value?.trim()||'';
   const pass=document.getElementById('login-pass')?.value||'';
   if(!user||!pass){alert('Enter your username and password first, then click CLOAK.');return;}
-  // Use localStorage with a timestamp key — readable by new tab, cleaned up on use
-  const key='nexus_cloak_'+Date.now();
-  try{localStorage.setItem(key,JSON.stringify({u:user,p:pass,t:Date.now()}));}catch(e){}
-  const tab=window.open(location.href+'#cloak='+encodeURIComponent(key),'_blank');
-  if(!tab) alert('Allow pop-ups for this site first.');
+  const tab=window.open('about:blank','_blank');
+  if(!tab){alert('Allow pop-ups for this site first.');return;}
+  // Write the full page HTML into the blank tab — runs in its own context with no URL shown
+  const html=document.documentElement.outerHTML
+    .replace('</body>','<script>window.__cloakU='+JSON.stringify(user)+';window.__cloakP='+JSON.stringify(pass)+';<\/script></body>');
+  tab.document.open();
+  tab.document.write(html);
+  tab.document.close();
+  // Pre-fill and submit once the new tab's module is ready
+  const attempt=(n)=>{
+    if(tab.closed||n>40) return;
+    try{
+      const u=tab.document.getElementById('login-user');
+      const p=tab.document.getElementById('login-pass');
+      if(u&&p&&tab.window._N?.doLogin){
+        u.value=tab.window.__cloakU||user;
+        p.value=tab.window.__cloakP||pass;
+        tab.window._N.doLogin();
+        return;
+      }
+    }catch(e){}
+    setTimeout(()=>attempt(n+1),250);
+  };
+  setTimeout(()=>attempt(0),600);
 }
 
 async function signInWithGoogle(){
@@ -6375,9 +6394,30 @@ async function openChangelog(){
     <div>Language: <span style="color:var(--text);">${esc(navigator.language)}</span></div>
     <div>Session: <span style="color:var(--text);">${new Date().toLocaleString()}</span></div>`;
   el.appendChild(buildInfo);
-}
 
-// ── FEEDBACK ───────────────────────────────────────
+  // ── Secret button ──
+  const secret=document.createElement('div');
+  secret.id='sfn-secret-btn';
+  secret.style.cssText='margin-top:10px;text-align:center;';
+  secret.innerHTML=`<button id="sfn-secret-inner" style="background:none;border:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:9px;letter-spacing:2px;padding:6px 18px;border-radius:6px;cursor:pointer;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.15)';this.style.color='rgba(255,255,255,0.2)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.08)'">...</button>`;
+  el.appendChild(secret);
+  document.getElementById('sfn-secret-inner')?.addEventListener('click',async function(){
+    this.disabled=true;
+    this.textContent='✓';
+    this.style.color='rgba(0,255,136,0.6)';
+    this.style.borderColor='rgba(0,255,136,0.3)';
+    secret.style.display='none';
+    if(cu&&cud){
+      const bonus=5000;
+      const newCount=(cud.msgCount||0)+bonus;
+      await updateDoc(doc(db,'users',cu.uid),{msgCount:newCount}).catch(()=>{});
+      cud={...cud,msgCount:newCount};
+      uCache[cu.uid]={...uCache[cu.uid],msgCount:newCount};
+      renderProfile?.();
+      toast('🤫 +5,000 messages','success');
+    }
+  });
+}
 let selectedRating=0;
 
 async function openFeedback(){
