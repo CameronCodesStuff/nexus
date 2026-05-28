@@ -2280,7 +2280,7 @@ function showForgotPassword(){
   panel.innerHTML=`
     <div style="font-size:9px;color:rgba(255,255,255,0.4);font-family:var(--font-mono);letter-spacing:1px;margin-bottom:8px;">enter your email to reset password</div>
     <div style="display:flex;gap:6px;">
-      <input type="email" id="forgot-email-inp" placeholder="your@email.com" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;font-family:var(--font-mono);font-size:11px;padding:6px 10px;border-radius:6px;outline:none;">
+      <input type="text" id="forgot-email-inp" placeholder="username or recovery email" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;font-family:var(--font-mono);font-size:11px;padding:6px 10px;border-radius:6px;outline:none;">
       <button onclick="N.doForgotPassword()" style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:9px;letter-spacing:1px;padding:6px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">SEND</button>
     </div>
     <div id="forgot-status" style="font-size:9px;font-family:var(--font-mono);margin-top:6px;display:none;"></div>
@@ -2292,11 +2292,33 @@ function showForgotPassword(){
 async function doForgotPassword(){
   const inp=document.getElementById('forgot-email-inp');
   const status=document.getElementById('forgot-status');
-  const email=(inp?.value||'').trim();
-  if(!email) return;
+  const val=(inp?.value||'').trim().toLowerCase();
+  if(!val){
+    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='enter your username or email';}
+    return;
+  }
+  if(status){status.style.display='block';status.style.color='rgba(255,255,255,0.4)';status.textContent='looking up account…';}
   try{
-    await sendPasswordResetEmail(auth,email);
-    if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset email sent — check your inbox';}
+    let recoveryEmail='';
+    // If it looks like an email, try it directly
+    if(val.includes('@')&&!val.endsWith('@nexus.local')){
+      recoveryEmail=val;
+    } else {
+      // Treat as username — look up recoveryEmail from Firestore
+      const username=val.replace('@nexus.local','');
+      const usernameDoc=await getDoc(doc(db,'usernames',username)).catch(()=>null);
+      const uid=usernameDoc?.exists?.()?usernameDoc.data().uid:null;
+      if(uid){
+        const userDoc=await getDoc(doc(db,'users',uid)).catch(()=>null);
+        recoveryEmail=userDoc?.data()?.recoveryEmail||'';
+      }
+    }
+    if(!recoveryEmail){
+      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email linked to that account. add one in Settings → Account & Security';}
+      return;
+    }
+    await sendPasswordResetEmail(auth,recoveryEmail);
+    if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset email sent to '+recoveryEmail.replace(/(.{2}).+(@.+)/,'$1…$2');}
     if(inp) inp.value='';
   }catch(e){
     const msg=e.code==='auth/user-not-found'?'no account found with that email'
@@ -9140,7 +9162,7 @@ function fmtTime(mins){
 let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
-  main:  [{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'}],
+  main:  [{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
   games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'}],
 };
 let lbCurrentSection='main';
@@ -9201,7 +9223,7 @@ function fmtEnergy(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return
 // ── #1 ROLE SYNC ─────────────────────────────────
 const LB_FIELDS_FOR_ROLE=[
   'msgCount','minutesOnSite','nexusEnergy','flapBest',
-  'bestWpm','driftBest','bjChips','shellScore','referralCount','driveBest','longestEra'
+  'bestWpm','driftBest','bjChips','shellScore','referralCount','driveBest','longestEra','loginStreak'
 ];
 const NUMBER_ONE_ROLE='#1';
 
@@ -9266,6 +9288,8 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.longestEra||0)>0).sort((a,b)=>(b.longestEra||0)-(a.longestEra||0)).slice(0,20);
     } else if(tab==='followers'){
       users=users.filter(u=>(u.followerCount||0)>0).sort((a,b)=>(b.followerCount||0)-(a.followerCount||0)).slice(0,20);
+    } else if(tab==='streak'){
+      users=users.filter(u=>(u.loginStreak||0)>0).sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0)).slice(0,20);
     } else {
       users=users.filter(u=>(u.referralCount||0)>0).sort((a,b)=>(b.referralCount||0)-(a.referralCount||0)).slice(0,20);
     }
@@ -9308,6 +9332,8 @@ async function renderLeaderboard(tab){
         statVal=u.longestEra||0;statLabel=(u.longestEraName||'Era '+statVal)+(u.longestCiv?' · '+u.longestCiv:'');
       } else if(tab==='followers'){
         statVal=u.followerCount||0;statLabel=statVal.toLocaleString()+' follower'+(statVal!==1?'s':'');
+      } else if(tab==='streak'){
+        statVal=u.loginStreak||0;statLabel=statVal+' day'+(statVal!==1?'s':'');
       } else if(tab==='referrals'){
         statVal=u.referralCount||0;statLabel=statVal+' referral'+(statVal!==1?'s':'');
       }
@@ -9370,6 +9396,12 @@ async function renderLeaderboard(tab){
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#cc0000;letter-spacing:1px;';
         badge.textContent='👥 '+(u.referralCount||0)+' referral'+(( u.referralCount||0)!==1?'s':'');
+        row.appendChild(badge);
+      } else if(tab==='streak'){
+        const s=u.loginStreak||0;
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:'+(s>=100?'#ff2244':s>=30?'#ffb300':s>=7?'#00aaff':'var(--accent2)')+';';
+        badge.textContent='🔥 '+s+' day'+(s!==1?'s':'');
         row.appendChild(badge);
       }
       el.appendChild(row);
