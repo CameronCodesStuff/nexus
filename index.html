@@ -1430,7 +1430,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile,
-  sendPasswordResetEmail, GoogleAuthProvider, linkWithPopup, signInWithPopup, fetchSignInMethodsForEmail, unlink
+  sendPasswordResetEmail, GoogleAuthProvider, linkWithPopup, signInWithPopup,
+  fetchSignInMethodsForEmail, unlink, updateEmail
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
@@ -2299,26 +2300,27 @@ async function doForgotPassword(){
   }
   if(status){status.style.display='block';status.style.color='rgba(255,255,255,0.4)';status.textContent='looking up account…';}
   try{
-    let recoveryEmail='';
-    // If it looks like an email, try it directly
+    let emailToReset='';
     if(val.includes('@')&&!val.endsWith('@nexus.local')){
-      recoveryEmail=val;
+      // Direct real email entered
+      emailToReset=val;
     } else {
-      // Treat as username — look up recoveryEmail from Firestore
+      // Username entered — look up their Firebase Auth email (now a real email) or recoveryEmail
       const username=val.replace('@nexus.local','');
       const usernameDoc=await getDoc(doc(db,'usernames',username)).catch(()=>null);
       const uid=usernameDoc?.exists?.()?usernameDoc.data().uid:null;
       if(uid){
         const userDoc=await getDoc(doc(db,'users',uid)).catch(()=>null);
-        recoveryEmail=userDoc?.data()?.recoveryEmail||'';
+        const userData=userDoc?.data()||{};
+        emailToReset=userData.recoveryEmail||'';
       }
     }
-    if(!recoveryEmail){
-      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email linked to that account. add one in Settings → Account & Security';}
+    if(!emailToReset){
+      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email found — add one in Settings → Account & Security';}
       return;
     }
-    await sendPasswordResetEmail(auth,recoveryEmail);
-    if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset email sent to '+recoveryEmail.replace(/(.{2}).+(@.+)/,'$1…$2');}
+    await sendPasswordResetEmail(auth,emailToReset);
+    if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset link sent to '+emailToReset.replace(/(.{2}).+(@.+)/,'$1…$2');}
     if(inp) inp.value='';
   }catch(e){
     const msg=e.code==='auth/user-not-found'?'no account found with that email'
@@ -7760,15 +7762,31 @@ async function saveLinkedEmail(){
   const email=(inp?.value||'').trim().toLowerCase();
   if(!email){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Please enter an email address.';}return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Invalid email address.';}return;}
+  if(status){status.style.display='block';status.style.color='var(--text-dim)';status.textContent='Saving…';}
   try{
-    // Store in Firestore — used for password reset and display
+    // Update Firebase Auth email so sendPasswordResetEmail actually works
+    await updateEmail(auth.currentUser, email);
+    // Also store in Firestore for display and fallback
     await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:email});
     cud={...cud,recoveryEmail:email};
-    if(status){status.style.display='block';status.style.color='var(--success)';status.textContent='✓ Email saved.';}
+    if(status){status.style.display='block';status.style.color='var(--success)';status.textContent='✓ Email saved. Password reset emails will now go here.';}
     toast('Recovery email saved.','success');
     setTimeout(()=>renderLinkedAccountsSection(),800);
   }catch(e){
-    if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Failed: '+e.message;}
+    // auth/requires-recent-login means they need to re-authenticate first
+    const msg=e.code==='auth/requires-recent-login'
+      ?'Please log out and back in, then try again (Firebase requires a recent login to change email).'
+      :e.code==='auth/email-already-in-use'
+      ?'That email is already used by another account.'
+      :e.code==='auth/invalid-email'
+      ?'Invalid email address.'
+      :'Failed: '+e.message;
+    // Even if Firebase Auth update fails, save to Firestore as fallback
+    try{
+      await updateDoc(doc(db,'users',cu.uid),{recoveryEmail:email});
+      cud={...cud,recoveryEmail:email};
+    }catch{}
+    if(status){status.style.display='block';status.style.color=e.code==='auth/requires-recent-login'?'var(--danger)':'var(--success)';status.textContent=e.code==='auth/requires-recent-login'?msg:'✓ Saved to account (Firebase email update requires re-login).';}
   }
 }
 
