@@ -23,3 +23,5 @@
 - **Real-time Communication:** WebRTC (`RTCPeerConnection`) with STUN/TURN servers — audio, video, and screen sharing
 
 - **Hosting / Assets:** GitHub Pages, GitHub API (for changelog fetching), Font Awesome
+
+![Profile Image](https://avatars.githubusercontent.com/u/151978475?s=400&u=fafe8a510f7450e3b69458fc25106e58d3003eea&v=4)
