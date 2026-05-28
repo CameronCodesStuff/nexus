@@ -2169,6 +2169,20 @@ onAuthStateChanged(auth, async user=>{
     cu=null;cud=null;
     $('auth-screen').classList.add('active');
     $('app-screen').classList.remove('active');
+    // Auto-login if launched via CLOAK button
+    try{
+      const cloakUser=sessionStorage.getItem('nexus_cloak_user');
+      const cloakPass=sessionStorage.getItem('nexus_cloak_pass');
+      if(cloakUser&&cloakPass){
+        sessionStorage.removeItem('nexus_cloak_user');
+        sessionStorage.removeItem('nexus_cloak_pass');
+        const uEl=document.getElementById('login-user');
+        const pEl=document.getElementById('login-pass');
+        if(uEl) uEl.value=cloakUser;
+        if(pEl) pEl.value=cloakPass;
+        setTimeout(()=>window._N?.doLogin?.(),300);
+      }
+    }catch(e){}
   }
 });
 
@@ -2233,21 +2247,20 @@ async function doRegister(){
 }
 
 function doLoginCloaked(){
-  const user=document.getElementById('login-user')?.value||'';
+  const user=document.getElementById('login-user')?.value?.trim()||'';
   const pass=document.getElementById('login-pass')?.value||'';
+  if(!user||!pass){alert('Enter your username and password first, then click CLOAK.');return;}
+  // Pass creds via sessionStorage so new tab can auto-login without DOM polling
+  try{
+    sessionStorage.setItem('nexus_cloak_user',user);
+    sessionStorage.setItem('nexus_cloak_pass',pass);
+  }catch(e){}
   const tab=window.open(location.href,'_blank');
-  if(!tab){alert('Allow pop-ups for this site first.');return;}
-  // Pre-fill login fields once the new tab's module script is ready
-  const attempt=()=>{
-    try{
-      if(tab.closed) return;
-      const u=tab.document.getElementById('login-user');
-      const p=tab.document.getElementById('login-pass');
-      if(u&&p){u.value=user;p.value=pass;if(tab.N&&tab.N.doLogin)tab.N.doLogin();return;}
-    }catch(e){}
-    setTimeout(attempt,300);
-  };
-  setTimeout(attempt,800);
+  if(!tab){
+    sessionStorage.removeItem('nexus_cloak_user');
+    sessionStorage.removeItem('nexus_cloak_pass');
+    alert('Allow pop-ups for this site first.');
+  }
 }
 
 async function signInWithGoogle(){
@@ -11432,82 +11445,60 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
 
 <!-- Games Hub Modal -->
 <div id="games-hub-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('games-hub-modal')">
-  <div class="modal" style="width:480px;">
+  <div class="modal" style="width:340px;">
     <div class="modal-title">🎮 GAMES</div>
     <button class="modal-close" onclick="N.closeModal('games-hub-modal')">✕</button>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+    <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;">
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">⌨️</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Type &amp; Earn</span>
-          <span class="game-btn-desc">Type words to earn messages · 15s to 120s modes</span>
-        </div>
-        <span class="game-btn-badge">MSGS</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">⌨️</span>
+        <span style="flex:1;">Type &amp; Earn</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--accent);letter-spacing:1px;">MSGS</span>
+      </button>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openFlapGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#00aaff,#0044cc);">🐦</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Nexus Flap</span>
-          <span class="game-btn-desc">Flap through pipes · each point earns +2 messages</span>
-        </div>
-        <span class="game-btn-badge">MSGS</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openFlapGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🐦</span>
+        <span style="flex:1;">Nexus Flap</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--accent);letter-spacing:1px;">MSGS</span>
+      </button>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openNexusGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#4466ff,#9933ff);">⬡</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Nexus Energy</span>
-          <span class="game-btn-desc">Cosmic clicker · redeem energy for messages</span>
-        </div>
-        <span class="game-btn-badge">MSGS</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openNexusGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">⬡</span>
+        <span style="flex:1;">Nexus Energy</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--accent);letter-spacing:1px;">MSGS</span>
+      </button>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriftGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff4500,#ff8800);">🚗</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Drift King</span>
-          <span class="game-btn-desc">Arcade drift racer · open plate or circuit track</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(255,255,255,0.06);color:var(--text-dim);">FUN</span>
-      </div>
+      <div style="height:1px;background:var(--border);margin:4px 0;"></div>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openBlackjack()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#1a6b2a,#2ecc71);">🃏</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Blackjack</span>
-          <span class="game-btn-desc">1000 free chips daily · stack your bankroll · climb the leaderboard</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(46,204,113,0.15);color:#2ecc71;">CHIPS</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openBlackjack()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🃏</span>
+        <span style="flex:1;">Blackjack</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#2ecc71;letter-spacing:1px;">CHIPS</span>
+      </button>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openShellGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,var(--accent),var(--accent2));">🎯</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Shell Game</span>
-          <span class="game-btn-desc">Track the ball · beat the shuffle · three difficulty levels</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(68,102,255,0.15);color:var(--accent);">REFLEX</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openShellGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🎯</span>
+        <span style="flex:1;">Shell Game</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:1px;">REFLEX</span>
+      </button>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openDriveGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#ff6600,#ff2200);">🏎️</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">Drive</span>
-          <span class="game-btn-desc">3D road racer · dodge traffic · beat your high score</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(255,102,0,0.15);color:#ff6600;">RACING</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openDriftGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🚗</span>
+        <span style="flex:1;">Drift King</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:1px;">RACING</span>
+      </button>
 
-      <div role="button" tabindex="0" class="game-btn" onclick="N.closeModal('games-hub-modal');N.openLongestGame()">
-        <div class="game-btn-icon" style="background:linear-gradient(135deg,#c9a84c,#50c878);">🌍</div>
-        <div class="game-btn-info">
-          <span class="game-btn-name">The Longest Game Ever</span>
-          <span class="game-btn-desc">Civilisation idle · from Stone Age to Omega Point</span>
-        </div>
-        <span class="game-btn-badge" style="background:rgba(201,168,76,0.15);color:#c9a84c;">IDLE</span>
-      </div>
+      <button onclick="N.closeModal('games-hub-modal');N.openDriveGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🏎️</span>
+        <span style="flex:1;">Drive</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:1px;">RACING</span>
+      </button>
+
+      <button onclick="N.closeModal('games-hub-modal');N.openLongestGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🌍</span>
+        <span style="flex:1;">The Longest Game Ever</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#c9a84c;letter-spacing:1px;">IDLE</span>
+      </button>
 
     </div>
   </div>
