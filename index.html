@@ -715,6 +715,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
     text-shadow:0 1px 3px rgba(0,0,0,0.6);
     -webkit-text-fill-color:#fff !important;
   }
+  @keyframes cool-guy-anim{0%{box-shadow:0 0 6px rgba(0,200,255,0.5);border-color:rgba(0,200,255,0.8);}50%{box-shadow:0 0 16px rgba(0,240,255,0.9),0 0 30px rgba(0,160,255,0.4);border-color:rgba(0,240,255,1);}100%{box-shadow:0 0 6px rgba(0,200,255,0.5);border-color:rgba(0,200,255,0.8);}}
+  .role-cool-guy{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#001a2e,#002e4a);color:#00d4ff;border:1px solid rgba(0,200,255,0.8);font-weight:900;vertical-align:middle;margin-left:8px;animation:cool-guy-anim 2s ease-in-out infinite;-webkit-text-fill-color:initial;}
+  @keyframes github-anim{0%,100%{background-position:0% center;}50%{background-position:100% center;}}
+  .role-github{display:inline-block;font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#161b22,#21262d,#30363d,#21262d,#161b22);background-size:300%;color:#f0f6fc;border:1px solid #30363d;font-weight:700;vertical-align:middle;margin-left:8px;box-shadow:0 0 8px rgba(240,246,252,0.1);animation:github-anim 3s linear infinite;-webkit-text-fill-color:initial;}
   /* Shooting game modal */
   #egg-modal{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
   #egg-modal.open{display:flex;}
@@ -2508,10 +2512,11 @@ async function enterApp(){
     checkLoginStreak();
     checkDailyOpsReset();
     startGameAutosave();
-    // Check streak king every 5 minutes
+    // Assign streak king to true #1 on login (not based on current user's streak)
+    assignStreakKingFromLeaderboard().catch(()=>{});
     if(window._streakKingInterval) clearInterval(window._streakKingInterval);
     window._streakKingInterval=setInterval(()=>{
-      if(cu&&cud) checkStreakKing(cud.loginStreak||0);
+      assignStreakKingFromLeaderboard().catch(()=>{});
     },5*60*1000);
     // Generate referral code if user doesn't have one
     (async()=>{
@@ -5887,8 +5892,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','tester','beginner_tester','bugfinder','feedback','og','easter','referral'];
-const ROLE_LABELS={owner:'Owner',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣'};
+const ROLE_OPTS=['owner','tester','beginner_tester','bugfinder','feedback','og','easter','referral','cool_guy','github'];
+const ROLE_LABELS={owner:'Owner',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',cool_guy:'Cool Guy 😎',github:'GitHub'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -7271,6 +7276,18 @@ function showStreakMilestone(streak){
   },1000);
 }
 
+async function assignStreakKingFromLeaderboard(){
+  // Query all users, find the one with highest loginStreak, crown them
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    const users=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>(u.loginStreak||0)>0);
+    if(!users.length) return;
+    users.sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0));
+    const king=users[0];
+    await checkStreakKing(king.loginStreak||0, king.id);
+  }catch(e){console.warn('assignStreakKingFromLeaderboard failed',e);}
+}
+
 async function checkStreakKing(myStreak, forceUid){
   // forceUid: explicitly crown this uid (used by leaderboard which knows true #1)
   // Otherwise just checks if current user deserves it
@@ -8347,6 +8364,8 @@ function getRoleBadge(uid){
     devoted:      '<span class="role-devoted">❤️‍🔥 DEVOTED</span>',
     streak_king:  '<span class="role-streak-king">👑 STREAK KING</span>',
     daily_ops:    '<span class="role-daily-ops">⚡ DAILY OPS</span>',
+    cool_guy:     '<span class="role-cool-guy">😎 COOL GUY</span>',
+    github:       '<span class="role-github">⌥ GitHub</span>',
   };
   return roles.map(r=>map[r]||'').join('');
 }
@@ -9428,12 +9447,7 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.loginStreak||0)>0).sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0)).slice(0,20);
       // Auto-assign streak_king role to whoever is #1
       if(users.length){
-        const king=users[0];
-        const currentKingId=(await getDoc(doc(db,'config','streakKing')).catch(()=>null))?.data()?.uid||'';
-        if(king.id!==currentKingId){
-          // Crown the new king
-          checkStreakKing(king.loginStreak||0, king.id).catch(()=>{});
-        }
+        assignStreakKingFromLeaderboard().catch(()=>{});
       }
     } else {
       users=users.filter(u=>(u.referralCount||0)>0).sort((a,b)=>(b.referralCount||0)-(a.referralCount||0)).slice(0,20);
