@@ -5895,48 +5895,53 @@ async function replyToTicket(uid){
 }
 
 async function fixGaganToWoxylow(){
-  // One-shot fix: find the GaganAKAPidgin account and fully rename it to woxylow,
-  // repairing all Firestore fields and login data in one go.
+  // Situation: users doc already says username=woxylow, but Firebase Auth still has
+  // gaganakaPidgin@nexus.local as the email, and the usernames/woxylow lookup doc
+  // is missing. So login with 'woxylow' fails (no usernames doc to find the uid),
+  // and only 'GaganAKAPidgin' works because Firebase Auth recognises that email directly.
+  //
+  // Fix: find the user doc by username=woxylow, ensure the usernames/woxylow doc exists,
+  // and set _authEmail to the old gaganakaPidgin email so the fallback login works.
   try{
-    toast('Searching for account…','info');
-    // Find the user by any of their known usernames
+    toast('Searching for woxylow account…','info');
     let uid=null, userData=null;
-    for(const tryName of ['gaganakpidgin','gaganakaPidgin','gaganAKAPidgin','gaganakApidgin']){
-      const unSnap=await getDoc(doc(db,'usernames',tryName.toLowerCase())).catch(()=>null);
-      if(unSnap?.exists()){uid=unSnap.data().uid;break;}
-    }
-    // Also try querying users collection directly
+
+    // Find by current username in users doc
+    const q=await getDocs(query(collection(db,'users'),where('username','==','woxylow'))).catch(()=>null);
+    if(q&&!q.empty){uid=q.docs[0].id;userData=q.docs[0].data();}
+
+    // Also try usernames doc in case it exists
     if(!uid){
-      for(const tryName of ['gaganakpidgin','gaganakaPidgin','gaganAKAPidgin','gaganakApidgin','GaganAKAPidgin']){
-        const q=await getDocs(query(collection(db,'users'),where('username','==',tryName.toLowerCase()))).catch(()=>null);
-        if(q&&!q.empty){uid=q.docs[0].id;break;}
+      const unSnap=await getDoc(doc(db,'usernames','woxylow')).catch(()=>null);
+      if(unSnap?.exists()){
+        uid=unSnap.data().uid;
+        const uSnap=await getDoc(doc(db,'users',uid)).catch(()=>null);
+        userData=uSnap?.data()||{};
       }
     }
-    if(!uid){toast('Could not find GaganAKAPidgin account. Check spelling or use HEAL USERNAMES.','danger');return;}
-    const uSnap=await getDoc(doc(db,'users',uid));
-    userData=uSnap.data()||{};
-    const oldUsername=(userData.username||'gaganakaPidgin').toLowerCase();
-    const newUsername='woxylow';
 
-    // The stable Firebase Auth email is the original registration email.
-    // Preserve it — this is what lets them log in.
-    const stableAuthEmail = userData._authEmail || userData._oldAuthEmail || toEmail(oldUsername);
+    if(!uid){toast('Could not find woxylow in users collection. Try HEAL USERNAMES instead.','danger');return;}
 
-    // 1. Delete old usernames doc
-    await deleteDoc(doc(db,'usernames',oldUsername)).catch(()=>{});
-    // 2. Create new usernames doc
-    await setDoc(doc(db,'usernames',newUsername),{uid,createdAt:serverTimestamp()});
-    // 3. Update user doc — preserve all existing data, only change identity fields
+    // The Firebase Auth email is still gaganakaPidgin@nexus.local — that's what
+    // they can currently log in with, so we preserve it as _authEmail.
+    const stableAuthEmail=userData._authEmail||userData._oldAuthEmail||toEmail('gaganakaPidgin');
+
+    // 1. Ensure the usernames/woxylow doc exists and points to this uid
+    await setDoc(doc(db,'usernames','woxylow'),{uid,createdAt:serverTimestamp()});
+    // 2. Clean up any old gaganakaPidgin usernames doc if still present
+    await deleteDoc(doc(db,'usernames','gaganakaPidgin')).catch(()=>{});
+    await deleteDoc(doc(db,'usernames','gaganakAPidgin')).catch(()=>{});
+    // 3. Patch user doc: set _authEmail so fallback login can find Firebase Auth account
     await updateDoc(doc(db,'users',uid),{
-      username:newUsername,
+      username:'woxylow',
       displayName:'woxylow',
       _authEmail:stableAuthEmail,
       _pendingAuthEmail:null,
       _oldAuthEmail:null,
     });
-    if(uCache[uid]){uCache[uid].username=newUsername;uCache[uid].displayName='woxylow';}
-    toast('✓ Account fixed: GaganAKAPidgin → woxylow. They can now log in as woxylow.','success');
-    console.info('[NEXUS fix] Done. Firebase Auth email for this account is:',stableAuthEmail,'— they must log in with username: woxylow');
+    if(uCache[uid]){uCache[uid].username='woxylow';uCache[uid].displayName='woxylow';}
+    toast('✓ Fixed! woxylow can now log in with username "woxylow". Firebase Auth email preserved as: '+stableAuthEmail,'success');
+    console.info('[NEXUS fix] woxylow uid:',uid,'| Firebase Auth email:',stableAuthEmail);
     loadOwnerUsers();
   }catch(e){toast('Fix failed: '+e.message,'danger');console.error(e);}
 }
