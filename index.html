@@ -2166,10 +2166,20 @@ onAuthStateChanged(auth, async user=>{
   if(user){
     cu=user;
     const uRef=doc(db,'users',user.uid);
-    const uSnap=await getDoc(uRef);
-    cud=uSnap.exists()?uSnap.data():{uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true};
-    if(!uSnap.exists())await setDoc(uRef,{...cud,createdAt:serverTimestamp()});
-    await updateDoc(uRef,{online:true});
+    try{
+      // Race the Firestore read against a 5s timeout so a bad rules config never hangs the app
+      const uSnap=await Promise.race([
+        getDoc(uRef),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
+      ]);
+      cud=uSnap.exists()?uSnap.data():{uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true};
+      if(!uSnap.exists()) await setDoc(uRef,{...cud,createdAt:serverTimestamp()}).catch(()=>{});
+      await updateDoc(uRef,{online:true}).catch(()=>{});
+    }catch(e){
+      // Firestore read failed (permissions, network, timeout) — enter app with minimal data
+      // The app will still work for chat; Firestore writes will self-heal once rules are fixed
+      cud=cud||{uid:user.uid,displayName:user.displayName||user.email?.split('@')[0]||'User',msgCount:0,online:true};
+    }
     enterApp();
   } else {
     cu=null;cud=null;
@@ -2420,6 +2430,16 @@ async function doLogin(){
     // Show loading screen while app initialises
     const ls=document.getElementById('loading-screen');
     if(ls){ls.style.display='flex';ls.style.opacity='1';ls.classList.remove('fade-out');}
+    // Safety net: force-dismiss loading screen after 8s in case enterApp never fires
+    window._loadingTimeout=setTimeout(()=>{
+      const ls2=document.getElementById('loading-screen');
+      if(ls2&&ls2.style.display!=='none'){
+        ls2.classList.add('fade-out');
+        setTimeout(()=>{ls2.style.display='none';ls2.classList.remove('fade-out');},450);
+        const err=$('login-error');
+        if(err&&!err.textContent) err.textContent='Taking longer than usual — check your connection.';
+      }
+    },8000);
   }catch(e){
     const m=e.message||'';
     err.textContent=(m.includes('user-not-found')||m.includes('wrong-password')||m.includes('invalid-credential'))?'Invalid username or password.':m.replace('Firebase: ','');
@@ -2569,6 +2589,7 @@ async function enterApp(){
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
   // Dismiss loading screen
+  if(window._loadingTimeout) clearTimeout(window._loadingTimeout);
   const ls=document.getElementById('loading-screen');
   if(ls){
     ls.classList.add('fade-out');
@@ -10299,7 +10320,7 @@ document.querySelectorAll('.diff-btn').forEach(btn=>{
 });
 
 buildBoard();bestVal.textContent=0;
-</script>
+<\/script>
 </body>
 </html>`;
 
