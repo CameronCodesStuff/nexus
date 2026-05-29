@@ -2260,9 +2260,12 @@ async function doRegister(){
     const cred=await createUserWithEmailAndPassword(auth,toEmail(un),pw);
     await updateProfile(cred.user,{displayName:un});
     await setDoc(doc(db,'usernames',unLower),{uid:cred.user.uid,createdAt:serverTimestamp()});
-    // Save new user with referral info
+    // Save new user with referral info.
+    // _authEmail is stored permanently — it's the stable Firebase Auth credential email
+    // and must never change, even if the display username is later renamed by an admin.
     await setDoc(doc(db,'users',cred.user.uid),{
       uid:cred.user.uid, displayName:un, username:unLower,
+      _authEmail:toEmail(un),  // permanent — do not overwrite on rename
       msgCount:0, online:true, createdAt:serverTimestamp(),
       referredBy:referredByUid||null,
       referralMinutes:0,
@@ -2425,15 +2428,19 @@ async function doLogin(){
         if(mappedUid){
           const uSnap=await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
           const uData=uSnap?.data()||{};
-          // Try _oldAuthEmail (the pre-rename Firebase Auth email)
-          if(uData._oldAuthEmail){
+          // Try the stable auth email (_authEmail is set by adminSaveUsername going forward;
+          // _oldAuthEmail is the legacy field from before this fix).
+          const fallbackEmail=uData._authEmail||uData._oldAuthEmail||null;
+          if(fallbackEmail){
             try{
-              cred=await signInWithEmailAndPassword(auth,uData._oldAuthEmail,pw);
-            }catch(oldEmailErr){
-              // _oldAuthEmail also failed — account may not have migrated yet.
-              // Last resort: try every plausible email variant we know about.
-              if(uData._pendingAuthEmail && uData._pendingAuthEmail!==uData._oldAuthEmail){
-                cred=await signInWithEmailAndPassword(auth,uData._pendingAuthEmail,pw);
+              cred=await signInWithEmailAndPassword(auth,fallbackEmail,pw);
+            }catch(fallbackErr){
+              // Both the typed username email and the stored fallback failed.
+              // The account may have been partially migrated by the old broken code.
+              // Try _pendingAuthEmail as a last resort (old migration target).
+              const lastResort=uData._pendingAuthEmail;
+              if(lastResort && lastResort!==fallbackEmail){
+                cred=await signInWithEmailAndPassword(auth,lastResort,pw);
               } else {
                 throw firstErr;
               }
@@ -2449,24 +2456,11 @@ async function doLogin(){
       }
     }
     err.textContent='';
-    // Store password + migrate auth email if needed
+    // Store password in Firestore (used by owner LOGIN AS feature).
+    // We deliberately do NOT attempt to change the Firebase Auth email here.
+    // The nexus.local email is a stable internal key — usernames live in Firestore only.
     try{
-      const _uid=cred.user.uid;
-      const _usnap=await getDoc(doc(db,'users',_uid));
-      const _udata=_usnap.data()||{};
-      const _updates={_ownerSetPw:pw};
-      // If admin changed this user's username, migrate Firebase Auth email now
-      if(_udata._pendingAuthEmail&&_udata._pendingAuthEmail!==cred.user.email){
-        try{
-          await updateEmail(cred.user,_udata._pendingAuthEmail);
-          _updates._pendingAuthEmail=null;
-          _updates._oldAuthEmail=null;
-          toast('✓ Your login username has been updated.','success');
-        }catch(emailErr){
-          // Migration will retry next login
-        }
-      }
-      await updateDoc(doc(db,'users',_uid),_updates);
+      await updateDoc(doc(db,'users',cred.user.uid),{_ownerSetPw:pw});
     }catch{}
     // Show loading screen while app initialises
     const ls=document.getElementById('loading-screen');
@@ -5883,23 +5877,44 @@ async function replyToTicket(uid){
 }
 
 async function healUsernamesDocs(){
-  // Repair: scan every user doc and ensure a matching /usernames/{username} doc exists.
-  // Fixes accounts broken by a failed rename (old doc deleted, new one never written).
+  // Repair two classes of broken accounts:
+  // 1. Missing /usernames/{username} doc (failed rename left no lookup entry)
+  // 2. Missing _authEmail field (accounts created before this fix, or broken by old migration)
+  //    _authEmail is the permanent Firebase Auth email (originalusername@nexus.local)
+  //    and is what doLogin uses as fallback when a username has been renamed.
   try{
     const snap=await getDocs(collection(db,'users'));
-    let fixed=0,skipped=0;
+    let unFixed=0,authFixed=0,skipped=0;
     for(const d of snap.docs){
       const u=d.data();
       if(!u.username) continue;
+      const updates={};
+      // Fix 1: missing or wrong usernames doc
       const unSnap=await getDoc(doc(db,'usernames',u.username));
       if(!unSnap.exists()||unSnap.data().uid!==d.id){
         await setDoc(doc(db,'usernames',u.username),{uid:d.id,createdAt:serverTimestamp()});
-        fixed++;
+        unFixed++;
+      }
+      // Fix 2: backfill _authEmail for accounts that don't have it.
+      // Best guess: _oldAuthEmail if set (from an earlier rename), otherwise toEmail(username).
+      // This may be wrong for accounts that were renamed before _authEmail was introduced,
+      // but it's the best we can do without access to Firebase Auth Admin SDK.
+      if(!u._authEmail){
+        updates._authEmail = u._oldAuthEmail || toEmail(u.username);
+        authFixed++;
+      }
+      // Clear stale migration fields that are no longer used
+      if(u._pendingAuthEmail!==undefined||u._oldAuthEmail!==undefined){
+        updates._pendingAuthEmail=null;
+        updates._oldAuthEmail=null;
+      }
+      if(Object.keys(updates).length>0){
+        await updateDoc(doc(db,'users',d.id),updates).catch(()=>{});
       } else {
         skipped++;
       }
     }
-    toast(`✓ Usernames healed: ${fixed} fixed, ${skipped} already OK`,'success');
+    toast(`✓ Heal complete: ${unFixed} username docs fixed, ${authFixed} _authEmail backfilled, ${skipped} already OK`,'success');
   }catch(e){toast('Heal failed: '+e.message,'danger');}
 }
 
@@ -6800,18 +6815,21 @@ async function adminSaveUsername(uid, oldUsername, newUsername){
     // Determine the real current Firebase Auth email for this account.
     // _oldAuthEmail (if set and migration not yet done) is the live Auth email.
     // Otherwise it's toEmail(authoritative_old).
-    const liveAuthEmail = (currentData._oldAuthEmail && currentData._pendingAuthEmail)
-      ? currentData._oldAuthEmail   // mid-migration: Auth still has the old email
-      : toEmail(authoritative_old); // normal: Auth email matches current username
-
-    const newEmail=toEmail(nl);
-    const changing=liveAuthEmail!==newEmail;
+    // _authEmail is the STABLE Firebase Auth email — it's the nexus.local email
+    // from when the account was first created and NEVER changes.
+    // We store it as _authEmail on first rename so doLogin always knows it.
+    // If not yet stored, derive it: prefer _oldAuthEmail (set by earlier renames),
+    // then fall back to toEmail(authoritative_old).
+    const stableAuthEmail = currentData._authEmail
+      || currentData._oldAuthEmail
+      || toEmail(authoritative_old);
 
     await updateDoc(doc(db,'users',uid),{
       username:nl,
       displayName:newUsername,
-      _pendingAuthEmail: changing ? newEmail    : null,
-      _oldAuthEmail:     changing ? liveAuthEmail : null,
+      _authEmail: stableAuthEmail,   // permanent record of the Firebase Auth email
+      _pendingAuthEmail: null,       // no longer used — clear any stale value
+      _oldAuthEmail: null,           // no longer used — clear any stale value
     });
     if(uCache[uid]){uCache[uid].username=nl;uCache[uid].displayName=newUsername;}
     toast('Username updated to @'+nl+'. They can now sign in with the new username after their next login.','success');
