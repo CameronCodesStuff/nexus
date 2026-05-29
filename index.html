@@ -9325,7 +9325,7 @@ let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
   main:  [{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
-  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'}],
+  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'}],
 };
 let lbCurrentSection='main';
 
@@ -9380,12 +9380,935 @@ function setLiveGameScore(field,score){
   _liveGameScores[field]=score;
 }
 
+const _WHACK_SRCDOC=`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WHACK-A-MOLE</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sky-top:#050818;--sky-bot:#0d1f3c;
+  --neon-yellow:#FFE600;--neon-pink:#FF2D78;--neon-cyan:#00F5FF;--neon-green:#39FF14;
+}
+html,body{height:100%;overflow:hidden;background:linear-gradient(175deg,var(--sky-top) 0%,var(--sky-bot) 100%);font-family:'Orbitron',monospace;cursor:none;user-select:none}
+
+#cursor{position:fixed;top:0;left:0;pointer-events:none;z-index:9999;transform-origin:12px 4px;transition:transform 0.05s}
+#cursor.smash{transform:rotate(40deg) scale(0.85)}
+#cursor svg{width:52px;height:52px;filter:drop-shadow(0 4px 8px rgba(0,0,0,0.6))}
+
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+#ground{
+  position:fixed;bottom:0;left:0;right:0;height:38%;z-index:1;pointer-events:none;
+  background:linear-gradient(0deg,#1a3d0a 0%,#2d6b15 40%,#3a8520 70%,#4da329 100%);
+}
+#ground::before{
+  content:'';position:absolute;inset:0;
+  background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='40'><ellipse cx='60' cy='35' rx='55' ry='12' fill='%232d5f12' opacity='0.4'/><ellipse cx='20' cy='38' rx='18' ry='6' fill='%23235010' opacity='0.3'/><ellipse cx='100' cy='36' rx='22' ry='7' fill='%23235010' opacity='0.35'/></svg>") repeat-x bottom / 120px 40px;
+}
+
+#scanlines{position:fixed;inset:0;pointer-events:none;z-index:500;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.025) 3px,rgba(0,0,0,0.025) 4px)}
+
+#game-container{position:relative;z-index:10;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+
+#title-banner{text-align:center;margin-bottom:16px}
+#title-banner h1{
+  font-family:'Black Ops One',cursive;
+  font-size:clamp(1.8rem,5.5vw,4rem);
+  color:var(--neon-yellow);
+  text-shadow:0 0 8px var(--neon-yellow),0 0 30px rgba(255,230,0,0.6),0 0 70px rgba(255,230,0,0.2);
+  letter-spacing:5px;
+  animation:titlePulse 2.5s ease-in-out infinite
+}
+@keyframes titlePulse{
+  0%,100%{text-shadow:0 0 8px var(--neon-yellow),0 0 30px rgba(255,230,0,0.5)}
+  50%{text-shadow:0 0 16px var(--neon-yellow),0 0 60px rgba(255,230,0,0.9),0 0 120px rgba(255,230,0,0.35)}
+}
+.subtitle{font-size:0.58rem;letter-spacing:7px;color:var(--neon-cyan);text-shadow:0 0 8px var(--neon-cyan);margin-top:3px}
+
+#hud{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;justify-content:center}
+.hud-box{
+  background:rgba(0,0,0,0.55);border:1px solid rgba(0,245,255,0.25);border-radius:10px;
+  padding:7px 18px;text-align:center;position:relative;overflow:hidden;backdrop-filter:blur(8px)
+}
+.hud-box::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.4),transparent)}
+.hud-label{font-size:0.5rem;letter-spacing:3px;color:rgba(0,245,255,0.7)}
+.hud-value{font-size:1.55rem;font-weight:900;line-height:1.1}
+#score-val{color:var(--neon-yellow);text-shadow:0 0 10px rgba(255,230,0,0.7)}
+#best-val{color:var(--neon-green);text-shadow:0 0 10px rgba(57,255,20,0.6)}
+#timer-val{color:var(--neon-pink);text-shadow:0 0 10px rgba(255,45,120,0.7)}
+#streak-val{color:#FF9800;text-shadow:0 0 10px rgba(255,152,0,0.7)}
+#timer-val.urgent{animation:urgentPulse 0.35s ease-in-out infinite}
+@keyframes urgentPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2);color:#FF1744;text-shadow:0 0 20px #FF1744}}
+
+#game-board{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+  padding:26px 28px 32px;
+  background:rgba(0,0,0,0.35);
+  border:1px solid rgba(255,230,0,0.12);
+  border-radius:24px;backdrop-filter:blur(6px);
+  max-width:560px;width:100%;
+  position:relative;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.05)
+}
+#game-board::before{
+  content:'';position:absolute;inset:-1px;border-radius:25px;
+  background:linear-gradient(135deg,rgba(0,245,255,0.1),transparent 50%,rgba(255,45,120,0.1));
+  z-index:-1;pointer-events:none
+}
+#game-board.shake{animation:screenShake 0.35s ease-out}
+@keyframes screenShake{
+  0%{transform:translate(0,0) rotate(0)}
+  15%{transform:translate(-6px,3px) rotate(-1deg)}
+  30%{transform:translate(6px,-3px) rotate(1deg)}
+  45%{transform:translate(-4px,2px) rotate(-0.5deg)}
+  60%{transform:translate(4px,-2px) rotate(0.5deg)}
+  75%{transform:translate(-2px,1px)}
+  100%{transform:translate(0,0) rotate(0)}
+}
+
+.hole-wrap{position:relative;aspect-ratio:1;max-width:155px;width:100%;margin:auto}
+.hole-scene{position:absolute;inset:0}
+.hole-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+
+.mole-clip-wrap{position:absolute;inset:0;overflow:hidden;border-radius:0;pointer-events:none;z-index:6}
+
+.mole{
+  position:absolute;bottom:34%;left:50%;
+  transform:translateX(-50%) translateY(110%);
+  width:68%;z-index:5;
+  will-change:transform;overflow:visible;
+  cursor:none;pointer-events:none
+}
+.mole.up,.mole.idle,.mole.whacked{pointer-events:auto}
+.mole::after{
+  content:'';position:absolute;
+  left:-30%;right:-30%;top:-10%;bottom:-20%;
+}
+.mole.up{animation:moleRise 0.2s cubic-bezier(0.22,1.4,0.6,1) forwards}
+.mole.down{animation:moleDrop 0.28s cubic-bezier(0.55,0,0.9,0.5) forwards}
+.mole.whacked{animation:moleWhacked 0.5s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+@keyframes moleRise{
+  0%{transform:translateX(-50%) translateY(110%)}
+  70%{transform:translateX(-50%) translateY(-8%)}
+  100%{transform:translateX(-50%) translateY(0%)}
+}
+@keyframes moleDrop{
+  0%{transform:translateX(-50%) translateY(0%)}
+  100%{transform:translateX(-50%) translateY(115%)}
+}
+@keyframes moleWhacked{
+  0%{transform:translateX(-50%) translateY(0%) rotate(0) scale(1);opacity:1}
+  10%{transform:translateX(-52%) translateY(-12%) rotate(-12deg) scale(1.05)}
+  30%{transform:translateX(-48%) translateY(5%) rotate(8deg) scale(0.85)}
+  55%{transform:translateX(-50%) translateY(30%) rotate(-4deg) scale(0.7);opacity:0.8}
+  100%{transform:translateX(-50%) translateY(130%) rotate(3deg) scale(0.4);opacity:0}
+}
+
+.mole svg{width:100%;height:auto;filter:drop-shadow(0 6px 12px rgba(0,0,0,0.7))}
+.mole.type-gold svg{filter:drop-shadow(0 0 14px rgba(255,210,0,0.9)) drop-shadow(0 6px 10px rgba(0,0,0,0.6))}
+.mole.type-bomb svg{filter:drop-shadow(0 0 14px rgba(255,30,30,0.9)) drop-shadow(0 6px 10px rgba(0,0,0,0.6))}
+
+.mole.idle{animation:moleIdle 1.8s ease-in-out infinite}
+@keyframes moleIdle{
+  0%,100%{transform:translateX(-50%) translateY(0%) scaleY(1)}
+  50%{transform:translateX(-50%) translateY(-2%) scaleY(1.02)}
+}
+
+.particle{
+  position:absolute;pointer-events:none;z-index:30;
+  border-radius:50%;
+  animation:particleFly var(--dur) ease-out forwards
+}
+@keyframes particleFly{
+  0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.2)}
+}
+.star-particle{
+  position:absolute;pointer-events:none;z-index:30;
+  animation:starFly var(--dur) ease-out forwards;
+  font-size:var(--sz);
+}
+@keyframes starFly{
+  0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}
+  100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(0)}
+}
+
+.hit-fx{
+  position:absolute;z-index:25;pointer-events:none;
+  font-family:'Black Ops One',cursive;font-size:1.35rem;
+  top:15%;left:50%;transform:translateX(-50%);
+  animation:hitFly 0.75s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+  white-space:nowrap
+}
+.hit-fx.pts{color:#FFE600;text-shadow:0 0 12px #FFE600,0 2px 4px rgba(0,0,0,0.8)}
+.hit-fx.big{color:#FF9800;font-size:1.7rem;text-shadow:0 0 16px #FF9800,0 2px 4px rgba(0,0,0,0.8)}
+.hit-fx.miss{color:rgba(255,100,100,0.9);font-size:0.85rem;text-shadow:0 2px 4px rgba(0,0,0,0.8)}
+.hit-fx.bomb{color:#FF1744;font-size:1.8rem;text-shadow:0 0 20px #FF1744,0 2px 4px rgba(0,0,0,0.8)}
+@keyframes hitFly{
+  0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.3)}
+  25%{transform:translateX(-50%) translateY(-22px) scale(1.5)}
+  100%{opacity:0;transform:translateX(-50%) translateY(-70px) scale(0.7)}
+}
+
+#combo-display{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  z-index:100;pointer-events:none;font-family:'Black Ops One',cursive;
+  font-size:clamp(2.5rem,7vw,5rem);
+  color:var(--neon-yellow);opacity:0;
+  text-shadow:0 0 40px var(--neon-yellow),0 0 80px rgba(255,230,0,0.4)
+}
+#combo-display.show{animation:comboAnim 1s cubic-bezier(0.34,1.56,0.64,1) forwards}
+@keyframes comboAnim{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(0.3);filter:blur(4px)}
+  35%{opacity:1;transform:translate(-50%,-50%) scale(1.25);filter:blur(0)}
+  65%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-60%) scale(0.85)}
+}
+
+.flash-overlay{position:fixed;inset:0;z-index:200;pointer-events:none;animation:flashAnim 0.4s ease-out forwards}
+@keyframes flashAnim{0%{opacity:1}100%{opacity:0}}
+
+#overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#overlay-box{
+  background:rgba(4,6,20,0.96);border:1px solid rgba(0,245,255,0.2);border-radius:22px;
+  padding:38px 48px;text-align:center;max-width:460px;width:90%;position:relative;overflow:hidden;
+  animation:overlayIn 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  box-shadow:0 30px 80px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.06)
+}
+@keyframes overlayIn{from{transform:scale(0.65) translateY(50px);opacity:0}to{transform:scale(1);opacity:1}}
+#overlay-box::before{content:'';position:absolute;inset:-1px;border-radius:23px;background:linear-gradient(135deg,rgba(0,245,255,0.2),transparent 40%,rgba(255,45,120,0.2));z-index:-1;pointer-events:none}
+#overlay-title{font-family:'Black Ops One',cursive;font-size:2.4rem;color:var(--neon-yellow);text-shadow:0 0 20px var(--neon-yellow);margin-bottom:8px}
+#overlay-sub{font-size:0.6rem;letter-spacing:5px;color:rgba(0,245,255,0.75);margin-bottom:28px}
+.final-label{font-size:0.55rem;letter-spacing:4px;color:#666}
+.final-num{font-size:3.5rem;font-weight:900;color:var(--neon-yellow);text-shadow:0 0 24px var(--neon-yellow);line-height:1}
+#new-best{font-size:0.7rem;color:var(--neon-green);text-shadow:0 0 10px var(--neon-green);letter-spacing:3px;margin-top:5px;animation:blink 0.5s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.diff-buttons{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:18px 0 10px}
+.diff-btn{font-family:'Orbitron',monospace;font-weight:700;font-size:0.65rem;letter-spacing:2px;padding:9px 18px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.5);cursor:pointer;transition:all 0.2s}
+.diff-btn:hover{background:rgba(255,255,255,0.1);color:white;transform:translateY(-2px)}
+.diff-btn.selected{border-color:var(--neon-cyan);color:var(--neon-cyan);background:rgba(0,245,255,0.08);box-shadow:0 0 14px rgba(0,245,255,0.25)}
+#start-btn{font-family:'Black Ops One',cursive;font-size:1.15rem;letter-spacing:3px;padding:14px 44px;background:linear-gradient(135deg,#FF2D78,#FF6B35);color:white;border:none;border-radius:50px;cursor:pointer;margin-top:12px;box-shadow:0 4px 24px rgba(255,45,120,0.45);transition:all 0.2s;animation:btnPulse 2.2s ease-in-out infinite}
+@keyframes btnPulse{0%,100%{box-shadow:0 4px 24px rgba(255,45,120,0.45)}50%{box-shadow:0 4px 40px rgba(255,45,120,0.8),0 0 70px rgba(255,107,53,0.25)}}
+#start-btn:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 10px 35px rgba(255,45,120,0.7)}
+#start-btn:active{transform:scale(0.96)}
+
+@media(max-width:480px){#game-board{gap:10px;padding:18px 14px 22px}#overlay-box{padding:28px 20px}}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div id="ground"></div>
+<div id="scanlines"></div>
+<div id="combo-display"></div>
+<div id="cursor">
+  <svg viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg">
+    
+    <rect x="22" y="28" width="8" height="22" rx="3" fill="#6B3A2A"/>
+    <rect x="23" y="28" width="3" height="22" rx="2" fill="rgba(255,255,255,0.15)"/>
+    
+    <rect x="8" y="10" width="36" height="20" rx="5" fill="#888"/>
+    <rect x="8" y="10" width="36" height="7" rx="4" fill="#aaa"/>
+    <rect x="9" y="11" width="10" height="18" rx="3" fill="#777"/>
+    <rect x="10" y="12" width="4" height="5" rx="1" fill="rgba(255,255,255,0.2)"/>
+    
+    <circle cx="16" cy="20" r="2" fill="#666"/>
+    <circle cx="36" cy="20" r="2" fill="#666"/>
+  </svg>
+</div>
+
+<div id="game-container">
+  <div id="title-banner">
+    <h1>WHACK-A-MOLE</h1>
+    <div class="subtitle">DELUXE ARCADE EDITION</div>
+  </div>
+  <div id="hud">
+    <div class="hud-box"><div class="hud-label">SCORE</div><div class="hud-value" id="score-val">0</div></div>
+    <div class="hud-box"><div class="hud-label">BEST</div><div class="hud-value" id="best-val">0</div></div>
+    <div class="hud-box"><div class="hud-label">TIME</div><div class="hud-value" id="timer-val">30</div></div>
+    <div class="hud-box"><div class="hud-label">STREAK</div><div class="hud-value" id="streak-val">0</div></div>
+  </div>
+  <div id="game-board"></div>
+</div>
+
+<div id="overlay">
+  <div id="overlay-box">
+    <div id="overlay-title">WHACK-A-MOLE</div>
+    <div id="overlay-sub">CHOOSE YOUR DIFFICULTY</div>
+    <div id="final-score-wrap" style="display:none;margin:16px 0">
+      <div class="final-label">FINAL SCORE</div>
+      <div class="final-num" id="final-score-num">0</div>
+      <div id="new-best" style="display:none">✦ NEW BEST ✦</div>
+    </div>
+    <div class="diff-buttons">
+      <button class="diff-btn selected" data-diff="easy">EASY</button>
+      <button class="diff-btn" data-diff="normal">NORMAL</button>
+      <button class="diff-btn" data-diff="hard">HARD</button>
+      <button class="diff-btn" data-diff="insane">INSANE</button>
+    </div>
+    <button id="start-btn">▶ PLAY NOW</button>
+  </div>
+</div>
+
+<script>
+
+const DIFFS={
+  easy:  {interval:1150,duration:1750,bombChance:0,   goldChance:0.09,time:40},
+  normal:{interval:880, duration:1350,bombChance:0.08,goldChance:0.13,time:35},
+  hard:  {interval:620, duration:980, bombChance:0.14,goldChance:0.16,time:30},
+  insane:{interval:390, duration:660, bombChance:0.21,goldChance:0.19,time:25}
+};
+
+let score=0,best=0,timeLeft=30,streak=0,gameActive=false;
+let selectedDiff='easy',moleTimers=[],tickTimer=null,spawnTimer=null,moles=[];
+let idleTimers=[];
+
+const board=document.getElementById('game-board');
+const overlayEl=document.getElementById('overlay');
+const scoreVal=document.getElementById('score-val');
+const bestVal=document.getElementById('best-val');
+const timerVal=document.getElementById('timer-val');
+const streakVal=document.getElementById('streak-val');
+const comboDisplay=document.getElementById('combo-display');
+const cursor=document.getElementById('cursor');
+
+document.addEventListener('mousemove',e=>{
+  cursor.style.left=(e.clientX-12)+'px';
+  cursor.style.top=(e.clientY-4)+'px';
+});
+document.addEventListener('mousedown',()=>{
+  cursor.classList.add('smash');
+  setTimeout(()=>cursor.classList.remove('smash'),180);
+});
+
+const bgCanvas=document.getElementById('bg-canvas');
+const bgCtx=bgCanvas.getContext('2d');
+let stars=[];
+function resizeBg(){bgCanvas.width=window.innerWidth;bgCanvas.height=window.innerHeight;initStars()}
+function initStars(){
+  stars=[];
+  for(let i=0;i<180;i++){
+    stars.push({x:Math.random()*bgCanvas.width,y:Math.random()*bgCanvas.height*0.7,
+      r:Math.random()*1.4+0.3,phase:Math.random()*Math.PI*2,speed:0.3+Math.random()*1.2,brightness:0.4+Math.random()*0.6})
+  }
+}
+let bgT=0;
+function drawBg(){
+  bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);
+  
+  const g=bgCtx.createLinearGradient(0,0,bgCanvas.width,bgCanvas.height*0.5);
+  g.addColorStop(0,'rgba(0,30,80,0)');
+  g.addColorStop(0.3,'rgba(0,60,120,0.06)');
+  g.addColorStop(0.6,'rgba(20,0,80,0.04)');
+  g.addColorStop(1,'rgba(0,0,0,0)');
+  bgCtx.fillStyle=g;bgCtx.fillRect(0,0,bgCanvas.width,bgCanvas.height*0.6);
+  
+  stars.forEach(s=>{
+    const a=s.brightness*(0.5+0.5*Math.sin(bgT*s.speed+s.phase));
+    bgCtx.beginPath();bgCtx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    bgCtx.fillStyle=\`rgba(255,255,255,\${a})\`;bgCtx.fill();
+    if(s.r>1){
+      bgCtx.beginPath();bgCtx.arc(s.x,s.y,s.r*2.5,0,Math.PI*2);
+      bgCtx.fillStyle=\`rgba(200,220,255,\${a*0.15})\`;bgCtx.fill();
+    }
+  });
+  bgT+=0.016;requestAnimationFrame(drawBg);
+}
+window.addEventListener('resize',resizeBg);resizeBg();drawBg();
+
+function normalMoleSVG(){
+  return\`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="body-g" cx="42%" cy="35%" r="58%">
+      <stop offset="0%" stop-color="#A0735A"/>
+      <stop offset="55%" stop-color="#7A5040"/>
+      <stop offset="100%" stop-color="#50301C"/>
+    </radialGradient>
+    <radialGradient id="belly-g" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#D4A882"/>
+      <stop offset="100%" stop-color="#C09060"/>
+    </radialGradient>
+    <radialGradient id="nose-g" cx="40%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#F4A0B0"/>
+      <stop offset="100%" stop-color="#C0506A"/>
+    </radialGradient>
+    <radialGradient id="eye-g" cx="35%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#3a2010"/>
+      <stop offset="100%" stop-color="#1a0a00"/>
+    </radialGradient>
+    <filter id="fur">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  
+  <ellipse cx="50" cy="125" rx="30" ry="7" fill="rgba(0,0,0,0.35)"/>
+  
+  <ellipse cx="50" cy="80" rx="38" ry="46" fill="url(#body-g)" filter="url(#fur)"/>
+  
+  <ellipse cx="50" cy="50" rx="36" ry="42" fill="url(#body-g)"/>
+  
+  <path d="M28 38 Q32 32 30 28" stroke="rgba(40,20,5,0.25)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <path d="M35 28 Q38 20 36 15" stroke="rgba(40,20,5,0.2)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <path d="M50 22 Q52 14 50 10" stroke="rgba(40,20,5,0.2)" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+  <path d="M65 28 Q68 20 66 16" stroke="rgba(40,20,5,0.2)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <path d="M72 38 Q76 32 74 28" stroke="rgba(40,20,5,0.25)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  
+  <ellipse cx="50" cy="72" rx="22" ry="28" fill="url(#belly-g)" opacity="0.85"/>
+  
+  <ellipse cx="22" cy="28" rx="11" ry="14" fill="#7A5040"/>
+  <ellipse cx="22" cy="28" rx="7" ry="9" fill="#C0706A"/>
+  <ellipse cx="78" cy="28" rx="11" ry="14" fill="#7A5040"/>
+  <ellipse cx="78" cy="28" rx="7" ry="9" fill="#C0706A"/>
+  
+  <ellipse cx="35" cy="48" rx="9" ry="10" fill="rgba(0,0,0,0.25)"/>
+  <ellipse cx="65" cy="48" rx="9" ry="10" fill="rgba(0,0,0,0.25)"/>
+  
+  <circle cx="35" cy="47" r="8" fill="url(#eye-g)"/>
+  <circle cx="65" cy="47" r="8" fill="url(#eye-g)"/>
+  
+  <circle cx="38" cy="44" r="2.8" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="68" cy="44" r="2.8" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="36" cy="43" r="1" fill="rgba(255,255,255,0.5)"/>
+  <circle cx="66" cy="43" r="1" fill="rgba(255,255,255,0.5)"/>
+  
+  <ellipse cx="50" cy="64" rx="10" ry="7" fill="url(#nose-g)"/>
+  <ellipse cx="50" cy="62" rx="8" ry="5" fill="#E07090"/>
+  
+  <ellipse cx="46" cy="62" rx="2.5" ry="1.8" fill="rgba(100,20,30,0.7)"/>
+  <ellipse cx="54" cy="62" rx="2.5" ry="1.8" fill="rgba(100,20,30,0.7)"/>
+  
+  <path d="M42 72 Q50 80 58 72" stroke="#8B3A4A" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  
+  <line x1="20" y1="65" x2="40" y2="66" stroke="rgba(255,230,200,0.7)" stroke-width="0.8"/>
+  <line x1="18" y1="69" x2="39" y2="68" stroke="rgba(255,230,200,0.6)" stroke-width="0.7"/>
+  <line x1="60" y1="66" x2="80" y2="65" stroke="rgba(255,230,200,0.7)" stroke-width="0.8"/>
+  <line x1="61" y1="68" x2="82" y2="69" stroke="rgba(255,230,200,0.6)" stroke-width="0.7"/>
+  
+  <path d="M18 108 Q14 120 16 124" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M28 112 Q26 125 28 128" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M72 112 Q74 125 72 128" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M82 108 Q86 120 84 124" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>\`;
+}
+
+function goldMoleSVG(){
+  return\`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="gbody" cx="42%" cy="35%" r="58%">
+      <stop offset="0%" stop-color="#FFE066"/>
+      <stop offset="50%" stop-color="#E8A800"/>
+      <stop offset="100%" stop-color="#A06800"/>
+    </radialGradient>
+    <radialGradient id="gbelly" cx="50%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#FFF0A0"/>
+      <stop offset="100%" stop-color="#FFD060"/>
+    </radialGradient>
+    <radialGradient id="geye" cx="35%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#3a1000"/>
+      <stop offset="100%" stop-color="#1a0800"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="125" rx="30" ry="7" fill="rgba(0,0,0,0.35)"/>
+  
+  <ellipse cx="50" cy="16" rx="22" ry="6" fill="rgba(255,220,0,0.15)"/>
+  
+  <ellipse cx="50" cy="80" rx="38" ry="46" fill="url(#gbody)"/>
+  <ellipse cx="50" cy="50" rx="36" ry="42" fill="url(#gbody)"/>
+  
+  <path d="M28 38 Q32 32 30 28" stroke="rgba(255,240,100,0.4)" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M50 22 Q52 14 50 10" stroke="rgba(255,240,100,0.35)" stroke-width="1" fill="none" stroke-linecap="round"/>
+  <path d="M72 38 Q76 32 74 28" stroke="rgba(255,240,100,0.4)" stroke-width="1" fill="none" stroke-linecap="round"/>
+  
+  <ellipse cx="50" cy="72" rx="22" ry="28" fill="url(#gbelly)" opacity="0.9"/>
+  
+  <path d="M32 22 L36 8 L42 16 L50 4 L58 16 L64 8 L68 22 Z" fill="#FFD700"/>
+  <path d="M32 22 L36 8 L42 16 L50 4 L58 16 L64 8 L68 22 Z" fill="none" stroke="#B8860B" stroke-width="0.8"/>
+  <circle cx="50" cy="6" r="3" fill="#FF3366"/>
+  <circle cx="37" cy="10" r="2" fill="#3366FF"/>
+  <circle cx="63" cy="10" r="2" fill="#33CC66"/>
+  
+  <ellipse cx="22" cy="28" rx="11" ry="14" fill="#C88000"/>
+  <ellipse cx="22" cy="28" rx="7" ry="9" fill="#FFB040"/>
+  <ellipse cx="78" cy="28" rx="11" ry="14" fill="#C88000"/>
+  <ellipse cx="78" cy="28" rx="7" ry="9" fill="#FFB040"/>
+  
+  <circle cx="35" cy="47" r="9" fill="url(#geye)"/>
+  <circle cx="65" cy="47" r="9" fill="url(#geye)"/>
+  <circle cx="35" cy="47" r="6" fill="#2a0800"/>
+  <circle cx="65" cy="47" r="6" fill="#2a0800"/>
+  <circle cx="38" cy="43" r="3.5" fill="rgba(255,255,255,0.9)"/>
+  <circle cx="68" cy="43" r="3.5" fill="rgba(255,255,255,0.9)"/>
+  <circle cx="36.5" cy="42" r="1.2" fill="rgba(255,255,255,0.6)"/>
+  <circle cx="66.5" cy="42" r="1.2" fill="rgba(255,255,255,0.6)"/>
+  
+  <ellipse cx="26" cy="58" rx="7" ry="4" fill="rgba(255,120,80,0.3)"/>
+  <ellipse cx="74" cy="58" rx="7" ry="4" fill="rgba(255,120,80,0.3)"/>
+  
+  <ellipse cx="50" cy="63" rx="9" ry="6" fill="#F4A0A0"/>
+  <ellipse cx="46" cy="62" rx="2.2" ry="1.6" fill="rgba(100,20,30,0.7)"/>
+  <ellipse cx="54" cy="62" rx="2.2" ry="1.6" fill="rgba(100,20,30,0.7)"/>
+  
+  <path d="M38 72 Q50 84 62 72" stroke="#8B3A4A" stroke-width="2" fill="rgba(255,100,100,0.3)" stroke-linecap="round"/>
+  
+  <line x1="18" y1="64" x2="40" y2="65" stroke="rgba(255,240,180,0.8)" stroke-width="0.9"/>
+  <line x1="16" y1="68" x2="39" y2="68" stroke="rgba(255,240,180,0.7)" stroke-width="0.8"/>
+  <line x1="60" y1="65" x2="82" y2="64" stroke="rgba(255,240,180,0.8)" stroke-width="0.9"/>
+  <line x1="61" y1="68" x2="84" y2="68" stroke="rgba(255,240,180,0.7)" stroke-width="0.8"/>
+  
+  <text x="8" y="28" font-size="11" fill="#FFD700" opacity="0.9">✦</text>
+  <text x="82" y="30" font-size="9" fill="#FFD700" opacity="0.8">✦</text>
+  <text x="48" y="122" font-size="8" fill="#FFD700" opacity="0.6">✦</text>
+  <animateTransform attributeName="transform" type="translate" values="0,0;0,-4;0,-1;0,-4;0,0" dur="0.9s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/>
+</svg>\`;
+}
+
+function bombMoleSVG(){
+  return\`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bbody" cx="42%" cy="35%" r="58%">
+      <stop offset="0%" stop-color="#555"/>
+      <stop offset="50%" stop-color="#333"/>
+      <stop offset="100%" stop-color="#111"/>
+    </radialGradient>
+    <radialGradient id="beye" cx="30%" cy="25%" r="65%">
+      <stop offset="0%" stop-color="#CC0000"/>
+      <stop offset="100%" stop-color="#600000"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="50" cy="125" rx="30" ry="7" fill="rgba(0,0,0,0.4)"/>
+  
+  <ellipse cx="50" cy="65" rx="42" ry="50" fill="rgba(255,0,0,0.04)"/>
+  <ellipse cx="50" cy="80" rx="38" ry="46" fill="url(#bbody)"/>
+  <ellipse cx="50" cy="50" rx="36" ry="42" fill="url(#bbody)"/>
+  
+  <path d="M24 42 Q35 36 40 40" stroke="#1a1a1a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M76 42 Q65 36 60 40" stroke="#1a1a1a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  
+  <circle cx="35" cy="49" r="9" fill="#1a0000"/>
+  <circle cx="65" cy="49" r="9" fill="#1a0000"/>
+  <circle cx="35" cy="49" r="6.5" fill="url(#beye)">
+    <animate attributeName="opacity" values="1;0.5;1" dur="0.6s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="65" cy="49" r="6.5" fill="url(#beye)">
+    <animate attributeName="opacity" values="1;0.5;1" dur="0.6s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="37" cy="46" r="2.5" fill="rgba(255,255,255,0.7)"/>
+  <circle cx="67" cy="46" r="2.5" fill="rgba(255,255,255,0.7)"/>
+  
+  <text x="50" y="82" text-anchor="middle" font-size="22" fill="rgba(255,30,30,0.5)">☠</text>
+  
+  <path d="M50 10 Q60 4 68 8 Q72 12 66 16" stroke="#FF6600" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  
+  <circle cx="66" cy="16" r="4" fill="#FF8800">
+    <animate attributeName="r" values="3;5;3" dur="0.25s" repeatCount="indefinite"/>
+    <animate attributeName="fill" values="#FF8800;#FFFF00;#FF4400;#FF8800" dur="0.25s" repeatCount="indefinite"/>
+  </circle>
+  
+  <path d="M38 74 Q50 68 62 74" stroke="#660000" stroke-width="2.5" fill="rgba(40,0,0,0.6)" stroke-linecap="round"/>
+  
+  <path d="M20 95 L30 80" stroke="rgba(255,50,0,0.12)" stroke-width="3"/>
+  <path d="M72 80 L82 95" stroke="rgba(255,50,0,0.12)" stroke-width="3"/>
+  
+  <line x1="18" y1="66" x2="38" y2="67" stroke="rgba(180,180,180,0.5)" stroke-width="0.8"/>
+  <line x1="16" y1="70" x2="37" y2="70" stroke="rgba(180,180,180,0.4)" stroke-width="0.7"/>
+  <line x1="62" y1="67" x2="82" y2="66" stroke="rgba(180,180,180,0.5)" stroke-width="0.8"/>
+  <line x1="63" y1="70" x2="84" y2="70" stroke="rgba(180,180,180,0.4)" stroke-width="0.7"/>
+</svg>\`;
+}
+
+function makeHoleSVG(seed){
+  
+  let s=seed*9301+49297;
+  const rnd=()=>{ s=(s*9301+49297)%233280; return s/233280; };
+
+  
+  const pebbles=[];
+  for(let i=0;i<8;i++){
+    const px=18+rnd()*64; const py=62+rnd()*22;
+    const rw=2+rnd()*4; const rh=1+rnd()*2.5;
+    const rot=(rnd()-0.5)*40;
+    const light=rnd()>0.5;
+    pebbles.push({px,py,rw,rh,rot,light});
+  }
+
+  
+  const blades=[];
+  const bladeCount=22;
+  for(let i=0;i<bladeCount;i++){
+    const angle=-Math.PI+(i/bladeCount)*Math.PI; 
+    const r=38+rnd()*4;
+    const bx=50+Math.cos(angle)*r;
+    const by=52+Math.sin(angle)*r*0.38;
+    const bh=8+rnd()*12;
+    const lean=(rnd()-0.5)*8;
+    const green=\`hsl(\${105+rnd()*25},\${52+rnd()*25}%,\${22+rnd()*18}%)\`;
+    const tip=\`hsl(\${115+rnd()*20},\${55+rnd()*20}%,\${30+rnd()*14}%)\`;
+    blades.push(\`<path d="M\${bx.toFixed(1)} \${by.toFixed(1)} Q\${(bx+lean).toFixed(1)} \${(by-bh*0.6).toFixed(1)} \${(bx+lean*1.4).toFixed(1)} \${(by-bh).toFixed(1)}" stroke="url(#gb\${i%4})" stroke-width="\${0.9+rnd()*1.1}" fill="none" stroke-linecap="round"/>\`);
+  }
+
+  
+  const backBlades=[];
+  for(let i=0;i<10;i++){
+    const angle=Math.PI+(i/10)*Math.PI;
+    const r=33+rnd()*3;
+    const bx=50+Math.cos(angle)*r;
+    const by=50+Math.sin(angle)*r*0.35;
+    const bh=5+rnd()*7;
+    const lean=(rnd()-0.5)*5;
+    backBlades.push(\`<path d="M\${bx.toFixed(1)} \${by.toFixed(1)} Q\${(bx+lean).toFixed(1)} \${(by-bh*0.5).toFixed(1)} \${(bx+lean*1.3).toFixed(1)} \${(by-bh).toFixed(1)}" stroke="hsl(\${108+rnd()*20},\${48+rnd()*20}%,\${18+rnd()*12}%)" stroke-width="\${0.7+rnd()*0.9}" fill="none" stroke-linecap="round"/>\`);
+  }
+
+  const uid=seed; 
+
+  return \`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+  <defs>
+    
+    <radialGradient id="dg\${uid}" cx="38%" cy="28%" r="68%">
+      <stop offset="0%"  stop-color="#9C6030"/>
+      <stop offset="30%" stop-color="#7A4520"/>
+      <stop offset="65%" stop-color="#562E10"/>
+      <stop offset="100%" stop-color="#341A06"/>
+    </radialGradient>
+    
+    <radialGradient id="ds\${uid}" cx="50%" cy="80%" r="55%">
+      <stop offset="0%"  stop-color="#B07040" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#7A4520" stop-opacity="0"/>
+    </radialGradient>
+    
+    <radialGradient id="hg\${uid}" cx="50%" cy="100%" r="70%">
+      <stop offset="0%"  stop-color="#3a1c06"/>
+      <stop offset="35%" stop-color="#1a0900"/>
+      <stop offset="100%" stop-color="#060200"/>
+    </radialGradient>
+    
+    <radialGradient id="hl\${uid}" cx="50%" cy="0%" r="80%">
+      <stop offset="0%"  stop-color="#60380A" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    
+    <linearGradient id="rl\${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"  stop-color="#C08040" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#6B3A18" stop-opacity="0"/>
+    </linearGradient>
+    
+    <linearGradient id="gg\${uid}" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%"  stop-color="#2E6B10"/>
+      <stop offset="60%" stop-color="#48A020"/>
+      <stop offset="100%" stop-color="#5DC030"/>
+    </linearGradient>
+    
+    <linearGradient id="gb0" x1="0%" y1="100%" x2="10%" y2="0%">
+      <stop offset="0%" stop-color="#3a7a18"/><stop offset="100%" stop-color="#6CC030"/>
+    </linearGradient>
+    <linearGradient id="gb1" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#2e6010"/><stop offset="100%" stop-color="#58b028"/>
+    </linearGradient>
+    <linearGradient id="gb2" x1="0%" y1="100%" x2="5%" y2="0%">
+      <stop offset="0%" stop-color="#3d7f1a"/><stop offset="100%" stop-color="#74d035"/>
+    </linearGradient>
+    <linearGradient id="gb3" x1="0%" y1="100%" x2="-5%" y2="0%">
+      <stop offset="0%" stop-color="#2a5a0e"/><stop offset="100%" stop-color="#50a022"/>
+    </linearGradient>
+    
+    <radialGradient id="sh\${uid}" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#000000" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    
+    <clipPath id="hc\${uid}">
+      <ellipse cx="50" cy="50" rx="20" ry="10.5"/>
+    </clipPath>
+    
+    <clipPath id="mc\${uid}">
+      <ellipse cx="50" cy="68" rx="40" ry="28"/>
+    </clipPath>
+  </defs>
+
+  
+  <ellipse cx="50" cy="95" rx="40" ry="7" fill="url(#sh\${uid})"/>
+
+  
+  \${backBlades.join('')}
+
+  
+  
+  <ellipse cx="50" cy="72" rx="42" ry="26" fill="url(#dg\${uid})"/>
+  
+  <ellipse cx="50" cy="72" rx="42" ry="26" fill="url(#ds\${uid})"/>
+  
+  <ellipse cx="50" cy="47" rx="40" ry="7" fill="none" stroke="rgba(180,110,50,0.25)" stroke-width="2"/>
+  
+  <ellipse cx="44" cy="57" rx="18" ry="8" fill="rgba(180,110,55,0.12)" transform="rotate(-15,44,57)"/>
+
+  
+  <path d="M32 70 Q36 67 40 69 Q43 71 47 68" stroke="rgba(30,12,2,0.45)" stroke-width="0.7" fill="none" stroke-linecap="round"/>
+  <path d="M56 74 Q60 71 64 73" stroke="rgba(30,12,2,0.35)" stroke-width="0.6" fill="none" stroke-linecap="round"/>
+  <path d="M38 80 Q42 77 44 79" stroke="rgba(30,12,2,0.3)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
+
+  
+  \${pebbles.map(p=>\`
+  <g transform="rotate(\${p.rot.toFixed(1)},\${p.px.toFixed(1)},\${p.py.toFixed(1)})">
+    <ellipse cx="\${p.px.toFixed(1)}" cy="\${p.py.toFixed(1)}" rx="\${p.rw.toFixed(1)}" ry="\${p.rh.toFixed(1)}" fill="\${p.light?'#A87848':'#6B4020'}" opacity="0.75"/>
+    <ellipse cx="\${(p.px-p.rw*0.25).toFixed(1)}" cy="\${(p.py-p.rh*0.3).toFixed(1)}" rx="\${(p.rw*0.4).toFixed(1)}" ry="\${(p.rh*0.35).toFixed(1)}" fill="rgba(255,200,120,0.3)"/>
+  </g>\`).join('')}
+
+  
+  
+  <ellipse cx="50" cy="50.5" rx="21.5" ry="11.5" fill="rgba(0,0,0,0.7)"/>
+  
+  <ellipse cx="50" cy="50" rx="20" ry="10.5" fill="url(#hg\${uid})"/>
+  
+  <ellipse cx="50" cy="50" rx="20" ry="10.5" fill="url(#hl\${uid})"/>
+  
+  <path d="M30 50 A20 10.5 0 0 1 70 50" fill="none" stroke="rgba(80,40,10,0.6)" stroke-width="3"/>
+  
+  <path d="M30 50 A20 10.5 0 0 0 70 50 L65 54 A17 8 0 0 1 35 54 Z" fill="rgba(0,0,0,0.35)"/>
+  
+  <ellipse cx="50" cy="57" rx="12" ry="4" fill="rgba(60,28,8,0.5)"/>
+
+  
+  
+  <ellipse cx="50" cy="50" rx="22" ry="11.5" fill="none" stroke="url(#rl\${uid})" stroke-width="2.5"/>
+  
+  <path d="M32 51 Q50 56.5 68 51" fill="none" stroke="rgba(160,90,35,0.7)" stroke-width="1.8" stroke-linecap="round"/>
+  
+  <path d="M33 53 Q50 59 67 53" fill="none" stroke="rgba(20,8,0,0.5)" stroke-width="1" stroke-linecap="round"/>
+
+  
+  
+  <ellipse cx="50" cy="47" rx="38" ry="14" fill="none" stroke="url(#gg\${uid})" stroke-width="11"/>
+  
+  <ellipse cx="50" cy="47.5" rx="30" ry="10" fill="none" stroke="rgba(10,40,5,0.6)" stroke-width="4"/>
+  
+  <path d="M16 44 Q50 34 84 44" fill="none" stroke="rgba(120,220,60,0.3)" stroke-width="3" stroke-linecap="round"/>
+  
+  <path d="M22 43 Q50 36 78 43" fill="none" stroke="rgba(160,255,80,0.12)" stroke-width="1.5" stroke-linecap="round"/>
+  
+  <path d="M20 48 Q50 54 80 48" fill="none" stroke="rgba(10,35,5,0.4)" stroke-width="2" stroke-linecap="round"/>
+
+  
+  \${blades.join('')}
+
+  
+  <path d="M26 46 Q28 40 27 37" stroke="rgba(180,255,100,0.2)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
+  <path d="M50 44 Q51 37 50 34" stroke="rgba(180,255,100,0.18)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
+  <path d="M74 46 Q72 40 73 37" stroke="rgba(180,255,100,0.2)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
+</svg>\`;
+}
+
+function buildBoard(){
+  board.innerHTML='';moles=[];idleTimers=[];
+  for(let i=0;i<9;i++){
+    const wrap=document.createElement('div');
+    wrap.className='hole-wrap';
+    wrap.innerHTML=\`
+      <div class="hole-scene">
+        <svg class="hole-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+          \${makeHoleSVG(i+1).replace(/<svg[^>]*>/,'').replace('</svg>','')}
+        </svg>
+        <div class="mole" id="mole-\${i}"></div>
+      </div>\`;
+    wrap.addEventListener('click',()=>{if(gameActive&&!moles[i]?.active){streak=0;spawnHitFx(i,'MISS','miss');updateHUD()}});
+    board.appendChild(wrap);
+    const mel=document.getElementById(\`mole-\${i}\`);
+    mel.addEventListener('click',e=>{e.stopPropagation();onHit(i,e)});
+    moles.push({el:mel,active:false,type:'normal'});
+  }
+}
+
+function popMole(idx,type){
+  const m=moles[idx];if(m.active)return;
+  m.active=true;m.type=type;
+  m.el.innerHTML=type==='gold'?goldMoleSVG():type==='bomb'?bombMoleSVG():normalMoleSVG();
+  m.el.className='mole type-'+type;
+  void m.el.offsetWidth;
+  m.el.classList.add('up');
+  
+  const idleDly=setTimeout(()=>{if(m.active)m.el.classList.add('idle')},220);
+  idleTimers[idx]=idleDly;
+  const cfg=DIFFS[selectedDiff];
+  moleTimers[idx]=setTimeout(()=>retractMole(idx),cfg.duration);
+}
+
+function retractMole(idx){
+  const m=moles[idx];if(!m.active)return;
+  clearTimeout(idleTimers[idx]);
+  m.el.className='mole type-'+m.type;
+  void m.el.offsetWidth;
+  m.el.classList.add('down');
+  m.active=false;
+  setTimeout(()=>{if(m.el){m.el.className='mole';m.el.innerHTML=''}},300);
+}
+
+function onHit(idx,e){
+  if(!gameActive)return;
+  const m=moles[idx];
+  if(!m.active)return;
+  clearTimeout(moleTimers[idx]);clearTimeout(idleTimers[idx]);
+  if(m.type==='bomb'){
+    score=Math.max(0,score-50);
+    spawnHitFx(idx,'-50','bomb');
+    spawnParticles(idx,'bomb');
+    streak=0;
+    shakeBoard();
+    flashScreen('rgba(255,0,0,0.28)');
+  } else {
+    streak++;
+    let pts=m.type==='gold'?50:10;
+    if(streak>=5)pts=Math.round(pts*(1+streak*0.12));
+    score+=pts;
+    spawnHitFx(idx,\`+\${pts}\`,pts>=30?'big':'pts');
+    spawnParticles(idx,m.type==='gold'?'gold':'normal');
+    if(streak>=3)showCombo(streak);
+    flashScreen('rgba(255,230,0,0.06)');
+  }
+  m.el.className='mole type-'+m.type;
+  void m.el.offsetWidth;
+  m.el.classList.add('whacked');
+  m.active=false;
+  setTimeout(()=>{if(m.el){m.el.className='mole';m.el.innerHTML=''}},520);
+  updateHUD();
+}
+
+function spawnParticles(idx,type){
+  const holes=board.querySelectorAll('.hole-wrap');
+  if(!holes[idx])return;
+  const wrap=holes[idx];
+  const colors={
+    normal:['#8B5E3C','#C09060','#6B3A20','#D4A882','#4a2a10'],
+    gold:['#FFD700','#FFA500','#FFEC6E','#E8A800','#FFF0A0'],
+    bomb:['#FF1744','#FF6D00','#FF3D00','#DD2200','rgba(255,100,0,0.8)']
+  };
+  const cols=colors[type]||colors.normal;
+  const count=type==='gold'?14:type==='bomb'?12:10;
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    const angle=(Math.PI*2/count)*i+Math.random()*0.5;
+    const dist=30+Math.random()*45;
+    const tx=Math.cos(angle)*dist;
+    const ty=Math.sin(angle)*dist-20;
+    const sz=3+Math.random()*6;
+    const dur=0.4+Math.random()*0.5;
+    p.style.cssText=\`width:\${sz}px;height:\${sz}px;background:\${cols[Math.floor(Math.random()*cols.length)]};left:50%;top:40%;--tx:\${tx}px;--ty:\${ty}px;--dur:\${dur}s;border-radius:\${type==='bomb'?'2px':'50%'}\`;
+    wrap.appendChild(p);
+    p.addEventListener('animationend',()=>p.remove());
+  }
+  
+  if(type==='gold'){
+    ['✦','★','✧'].forEach((ch,i)=>{
+      const s=document.createElement('div');
+      s.className='star-particle';
+      const angle=(Math.PI*2/3)*i;
+      const dist=40+Math.random()*30;
+      s.style.cssText=\`left:50%;top:30%;--tx:\${Math.cos(angle)*dist}px;--ty:\${Math.sin(angle)*dist-30}px;--dur:0.8s;--sz:\${14+Math.random()*10}px;--rot:\${Math.random()*360}deg;color:#FFD700;text-shadow:0 0 8px #FFD700\`;
+      s.textContent=ch;
+      wrap.appendChild(s);
+      s.addEventListener('animationend',()=>s.remove());
+    });
+  }
+}
+
+function spawnHitFx(idx,text,cls){
+  const holes=board.querySelectorAll('.hole-wrap');
+  if(!holes[idx])return;
+  const fx=document.createElement('div');
+  fx.className='hit-fx '+cls;fx.textContent=text;
+  holes[idx].appendChild(fx);
+  fx.addEventListener('animationend',()=>fx.remove());
+}
+
+function showCombo(n){
+  const msgs=[,,,'COMBO!','GREAT!','AWESOME!','INSANE!','GODLIKE!'];
+  comboDisplay.textContent=\`\${n}× \${msgs[Math.min(n,7)]||'LEGENDARY!'}\`;
+  comboDisplay.className='';void comboDisplay.offsetWidth;comboDisplay.className='show';
+}
+
+function flashScreen(color){
+  const fl=document.createElement('div');fl.className='flash-overlay';
+  fl.style.background=color;document.body.appendChild(fl);
+  fl.addEventListener('animationend',()=>fl.remove());
+}
+function shakeBoard(){
+  board.classList.remove('shake');void board.offsetWidth;board.classList.add('shake');
+  board.addEventListener('animationend',()=>board.classList.remove('shake'),{once:true});
+}
+
+function updateHUD(){
+  scoreVal.textContent=score;streakVal.textContent=streak;
+  if(score>best){best=score;bestVal.textContent=best}
+}
+
+function spawnLoop(){
+  const cfg=DIFFS[selectedDiff];
+  const avail=moles.map((m,i)=>m.active?-1:i).filter(i=>i>=0);
+  if(avail.length>0){
+    const idx=avail[Math.floor(Math.random()*avail.length)];
+    const r=Math.random();
+    const type=r<cfg.bombChance?'bomb':r<cfg.bombChance+cfg.goldChance?'gold':'normal';
+    popMole(idx,type);
+  }
+  spawnTimer=setTimeout(spawnLoop,cfg.interval+(Math.random()*280-140));
+}
+
+function startGame(){
+  const cfg=DIFFS[selectedDiff];
+  score=0;streak=0;timeLeft=cfg.time;gameActive=true;
+  overlayEl.style.display='none';buildBoard();updateHUD();
+  timerVal.textContent=timeLeft;timerVal.classList.remove('urgent');
+  spawnLoop();
+  tickTimer=setInterval(()=>{
+    timeLeft--;timerVal.textContent=timeLeft;
+    if(timeLeft<=5)timerVal.classList.add('urgent');
+    if(timeLeft<=0)endGame();
+  },1000);
+}
+
+function endGame(){
+  gameActive=false;clearInterval(tickTimer);clearTimeout(spawnTimer);
+  moleTimers.forEach(clearTimeout);idleTimers.forEach(clearTimeout);
+  moles.forEach((_,i)=>retractMole(i));
+  setTimeout(()=>{
+    const isNewBest=score>best;if(isNewBest)best=score;bestVal.textContent=best;
+    // Report score to parent (Nexus)
+    try{window.parent.postMessage({type:'whackScore',score:best},'*');}catch(e){}
+    document.getElementById('overlay-title').textContent=score>=300?'LEGENDARY!':score>=150?'GREAT WORK!':'GAME OVER';
+    document.getElementById('overlay-sub').textContent='READY FOR ANOTHER ROUND?';
+    document.getElementById('final-score-wrap').style.display='block';
+    document.getElementById('final-score-num').textContent=score;
+    document.getElementById('new-best').style.display=isNewBest?'block':'none';
+    document.getElementById('start-btn').textContent='▶ PLAY AGAIN';
+    const box=document.getElementById('overlay-box');
+    box.style.animation='none';void box.offsetWidth;box.style.animation='';
+    overlayEl.style.display='flex';
+  },700);
+}
+
+document.getElementById('start-btn').addEventListener('click',startGame);
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');selectedDiff=btn.dataset.diff;
+  });
+});
+
+buildBoard();bestVal.textContent=0;
+</script>
+</body>
+</html>`;
+
 function fmtEnergy(n){if(n>=1e15)return(n/1e15).toFixed(2)+'Q';if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString();}
 
 // ── #1 ROLE SYNC ─────────────────────────────────
 const LB_FIELDS_FOR_ROLE=[
   'msgCount','minutesOnSite','nexusEnergy','flapBest',
-  'bestWpm','driftBest','bjChips','shellScore','referralCount','driveBest','longestEra','loginStreak'
+  'bestWpm','driftBest','bjChips','shellScore','referralCount','driveBest','longestEra','loginStreak','whackBest'
 ];
 const NUMBER_ONE_ROLE='#1';
 
@@ -9448,6 +10371,8 @@ async function renderLeaderboard(tab){
       users=users.filter(u=>(u.driveBest||0)>0).sort((a,b)=>(b.driveBest||0)-(a.driveBest||0)).slice(0,20);
     } else if(tab==='longest'){
       users=users.filter(u=>(u.longestEra||0)>0).sort((a,b)=>(b.longestEra||0)-(a.longestEra||0)).slice(0,20);
+    } else if(tab==='whack'){
+      users=users.filter(u=>(u.whackBest||0)>0).sort((a,b)=>(b.whackBest||0)-(a.whackBest||0)).slice(0,20);
     } else if(tab==='followers'){
       users=users.filter(u=>(u.followerCount||0)>0).sort((a,b)=>(b.followerCount||0)-(a.followerCount||0)).slice(0,20);
     } else if(tab==='streak'){
@@ -9496,6 +10421,8 @@ async function renderLeaderboard(tab){
         statVal=u.driveBest||0;statLabel=statVal.toLocaleString()+' pts';
       } else if(tab==='longest'){
         statVal=u.longestEra||0;statLabel=(u.longestEraName||'Era '+statVal)+(u.longestCiv?' · '+u.longestCiv:'');
+      } else if(tab==='whack'){
+        statVal=u.whackBest||0;statLabel=statVal+' pts';
       } else if(tab==='followers'){
         statVal=u.followerCount||0;statLabel=statVal.toLocaleString()+' follower'+(statVal!==1?'s':'');
       } else if(tab==='streak'){
@@ -9557,6 +10484,11 @@ async function renderLeaderboard(tab){
         const badge=document.createElement('div');
         badge.style.cssText='font-family:var(--font-display);font-size:11px;color:#c9a84c;letter-spacing:1px;';
         badge.textContent='🌍 '+(u.longestEraName||'Era '+(u.longestEra||0));
+        row.appendChild(badge);
+      } else if(tab==='whack'){
+        const badge=document.createElement('div');
+        badge.style.cssText='font-family:var(--font-display);font-size:11px;letter-spacing:1px;color:#FFE600;';
+        badge.textContent='🔨 '+(u.whackBest||0)+' pts';
         row.appendChild(badge);
       } else if(tab==='referrals'){
         const badge=document.createElement('div');
@@ -10211,6 +11143,42 @@ function closeDriveGame(){
   // Reset so next open reloads fresh
   if(iframe){iframe._loaded=false;iframe.srcdoc='';}
 }
+
+function openWhackGame(){
+  setActivity('playing Whack-A-Mole');
+  const overlay=document.getElementById('whack-game-overlay');
+  if(!overlay) return;
+  overlay.style.display='flex';
+  const iframe=document.getElementById('whack-game-iframe');
+  if(iframe&&!iframe._loaded){
+    iframe._loaded=true;
+    iframe.srcdoc=_WHACK_SRCDOC||'';
+  }
+}
+
+function closeWhackGame(){
+  const overlay=document.getElementById('whack-game-overlay');
+  if(overlay) overlay.style.display='none';
+  const iframe=document.getElementById('whack-game-iframe');
+  if(iframe){iframe._loaded=false;iframe.srcdoc='';}
+}
+
+// Listen for score from Whack-A-Mole
+window.addEventListener('message',async function(e){
+  if(e.data&&e.data.type==='whackScore'&&cu&&cud){
+    const s=Math.floor(e.data.score)||0;
+    setLiveGameScore('whackBest',s);
+    if(s>(cud.whackBest||0)){
+      try{
+        await updateDoc(doc(db,'users',cu.uid),{whackBest:s});
+        cud={...cud,whackBest:s};
+        uCache[cu.uid]={...uCache[cu.uid],whackBest:s};
+        toast('🔨 New Whack-A-Mole record: '+s+' pts!','success');
+        syncLeaderboardRoles().catch(()=>{});
+      }catch(ex){}
+    }
+  }
+});
 
 // Listen for score from Drive game
 window.addEventListener('message',async function(e){
@@ -11300,6 +12268,7 @@ window._N = {
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
+  openWhackGame, closeWhackGame,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
   toggleNotifications, updateNotifSettingsUI,
@@ -11586,6 +12555,12 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
         <span style="font-size:9px;font-family:var(--font-mono);color:#c9a84c;letter-spacing:1px;">IDLE</span>
       </button>
 
+      <button onclick="N.closeModal('games-hub-modal');N.openWhackGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🔨</span>
+        <span style="flex:1;">Whack-A-Mole</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#FFE600;letter-spacing:1px;">REFLEX</span>
+      </button>
+
     </div>
   </div>
 </div>
@@ -11837,6 +12812,15 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
 <div id="drive-game-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
   <button onclick="N.closeDriveGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,102,0,0.15);border:1px solid rgba(255,102,0,0.4);color:#ff6600;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10000;">✕ CLOSE</button>
   <iframe id="drive-game-iframe"
+    style="width:100vw;height:100vh;border:none;display:block;"
+    sandbox="allow-scripts allow-same-origin">
+  </iframe>
+</div>
+
+<!-- Whack-A-Mole Overlay -->
+<div id="whack-game-overlay" style="display:none;position:fixed;inset:0;background:#050818;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
+  <button onclick="N.closeWhackGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,230,0,0.15);border:1px solid rgba(255,230,0,0.4);color:#FFE600;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10000;">✕ CLOSE</button>
+  <iframe id="whack-game-iframe"
     style="width:100vw;height:100vh;border:none;display:block;"
     sandbox="allow-scripts allow-same-origin">
   </iframe>
