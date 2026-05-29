@@ -2725,12 +2725,12 @@ function setupChatsListener(){
     renderSidebar();
     if(!_retroDone){_retroDone=true;setTimeout(retroCheckAchs,500);}
   });
-  // Live listener for all users so online dots stay current
+  // Live listener for all users so online dots stay current.
+  // Falls back to own-doc-only listener if rules deny collection reads.
   if(usersUnsub) usersUnsub();
-  usersUnsub=onSnapshot(collection(db,'users'),snap=>{
+  const _usersSnap=snap=>{
     snap.docChanges().forEach(ch=>{
       uCache[ch.doc.id]={...ch.doc.data()};
-      // Sync own user's live data into cud — but not during impersonation
       if(!cud?._impersonated && ch.doc.id===cu?.uid&&cud){
         const d=ch.doc.data();
         cud={...cud,...d};
@@ -2738,6 +2738,19 @@ function setupChatsListener(){
     });
     renderSidebar();
     if(acid) refreshChatHeader();
+  };
+  usersUnsub=onSnapshot(collection(db,'users'),_usersSnap, fsErr=>{
+    if(fsErr.code==='permission-denied'){
+      // Rules block collection-level reads — watch only own doc for live cud sync
+      usersUnsub=onSnapshot(doc(db,'users',cu.uid), ownSnap=>{
+        if(!ownSnap.exists()) return;
+        const d=ownSnap.data();
+        uCache[cu.uid]={...uCache[cu.uid],...d};
+        if(!cud?._impersonated&&cud){cud={...cud,...d};}
+        renderSidebar();
+        if(acid) refreshChatHeader();
+      }, ()=>{});
+    }
   });
 }
 
