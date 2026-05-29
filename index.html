@@ -2512,12 +2512,15 @@ async function enterApp(){
     checkLoginStreak();
     checkDailyOpsReset();
     startGameAutosave();
-    // Assign streak king to true #1 on login (not based on current user's streak)
-    assignStreakKingFromLeaderboard().catch(()=>{});
-    if(window._streakKingInterval) clearInterval(window._streakKingInterval);
-    window._streakKingInterval=setInterval(()=>{
+    // Wait for owner check to resolve before assigning streak king
+    // (isOwner must be set first so we know whether to do full query or personal check)
+    checkOwnerAndShowBtn().then(()=>{
       assignStreakKingFromLeaderboard().catch(()=>{});
-    },5*60*1000);
+      if(window._streakKingInterval) clearInterval(window._streakKingInterval);
+      window._streakKingInterval=setInterval(()=>{
+        assignStreakKingFromLeaderboard().catch(()=>{});
+      },5*60*1000);
+    }).catch(()=>{});
     // Generate referral code if user doesn't have one
     (async()=>{
       const uid=cu.uid;
@@ -7277,15 +7280,19 @@ function showStreakMilestone(streak){
 }
 
 async function assignStreakKingFromLeaderboard(){
-  // Query all users, find the one with highest loginStreak, crown them
+  // Only the owner has permission to read all users — everyone else just checks their own streak
   try{
-    const snap=await getDocs(collection(db,'users'));
-    const users=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>(u.loginStreak||0)>0);
-    if(!users.length) return;
-    users.sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0));
-    const king=users[0];
-    await checkStreakKing(king.loginStreak||0, king.id);
-  }catch(e){console.warn('assignStreakKingFromLeaderboard failed',e);}
+    if(isOwner){
+      const snap=await getDocs(collection(db,'users'));
+      const users=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>(u.loginStreak||0)>0);
+      if(!users.length) return;
+      users.sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0));
+      await checkStreakKing(users[0].loginStreak||0, users[0].id);
+    } else if(cu&&cud){
+      // Regular user: just check if they personally beat the current king
+      await checkStreakKing(cud.loginStreak||0);
+    }
+  }catch(e){/* silently ignore permission errors */}
 }
 
 async function checkStreakKing(myStreak, forceUid){
