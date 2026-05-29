@@ -2405,23 +2405,39 @@ async function doLogin(){
   err.textContent='Authenticating…';
   try{
     let cred;
-    // First try direct login with typed username
+    // First try direct login with typed username → email
     try{
       cred=await signInWithEmailAndPassword(auth,toEmail(un),pw);
     }catch(firstErr){
-      // If that fails, check if this is a renamed account — look up uid via usernames collection
-      // then find the old auth email from Firestore
       if(firstErr.code==='auth/user-not-found'||firstErr.code==='auth/invalid-credential'||firstErr.code==='auth/wrong-password'){
+        // Direct login failed — this user may have been renamed.
+        // Strategy: find their uid, then try _oldAuthEmail as the Firebase Auth email.
+        let mappedUid=null;
+        // 1) Try usernames collection (fast path)
         const unSnap=await getDoc(doc(db,'usernames',un.toLowerCase())).catch(()=>null);
-        const mappedUid=unSnap?.exists?.()?unSnap.data().uid:null;
+        if(unSnap?.exists?.()) mappedUid=unSnap.data().uid;
+        // 2) If usernames doc is missing (e.g. write failed during rename), fall back to
+        //    querying users collection directly by username field
+        if(!mappedUid){
+          const usersQ=await getDocs(query(collection(db,'users'),where('username','==',un.toLowerCase()))).catch(()=>null);
+          if(usersQ&&!usersQ.empty) mappedUid=usersQ.docs[0].id;
+        }
         if(mappedUid){
           const uSnap=await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
           const uData=uSnap?.data()||{};
-          // Try signing in with the old auth email if we know it.
-          // Only attempt if _oldAuthEmail differs from _pendingAuthEmail — if they're the same
-          // it means the rename was saved incorrectly and we'd just fail again.
-          if(uData._oldAuthEmail && uData._oldAuthEmail !== uData._pendingAuthEmail){
-            cred=await signInWithEmailAndPassword(auth,uData._oldAuthEmail,pw);
+          // Try _oldAuthEmail (the pre-rename Firebase Auth email)
+          if(uData._oldAuthEmail){
+            try{
+              cred=await signInWithEmailAndPassword(auth,uData._oldAuthEmail,pw);
+            }catch(oldEmailErr){
+              // _oldAuthEmail also failed — account may not have migrated yet.
+              // Last resort: try every plausible email variant we know about.
+              if(uData._pendingAuthEmail && uData._pendingAuthEmail!==uData._oldAuthEmail){
+                cred=await signInWithEmailAndPassword(auth,uData._pendingAuthEmail,pw);
+              } else {
+                throw firstErr;
+              }
+            }
           } else {
             throw firstErr;
           }
@@ -5866,6 +5882,27 @@ async function replyToTicket(uid){
   openChat(ref.id);
 }
 
+async function healUsernamesDocs(){
+  // Repair: scan every user doc and ensure a matching /usernames/{username} doc exists.
+  // Fixes accounts broken by a failed rename (old doc deleted, new one never written).
+  try{
+    const snap=await getDocs(collection(db,'users'));
+    let fixed=0,skipped=0;
+    for(const d of snap.docs){
+      const u=d.data();
+      if(!u.username) continue;
+      const unSnap=await getDoc(doc(db,'usernames',u.username));
+      if(!unSnap.exists()||unSnap.data().uid!==d.id){
+        await setDoc(doc(db,'usernames',u.username),{uid:d.id,createdAt:serverTimestamp()});
+        fixed++;
+      } else {
+        skipped++;
+      }
+    }
+    toast(`✓ Usernames healed: ${fixed} fixed, ${skipped} already OK`,'success');
+  }catch(e){toast('Heal failed: '+e.message,'danger');}
+}
+
 async function loadOwnerUsers(){
   const panel=document.getElementById('op-panel-users');
   if(!panel) return;
@@ -5873,7 +5910,7 @@ async function loadOwnerUsers(){
   try{
     const snap=await getDocs(collection(db,'users'));
     const users=snap.docs.map(d=>({id:d.id,...d.data()}));
-    panel.innerHTML='<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:12px;">'+users.length+' registered users</div>';
+    panel.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);">'+users.length+' registered users</span><button class="btn-small" onclick="N.healUsernamesDocs()" style="font-size:9px;" title="Fix missing username docs caused by failed renames">🔧 HEAL USERNAMES</button></div>';
     users.sort((a,b)=>(a.username||'').localeCompare(b.username||'')).forEach(u=>{
       // show all users including owner
       const rank=getRank(u.msgCount||0);
@@ -6742,23 +6779,39 @@ async function adminSaveUsername(uid, oldUsername, newUsername){
   if(!/^[a-zA-Z0-9_]+$/.test(newUsername)){toast('Letters, numbers, underscores only.','danger');return;}
   const nl=newUsername.toLowerCase();
   try{
+    // Always read the authoritative current username from Firestore — don't trust the
+    // passed-in oldUsername which may be stale from the panel's render-time closure.
+    const currentUserSnap=await getDoc(doc(db,'users',uid));
+    const currentData=currentUserSnap.data()||{};
+    const authoritative_old=(currentData.username||oldUsername||'').toLowerCase();
+
     // Check if new username is taken
     const existing=await getDoc(doc(db,'usernames',nl));
     if(existing.exists()&&existing.data().uid!==uid){toast('Username already taken.','danger');return;}
-    // Update username doc — delete old entry, create new
-    if(oldUsername) await deleteDoc(doc(db,'usernames',oldUsername.toLowerCase())).catch(()=>{});
-    await setDoc(doc(db,'usernames',nl),{uid,createdAt:serverTimestamp()});
-    // Update user doc:
-    //   _pendingAuthEmail — tells doLogin to migrate Firebase Auth email to the new username
-    //   _oldAuthEmail     — the CURRENT Auth email; doLogin uses this as a fallback until
-    //                       the migration completes. Must always be the OLD name, never the new one.
-    const oldEmail = toEmail(oldUsername || nl); // safe: if no oldUsername, new==old, no migration needed
-    const newEmail = toEmail(nl);
+
+    // Delete old usernames doc. Also scan for any orphaned docs pointing to this uid
+    // (handles the case where a previous rename deleted old but failed to write new).
+    if(authoritative_old && authoritative_old!==nl){
+      await deleteDoc(doc(db,'usernames',authoritative_old)).catch(()=>{});
+    }
+    // Write new usernames doc — include both uid and the owning uid so owner rules pass
+    await setDoc(doc(db,'usernames',nl),{uid, createdAt:serverTimestamp()});
+
+    // Determine the real current Firebase Auth email for this account.
+    // _oldAuthEmail (if set and migration not yet done) is the live Auth email.
+    // Otherwise it's toEmail(authoritative_old).
+    const liveAuthEmail = (currentData._oldAuthEmail && currentData._pendingAuthEmail)
+      ? currentData._oldAuthEmail   // mid-migration: Auth still has the old email
+      : toEmail(authoritative_old); // normal: Auth email matches current username
+
+    const newEmail=toEmail(nl);
+    const changing=liveAuthEmail!==newEmail;
+
     await updateDoc(doc(db,'users',uid),{
       username:nl,
       displayName:newUsername,
-      _pendingAuthEmail: oldEmail !== newEmail ? newEmail : null,  // only set if actually changing
-      _oldAuthEmail:     oldEmail !== newEmail ? oldEmail : null,  // only set if actually changing
+      _pendingAuthEmail: changing ? newEmail    : null,
+      _oldAuthEmail:     changing ? liveAuthEmail : null,
     });
     if(uCache[uid]){uCache[uid].username=nl;uCache[uid].displayName=newUsername;}
     toast('Username updated to @'+nl+'. They can now sign in with the new username after their next login.','success');
@@ -12321,7 +12374,7 @@ window._N = {
   removeLinkedEmail,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
-  adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount,
+  adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount, healUsernamesDocs,
   showImpersonationBanner, returnToOwner,
   adminRenameUser, adminChangePassword, adminDeleteAccount,
   renderAnnouncePanel,
