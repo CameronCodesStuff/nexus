@@ -2175,13 +2175,23 @@ onAuthStateChanged(auth, async user=>{
         getDoc(uRef),
         new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
       ]);
-      cud=uSnap.exists()?uSnap.data():{uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true};
-      if(!uSnap.exists()) await setDoc(uRef,{...cud,createdAt:serverTimestamp()}).catch(()=>{});
+      if(uSnap.exists()){
+        cud=uSnap.data();
+      } else {
+        // Brand-new account — bootstrap from Auth profile, never overwrite an existing doc
+        cud={uid:user.uid,displayName:user.displayName||'User',username:(user.displayName||'user').toLowerCase(),msgCount:0,online:true,roles:[],createdAt:serverTimestamp()};
+        await setDoc(uRef,cud).catch(()=>{});
+      }
       await updateDoc(uRef,{online:true}).catch(()=>{});
     }catch(e){
-      // Firestore read failed (permissions, network, timeout) — enter app with minimal data
-      // The app will still work for chat; Firestore writes will self-heal once rules are fixed
-      cud=cud||{uid:user.uid,displayName:user.displayName||user.email?.split('@')[0]||'User',msgCount:0,online:true};
+      // Firestore read failed (permissions, network, timeout) — keep any previously loaded cud
+      // rather than overwriting with a bare minimal object that would wipe roles/msgCount.
+      // Only set a fallback if cud is completely absent (e.g. first load with no prior state).
+      if(!cud||!cud.uid){
+        // Derive display name from Firestore display name, NOT from the Firebase Auth email,
+        // since the Auth email is 'oldusername@nexus.local' and may be stale after a rename.
+        cud={uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true,roles:[]};
+      }
     }
     enterApp();
   } else {
@@ -2407,8 +2417,10 @@ async function doLogin(){
         if(mappedUid){
           const uSnap=await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
           const uData=uSnap?.data()||{};
-          // Try signing in with the old auth email if we know it
-          if(uData._oldAuthEmail){
+          // Try signing in with the old auth email if we know it.
+          // Only attempt if _oldAuthEmail differs from _pendingAuthEmail — if they're the same
+          // it means the rename was saved incorrectly and we'd just fail again.
+          if(uData._oldAuthEmail && uData._oldAuthEmail !== uData._pendingAuthEmail){
             cred=await signInWithEmailAndPassword(auth,uData._oldAuthEmail,pw);
           } else {
             throw firstErr;
@@ -5898,7 +5910,15 @@ async function loadOwnerUsers(){
       const unInput=document.createElement('input');unInput.className='modal-input';unInput.style.cssText='flex:1;padding:6px 10px;font-size:12px;';
       unInput.value=u.username||'';unInput.placeholder='Username';
       const unBtn=document.createElement('button');unBtn.className='btn-small primary';unBtn.style.fontSize='9px';unBtn.textContent='SAVE';
-      unBtn.onclick=()=>adminSaveUsername(u.id,u.username||'',unInput.value.trim());
+      // Use a mutable ref so repeated saves in the same panel session use the latest old value
+      let _currentUsername=u.username||'';
+      unBtn.onclick=async()=>{
+        const prev=_currentUsername;
+        const next=unInput.value.trim();
+        await adminSaveUsername(u.id,prev,next);
+        // Update local ref so a second save in the same session uses the new name as oldUsername
+        _currentUsername=next.toLowerCase();
+      };
       unRow.appendChild(unLabel);unRow.appendChild(unInput);unRow.appendChild(unBtn);
       fields.appendChild(unRow);
 
@@ -6728,13 +6748,17 @@ async function adminSaveUsername(uid, oldUsername, newUsername){
     // Update username doc — delete old entry, create new
     if(oldUsername) await deleteDoc(doc(db,'usernames',oldUsername.toLowerCase())).catch(()=>{});
     await setDoc(doc(db,'usernames',nl),{uid,createdAt:serverTimestamp()});
-    // Update user doc — store _pendingAuthEmail so next login migrates their Firebase Auth email
-    // and _oldAuthEmail so login can fall back to it before migration completes
+    // Update user doc:
+    //   _pendingAuthEmail — tells doLogin to migrate Firebase Auth email to the new username
+    //   _oldAuthEmail     — the CURRENT Auth email; doLogin uses this as a fallback until
+    //                       the migration completes. Must always be the OLD name, never the new one.
+    const oldEmail = toEmail(oldUsername || nl); // safe: if no oldUsername, new==old, no migration needed
+    const newEmail = toEmail(nl);
     await updateDoc(doc(db,'users',uid),{
       username:nl,
       displayName:newUsername,
-      _pendingAuthEmail:toEmail(nl),   // signals login handler to update Auth email
-      _oldAuthEmail:toEmail(oldUsername||nl), // fallback so they can still log in with new username
+      _pendingAuthEmail: oldEmail !== newEmail ? newEmail : null,  // only set if actually changing
+      _oldAuthEmail:     oldEmail !== newEmail ? oldEmail : null,  // only set if actually changing
     });
     if(uCache[uid]){uCache[uid].username=nl;uCache[uid].displayName=newUsername;}
     toast('Username updated to @'+nl+'. They can now sign in with the new username after their next login.','success');
