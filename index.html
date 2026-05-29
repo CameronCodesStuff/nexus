@@ -2408,51 +2408,69 @@ async function doLogin(){
   err.textContent='Authenticating…';
   try{
     let cred;
-    // First try direct login with typed username → email
+    // Build a deduplicated list of emails to try for this username.
+    // We try them all in order, stopping on the first success.
+    // This handles: normal login, renamed accounts, partially-migrated accounts,
+    // and accounts broken by the old updateEmail migration approach.
+    const _tryEmails=async(emailList,password)=>{
+      let lastErr=null;
+      for(const email of emailList){
+        if(!email) continue;
+        try{
+          return await signInWithEmailAndPassword(auth,email,password);
+        }catch(e){
+          lastErr=e;
+          // Only keep trying on credential errors — stop immediately on other errors
+          if(e.code!=='auth/user-not-found'&&e.code!=='auth/invalid-credential'&&e.code!=='auth/wrong-password') throw e;
+        }
+      }
+      throw lastErr;
+    };
+
+    // Step 1: try direct login with whatever the user typed
+    const directEmail=toEmail(un);
     try{
-      cred=await signInWithEmailAndPassword(auth,toEmail(un),pw);
+      cred=await signInWithEmailAndPassword(auth,directEmail,pw);
     }catch(firstErr){
-      if(firstErr.code==='auth/user-not-found'||firstErr.code==='auth/invalid-credential'||firstErr.code==='auth/wrong-password'){
-        // Direct login failed — this user may have been renamed.
-        // Strategy: find their uid, then try _oldAuthEmail as the Firebase Auth email.
-        let mappedUid=null;
-        // 1) Try usernames collection (fast path)
-        const unSnap=await getDoc(doc(db,'usernames',un.toLowerCase())).catch(()=>null);
-        if(unSnap?.exists?.()) mappedUid=unSnap.data().uid;
-        // 2) If usernames doc is missing (e.g. write failed during rename), fall back to
-        //    querying users collection directly by username field
-        if(!mappedUid){
-          const usersQ=await getDocs(query(collection(db,'users'),where('username','==',un.toLowerCase()))).catch(()=>null);
-          if(usersQ&&!usersQ.empty) mappedUid=usersQ.docs[0].id;
-        }
-        if(mappedUid){
-          const uSnap=await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
-          const uData=uSnap?.data()||{};
-          // Try the stable auth email (_authEmail is set by adminSaveUsername going forward;
-          // _oldAuthEmail is the legacy field from before this fix).
-          const fallbackEmail=uData._authEmail||uData._oldAuthEmail||null;
-          if(fallbackEmail){
-            try{
-              cred=await signInWithEmailAndPassword(auth,fallbackEmail,pw);
-            }catch(fallbackErr){
-              // Both the typed username email and the stored fallback failed.
-              // The account may have been partially migrated by the old broken code.
-              // Try _pendingAuthEmail as a last resort (old migration target).
-              const lastResort=uData._pendingAuthEmail;
-              if(lastResort && lastResort!==fallbackEmail){
-                cred=await signInWithEmailAndPassword(auth,lastResort,pw);
-              } else {
-                throw firstErr;
-              }
-            }
-          } else {
-            throw firstErr;
-          }
-        } else {
-          throw firstErr;
-        }
-      } else {
-        throw firstErr;
+      if(firstErr.code!=='auth/user-not-found'&&firstErr.code!=='auth/invalid-credential'&&firstErr.code!=='auth/wrong-password') throw firstErr;
+
+      // Step 2: look up their user doc to find stored email fields
+      let mappedUid=null;
+      const unSnap=await getDoc(doc(db,'usernames',un.toLowerCase())).catch(()=>null);
+      if(unSnap?.exists?.()) mappedUid=unSnap.data().uid;
+      if(!mappedUid){
+        const usersQ=await getDocs(query(collection(db,'users'),where('username','==',un.toLowerCase()))).catch(()=>null);
+        if(usersQ&&!usersQ.empty) mappedUid=usersQ.docs[0].id;
+      }
+
+      if(!mappedUid) throw firstErr; // username doesn't exist at all
+
+      const uSnap=await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
+      const uData=uSnap?.data()||{};
+
+      // Build every plausible email for this account, deduplicated, excluding the
+      // one we already tried. We include the current username email too in case
+      // Firebase Auth was partially migrated by the old broken code.
+      const candidates=[...new Set([
+        uData._authEmail,
+        uData._oldAuthEmail,
+        uData._pendingAuthEmail,
+        toEmail(uData.username||''),
+        directEmail,
+      ].filter(Boolean))].filter(e=>e!==directEmail);
+
+      // Log candidates to console so the owner can diagnose if all fail
+      console.info('[NEXUS login] Trying fallback emails for',un,':',candidates.map(e=>e.split('@')[0]));
+      err.textContent='Authenticating… (checking rename history)';
+
+      try{
+        cred=await _tryEmails(candidates,pw);
+      }catch(allFailed){
+        // Nothing worked. Show a helpful message and log what was tried.
+        console.error('[NEXUS login] All email variants failed for',un,
+          '— check Firebase Auth console for the actual email. Tried:',candidates);
+        err.textContent='Login failed. If your username was recently changed, contact the owner.';
+        return;
       }
     }
     err.textContent='';
