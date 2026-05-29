@@ -2012,7 +2012,9 @@ const storage = getStorage(fbApp);
 
 // Always require fresh login — sign out any cached session immediately on load
 // This runs synchronously before onAuthStateChanged is registered below
+let _authReady=false;
 await signOut(auth).catch(()=>{});
+_authReady=true;
 
 // ── STATE ──────────────────────────────────────
 let hiddenChats=new Set(JSON.parse(localStorage.getItem('nexus_hidden_chats')||'[]'));
@@ -2163,6 +2165,7 @@ const validUN=u=>/^[a-zA-Z0-9_]{2,20}$/.test(u);
 
 // ── AUTH STATE ─────────────────────────────────
 onAuthStateChanged(auth, async user=>{
+  if(!_authReady) return; // ignore stale auth events fired before forced sign-out completes
   if(user){
     cu=user;
     const uRef=doc(db,'users',user.uid);
@@ -2226,6 +2229,10 @@ async function doRegister(){
   const err=$('reg-error-2')||$('reg-error');
   const tncCheck=document.getElementById('tnc-check');
   if(tncCheck&&!tncCheck.checked){err.textContent='You must agree to the Terms & Conditions.';return;}
+  // Guard: re-validate username here in case showTnC was bypassed
+  if(!validUN(un)){err.textContent='Username: 2–20 characters, letters/numbers/underscores only.';return;}
+  if(pw.length<6){err.textContent='Password must be at least 6 characters.';return;}
+  if(pw!==pw2){err.textContent='Passwords do not match.';return;}
   err.textContent='Checking username…';
   const unLower=un.toLowerCase();
   try{
@@ -2278,21 +2285,27 @@ function doLoginCloaked(){
   if(!user||!pass){alert('Enter your username and password first, then click CLOAK.');return;}
   const tab=window.open('about:blank','_blank');
   if(!tab){alert('Allow pop-ups for this site first.');return;}
-  // Write the full page HTML into the blank tab — runs in its own context with no URL shown
-  const html=document.documentElement.outerHTML
-    .replace('</body>','<script>window.__cloakU='+JSON.stringify(user)+';window.__cloakP='+JSON.stringify(pass)+';<\/script></body>');
+  // Store credentials in a short-lived localStorage key (cleaned up within 60s by startup code)
+  // Never inject them as string literals into document.write so they don't appear in page source
+  const cloakKey='nexus_cloak_'+Math.random().toString(36).slice(2);
+  try{localStorage.setItem(cloakKey,JSON.stringify({u:user,p:pass,t:Date.now()}));}catch(e){alert('Could not store cloak credentials — check localStorage access.');return;}
+  // Write the page HTML without any credential data embedded
+  const html=document.documentElement.outerHTML;
   tab.document.open();
   tab.document.write(html);
   tab.document.close();
-  // Pre-fill and submit once the new tab's module is ready
+  // Pre-fill and submit once the new tab's module is ready, reading from localStorage
   const attempt=(n)=>{
     if(tab.closed||n>40) return;
     try{
       const u=tab.document.getElementById('login-user');
       const p=tab.document.getElementById('login-pass');
       if(u&&p&&tab.window._N?.doLogin){
-        u.value=tab.window.__cloakU||user;
-        p.value=tab.window.__cloakP||pass;
+        const raw=localStorage.getItem(cloakKey);
+        localStorage.removeItem(cloakKey); // clean up immediately after reading
+        const creds=raw?JSON.parse(raw):null;
+        u.value=(creds&&(Date.now()-creds.t)<30000)?creds.u:user;
+        p.value=(creds&&(Date.now()-creds.t)<30000)?creds.p:pass;
         tab.window._N.doLogin();
         return;
       }
@@ -2362,7 +2375,7 @@ async function doForgotPassword(){
       }
     }
     if(!emailToReset){
-      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email found — add one in Settings → Account & Security';}
+      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email on file — add one in Settings → Account & Security';}
       return;
     }
     await sendPasswordResetEmail(auth,emailToReset);
@@ -2431,7 +2444,11 @@ async function doLogin(){
     const ls=document.getElementById('loading-screen');
     if(ls){ls.style.display='flex';ls.style.opacity='1';ls.classList.remove('fade-out');}
     // Safety net: force-dismiss loading screen after 8s in case enterApp never fires
+    // Guard with a flag so the timeout never fires after enterApp has already run
+    window._appEntered=false;
+    if(window._loadingTimeout) clearTimeout(window._loadingTimeout);
     window._loadingTimeout=setTimeout(()=>{
+      if(window._appEntered) return; // enterApp already ran — do nothing
       const ls2=document.getElementById('loading-screen');
       if(ls2&&ls2.style.display!=='none'){
         ls2.classList.add('fade-out');
@@ -2588,8 +2605,9 @@ async function enterApp(){
   applyAllDisplayPrefs();
   $('chat-empty').style.display='flex';
   $('active-chat').style.display='none';
-  // Dismiss loading screen
-  if(window._loadingTimeout) clearTimeout(window._loadingTimeout);
+  // Dismiss loading screen — mark entered so the safety-net timeout won't fire after us
+  window._appEntered=true;
+  if(window._loadingTimeout){clearTimeout(window._loadingTimeout);window._loadingTimeout=null;}
   const ls=document.getElementById('loading-screen');
   if(ls){
     ls.classList.add('fade-out');
