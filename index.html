@@ -2851,10 +2851,11 @@ function mkBannerStrip(uid, cls) {
     'lava':     'linear-gradient(135deg,#200122,#6f0000)',
     'neon':     'linear-gradient(135deg,#00ff87,#60efff)'
   };
-  var t = u.banner || 'default';
+  // Sidebar banner uses dedicated sideBanner fields, separate from profile banner
+  var t = u.sideBanner || 'default';
   var src = '';
-  if (t === 'data' && u.bannerData && u.bannerData.length > 10) src = u.bannerData;
-  else if (t === 'url' && u.bannerUrl && u.bannerUrl.indexOf('http') === 0) src = u.bannerUrl;
+  if (t === 'data' && u.sideBannerData && u.sideBannerData.length > 10) src = u.sideBannerData;
+  else if (t === 'url' && u.sideBannerUrl && u.sideBannerUrl.indexOf('http') === 0) src = u.sideBannerUrl;
   if (src) return '<div class="' + cls + '" style="background:url(' + JSON.stringify(src) + ') center/cover;"></div>';
   return '<div class="' + cls + '" style="background:' + (G[t] || G['default']) + ';"></div>';
 }
@@ -4086,8 +4087,7 @@ function renderSettings(){
   // ---- BANNER SECTION ----
   var _bEl = document.getElementById('settings-banner-section');
   if (_bEl) {
-    var _bmc = (cud && cud.msgCount) || 0;
-    var _bcur = (cud && cud.banner) || 'default';
+    var _bmc  = (cud && cud.msgCount) || 0;
     var _blist = [
       {id:'default', label:'DEFAULT', bg:'linear-gradient(135deg,var(--accent),var(--accent2))'},
       {id:'sunset',  label:'SUNSET',  bg:'linear-gradient(135deg,#ff6b35,#f7c948,#ff3366)'},
@@ -4102,26 +4102,50 @@ function renderSettings(){
       {id:'lava',    label:'LAVA',    bg:'linear-gradient(135deg,#200122,#6f0000)'},
       {id:'neon',    label:'NEON',    bg:'linear-gradient(135deg,#00ff87,#60efff)'}
     ];
-    var _bcards = _blist.map(function(p) {
-      var sel = p.id === _bcur ? ' selected' : '';
-      return '<div class="banner-card' + sel + '" style="background:' + p.bg + ';" onclick="N.saveBanner(\'' + p.id + '\');"><span>' + p.label + '</span></div>';
-    }).join('');
-    var _binfo = _bmc >= 20000
+    function _mkBCards(curId, saveFn, urlInputId, urlSaveFn, fileInputId, fileSaveFn) {
+      return _blist.map(function(p) {
+        var sel = p.id === curId ? ' selected' : '';
+        return '<div class="banner-card' + sel + '" style="background:' + p.bg + ';" onclick="N.' + saveFn + '(\'' + p.id + '\');"><span>' + p.label + '</span></div>';
+      }).join('');
+    }
+    // ── Profile banner (shown on your profile modal) ──────────────────────
+    var _pbCur   = (cud && cud.banner)     || 'default';
+    var _pbCards = _mkBCards(_pbCur, 'saveBanner', 'banner-url-input', 'saveBannerUrl', 'banner-file-input', 'saveBannerFile');
+    // ── Sidebar banner (shown in chat list + find friends, unlocks at 20k) ─
+    var _sbCur   = (cud && cud.sideBanner) || 'default';
+    var _sbCards = _mkBCards(_sbCur, 'saveSideBanner', 'side-banner-url-input', 'saveSideBannerUrl', 'side-banner-file-input', 'saveSideBannerFile');
+    var _sbLock  = _bmc >= 20000
       ? '<p style="font-size:11px;color:var(--success);font-family:var(--font-mono);margin:0 0 10px;">UNLOCKED - shows in sidebar + find friends</p>'
       : '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Locked - shows at 20,000 msgs (' + (20000 - _bmc).toLocaleString() + ' to go)</p>';
     _bEl.innerHTML =
+      // ── Profile banner ──
       '<div class="settings-label">PROFILE BANNER</div>'
-      + _binfo
-      + '<div class="banner-grid">' + _bcards + '</div>'
+      + '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Shows on your profile card when others tap your name.</p>'
+      + '<div class="banner-grid">' + _pbCards + '</div>'
       + '<div class="settings-label" style="margin-top:8px;">CUSTOM IMAGE URL</div>'
       + '<div style="display:flex;gap:8px;margin-bottom:8px;">'
-      + '<input class="modal-input" id="banner-url-input" placeholder="https://example.com/image.jpg"'
-      + ' value="' + esc((cud && cud.bannerUrl) || '') + '" style="flex:1;">'
-      + '<button class="btn-small primary" onclick="N.saveBannerUrl()">SET</button>'
+      +   '<input class="modal-input" id="banner-url-input" placeholder="https://example.com/image.jpg"'
+      +   ' value="' + esc((cud && cud.bannerUrl) || '') + '" style="flex:1;">'
+      +   '<button class="btn-small primary" onclick="N.saveBannerUrl()">SET</button>'
       + '</div>'
       + '<label class="btn-small primary" style="cursor:pointer;display:inline-block;">'
-      + 'UPLOAD BANNER'
-      + '<input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="N.saveBannerFile(this)">'
+      +   'UPLOAD IMAGE'
+      +   '<input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="N.saveBannerFile(this)">'
+      + '</label>'
+      // ── Sidebar banner ──
+      + '<div class="settings-label" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">SIDEBAR BANNER</div>'
+      + _sbLock
+      + '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Shows behind your name in the chat list and find friends.</p>'
+      + '<div class="banner-grid">' + _sbCards + '</div>'
+      + '<div class="settings-label" style="margin-top:8px;">CUSTOM IMAGE URL</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:8px;">'
+      +   '<input class="modal-input" id="side-banner-url-input" placeholder="https://example.com/image.jpg"'
+      +   ' value="' + esc((cud && cud.sideBannerUrl) || '') + '" style="flex:1;">'
+      +   '<button class="btn-small primary" onclick="N.saveSideBannerUrl()">SET</button>'
+      + '</div>'
+      + '<label class="btn-small primary" style="cursor:pointer;display:inline-block;">'
+      +   'UPLOAD IMAGE'
+      +   '<input type="file" id="side-banner-file-input" accept="image/*" style="display:none" onchange="N.saveSideBannerFile(this)">'
       + '</label>';
   }
 
@@ -4316,6 +4340,44 @@ function saveBannerFile(input){
   };
   reader.readAsDataURL(file);
 }
+async function saveSideBanner(presetId){
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{sideBanner:presetId,sideBannerUrl:null,sideBannerData:null});
+    cud={...cud,sideBanner:presetId,sideBannerUrl:null,sideBannerData:null};
+    uCache[cu.uid]={...uCache[cu.uid],sideBanner:presetId,sideBannerUrl:null,sideBannerData:null};
+    toast('Sidebar banner updated!','success');
+    renderSettings();renderSidebar();
+  }catch(e){toast('Save failed: '+e.message,'danger');}
+}
+async function saveSideBannerUrl(){
+  const url=($('side-banner-url-input')?.value||'').trim();
+  if(!url){toast('Enter a URL.','danger');return;}
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{sideBanner:'url',sideBannerUrl:url,sideBannerData:null});
+    cud={...cud,sideBanner:'url',sideBannerUrl:url,sideBannerData:null};
+    uCache[cu.uid]={...uCache[cu.uid],sideBanner:'url',sideBannerUrl:url,sideBannerData:null};
+    toast('Sidebar banner URL set!','success');
+    renderSettings();renderSidebar();
+  }catch(e){toast('Save failed: '+e.message,'danger');}
+}
+function saveSideBannerFile(input){
+  const file=input.files[0];if(!file)return;
+  if(file.size>600000){toast('Image too large. Max ~600KB.','danger');input.value='';return;}
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const data=e.target.result;
+    try{
+      await updateDoc(doc(db,'users',cu.uid),{sideBanner:'data',sideBannerUrl:null,sideBannerData:data});
+      cud={...cud,sideBanner:'data',sideBannerUrl:null,sideBannerData:data};
+      uCache[cu.uid]={...uCache[cu.uid],sideBanner:'data',sideBannerUrl:null,sideBannerData:data};
+      toast('Sidebar banner uploaded!','success');
+      renderSettings();renderSidebar();
+    }catch(e2){toast('Upload failed (try a smaller image).','danger');}
+    input.value='';
+  };
+  reader.readAsDataURL(file);
+}
+
 
 // ── BLOCK / UNBLOCK ──────────────────────────────
 async function toggleBlock(targetUid){
@@ -12504,6 +12566,7 @@ window._N = {
   applyBgUrl, applyBgFile, clearChatBg,
   saveEmoji,
   saveBanner, saveBannerUrl, saveBannerFile,
+  saveSideBanner, saveSideBannerUrl, saveSideBannerFile,
   toggleSidebar, closeSidebar, setMobileMode,
   toggleBlock, saveProfilePicUrl, saveProfilePicFile, clearProfilePic,
   toggleRecording, stopRecording, cancelRecording, playVoice, cycleSpeed,
