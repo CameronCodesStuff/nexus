@@ -90,7 +90,13 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   #more-menu::-webkit-scrollbar{width:4px;}  #more-menu::-webkit-scrollbar-track{background:transparent;}  #more-menu::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
   .chat-feed::-webkit-scrollbar{width:3px;}
   .chat-feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-  .feed-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s;position:relative;border-left:2px solid transparent;}
+  /* Profile banner strip shown in sidebar and find-friends list */
+  .feed-item-banner{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0.18;pointer-events:none;}
+  .feed-item-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .user-item{position:relative;overflow:hidden;}
+  .user-item-banner{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0.18;pointer-events:none;}
+  .user-item-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .feed-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.15s;position:relative;overflow:hidden;border-left:2px solid transparent;}
   .feed-item:hover{background:rgba(255,255,255,0.025);}
   .feed-item.active{background:rgba(68,102,255,0.08);border-left-color:var(--accent);}
   .feed-avatar{width:42px;height:42px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;position:relative;border:1px solid var(--border);overflow:hidden;}
@@ -2818,6 +2824,36 @@ function refreshChatHeader(){
 }
 
 // ── SIDEBAR ────────────────────────────────────
+
+function getBannerInfo(uid){
+  var u=uCache[uid]||{};
+  if((u.msgCount||0)<20000) return null;
+  var B={
+    'default':'linear-gradient(135deg,var(--accent),var(--accent2))',
+    'sunset':'linear-gradient(135deg,#ff6b35,#f7c948,#ff3366)',
+    'ocean':'linear-gradient(135deg,#0052d4,#4364f7,#6fb1fc)',
+    'forest':'linear-gradient(135deg,#0f9b58,#38ef7d)',
+    'galaxy':'linear-gradient(135deg,#09091a,#2d0057,#4b0082,#000080)',
+    'fire':'linear-gradient(135deg,#ff4500,#ff8c00,#ffd700)',
+    'ice':'linear-gradient(135deg,#a8edea,#fed6e3,#a8edea)',
+    'midnight':'linear-gradient(135deg,#0a0a0a,#1a1a2e,#16213e)',
+    'candy':'linear-gradient(135deg,#f953c6,#b91d73)',
+    'aurora':'linear-gradient(135deg,#00c9ff,#92fe9d)',
+    'lava':'linear-gradient(135deg,#200122,#6f0000)',
+    'neon':'linear-gradient(135deg,#00ff87,#60efff)',
+  };
+  var t=u.banner||'default';
+  if(t==='data'&&u.bannerData) return {bg:'',imgSrc:u.bannerData};
+  if(t==='url'&&u.bannerUrl)   return {bg:'',imgSrc:u.bannerUrl};
+  if(B[t]) return {bg:B[t],imgSrc:''};
+  return null;
+}
+function bannerStripHtml(uid,cls){
+  var b=getBannerInfo(uid);
+  if(!b) return '';
+  if(b.imgSrc) return '<div class="'+cls+'"><img src="'+esc(b.imgSrc)+'" alt="" onerror="this.parentElement.style.display=\'none\'"></div>';
+  return '<div class="'+cls+'" style="background:'+b.bg+';"></div>';
+}
 function renderSidebar(){
   const feed=$('chat-feed');
   const sorted=Object.values(aChats).sort((a,b)=>(b.lastTs?.seconds||0)-(a.lastTs?.seconds||0));
@@ -2842,7 +2878,8 @@ function renderSidebar(){
     el.oncontextmenu=e=>showChatContextMenu(e,chat.id);
     const ava=ig?'👥':avatarHtml(ouid||'','42px');
     const noteHtml=(!ig&&ou?.note&&ou.noteTs&&(Date.now()-(ou.noteTs?.seconds||0)*1000)<86400000)?`<div class="note-bubble">${esc(ou.note)}</div>`:'';
-    el.innerHTML=`<div class="feed-avatar${ig?' group':''}" style="position:relative;">${noteHtml}${ava}${isOnline(ou)?`<div class="online-dot ${getStatusDotClass(ou)}"></div>`:''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
+    const _sb=(!ig&&ouid)?bannerStripHtml(ouid,'feed-item-banner'):'';
+    el.innerHTML=`${_sb}<div class="feed-avatar${ig?' group':''}" style="position:relative;">${noteHtml}${ava}${isOnline(ou)?`<div class="online-dot ${getStatusDotClass(ou)}"></div>`:''}</div><div class="feed-info"><div class="feed-name ${ig?'':rank.c} ${ig?'':rank.fc||''}" style="${!ig?getUserFontStyle(ouid||'')+';':''}"><span>${esc(nm)}</span>${!ig&&ouid?getRoleBadge(ouid):''}</div><div class="feed-preview${hasUnread?' fw-unread':''}">${esc(String(chat.lastMessage||'No messages yet').substring(0,50))}</div></div><div class="feed-meta"><div class="feed-time">${ts?ago(ts):''}</div>${hasUnread?'<div class="feed-unread"></div>':''}</div>`;
     feed.appendChild(el);
   });
 }
@@ -3472,7 +3509,8 @@ function buildUsersList(){
   entries.sort((a,b)=>{const ao=isOnline(a[1])?1:0,bo=isOnline(b[1])?1:0;return bo-ao||(a[1].username||'').localeCompare(b[1].username||'');}).forEach(([uid,u])=>{
     const rank=getRank(u.msgCount||0),el=document.createElement('div');el.className='user-item';
     const device=u.device==='mobile'?'📱':'💻';
-    el.innerHTML=`<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;cursor:pointer;" onclick="N.openProfileModal('${uid}')">${avatarHtml(uid,'42px')}${isOnline(u)?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info" style="cursor:pointer;" onclick="N.openProfileModal('${uid}')"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><div style="display:flex;gap:6px;"><button class="btn-small" onclick="N.openProfileModal('${uid}')">PROFILE</button><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button></div>`;
+    const _fb=bannerStripHtml(uid,'user-item-banner');
+    el.innerHTML=`${_fb}<div class="feed-avatar" style="position:relative;overflow:hidden;padding:0;cursor:pointer;" onclick="N.openProfileModal('${uid}')">${avatarHtml(uid,'42px')}${isOnline(u)?`<div class="online-dot ${getStatusDotClass(u)}"></div>`:''}</div><div class="user-item-info" style="cursor:pointer;" onclick="N.openProfileModal('${uid}')"><div class="user-item-name ${rank.c} ${rank.fc||''}">${esc(u.displayName||uid)} <span style="font-size:10px;opacity:0.5;">${device}</span>${getRoleBadge(uid)}</div><div class="user-item-msgs">@${esc(u.username||'')} · ${u.msgCount||0} msgs · ${rank.l}</div></div><div style="display:flex;gap:6px;"><button class="btn-small" onclick="N.openProfileModal('${uid}')">PROFILE</button><button class="btn-small primary" onclick="N.startDM('${uid}')">CHAT</button></div>`;
     list.appendChild(el);
   });
 }
@@ -4071,7 +4109,17 @@ function renderSettings(){
       const sel=p.id===curBanner?' selected':'';
       return '<div class="banner-card'+sel+'" style="'+p.style+'" onclick="N.saveBanner(\''+p.id+'\')"><span>'+p.label+'</span></div>';
     }).join('');
-    bannerSection.innerHTML='<div class="settings-label">PROFILE BANNER</div>'
+    var _bannerMc=cud&&cud.msgCount||0,_bannerUnlocked=_bannerMc>=20000;
+    if(!_bannerUnlocked){
+      bannerSection.innerHTML='<div class="settings-label">PROFILE BANNER</div>'
+        +'<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">'
+        +'<div style="font-size:24px;margin-bottom:8px;">\uD83D\uDD12</div>'
+        +'<div style="font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:var(--text-dim);margin-bottom:6px;">LOCKED</div>'
+        +'<div style="font-size:12px;color:var(--text-dim);">Unlocks at <span style="color:var(--accent);font-weight:700;">20,000 messages</span></div>'
+        +'<div style="font-size:11px;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);">'+(20000-_bannerMc).toLocaleString()+' to go</div>'
+        +'</div>';
+    } else {
+    bannerSection.innerHTML='<div class="settings-label">PROFILE BANNER <span style="font-size:9px;font-family:var(--font-mono);color:var(--success);margin-left:6px;">✓ UNLOCKED</span></div>'
       +'<div class="banner-grid">'+bannerRows+'</div>'
       +'<div class="settings-label" style="margin-top:10px;">CUSTOM IMAGE URL</div>'
       +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
@@ -4082,6 +4130,7 @@ function renderSettings(){
       +'📁 UPLOAD BANNER'
       +'<input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="N.saveBannerFile(this)">'
       +'</label>';
+    }
   }
 
   // ── BIO SECTION ──
