@@ -2598,19 +2598,33 @@ async function enterApp(){
         assignStreakKingFromLeaderboard().catch(()=>{});
       },5*60*1000);
     }).catch(()=>{});
-    // Generate referral code if user doesn't have one
+    // Ensure referral code exists — use the one already in Firestore if present,
+    // only generate a new one if the user genuinely doesn't have one yet.
     (async()=>{
       const uid=cu.uid;
-      let h=0;for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))>>>0;
-      const ltrs='ABCDEFGHJKLMNPQRSTUVWXYZ',digs='23456789';
-      const h1=(h^(h>>>7))>>>0,h2=(h1^(h1>>>13))>>>0,h3=(h2^(h2>>>17))>>>0;
-      const code=ltrs[h%ltrs.length]+ltrs[h1%ltrs.length]+ltrs[h2%ltrs.length]+digs[h%digs.length]+digs[h1%digs.length]+ltrs[h3%ltrs.length]+ltrs[(h2^h3)%ltrs.length];
-      cud={...cud,referralCode:code};
-      uCache[uid]={...uCache[uid],referralCode:code};
-      try{
-        await updateDoc(doc(db,'users',uid),{referralCode:code});
-        await setDoc(doc(db,'referrals',code),{uid,createdAt:serverTimestamp()},{merge:true});
-      }catch{}
+      // Re-read the user doc to get the authoritative referralCode from Firestore
+      const freshSnap=await getDoc(doc(db,'users',uid)).catch(()=>null);
+      const existingCode=freshSnap?.data()?.referralCode;
+      if(existingCode){
+        // Use the stored code — don't overwrite with a freshly hashed one
+        cud={...cud,referralCode:existingCode};
+        uCache[uid]={...uCache[uid],referralCode:existingCode};
+        // Ensure the referrals lookup doc exists (repair if missing)
+        const refSnap=await getDoc(doc(db,'referrals',existingCode)).catch(()=>null);
+        if(!refSnap?.exists()) await setDoc(doc(db,'referrals',existingCode),{uid,createdAt:serverTimestamp()}).catch(()=>{});
+      } else {
+        // No code yet — generate one from uid hash
+        let h=0;for(let i=0;i<uid.length;i++) h=(h*31+uid.charCodeAt(i))>>>0;
+        const ltrs='ABCDEFGHJKLMNPQRSTUVWXYZ',digs='23456789';
+        const h1=(h^(h>>>7))>>>0,h2=(h1^(h1>>>13))>>>0,h3=(h2^(h2>>>17))>>>0;
+        const code=ltrs[h%ltrs.length]+ltrs[h1%ltrs.length]+ltrs[h2%ltrs.length]+digs[h%digs.length]+digs[h1%digs.length]+ltrs[h3%ltrs.length]+ltrs[(h2^h3)%ltrs.length];
+        cud={...cud,referralCode:code};
+        uCache[uid]={...uCache[uid],referralCode:code};
+        try{
+          await updateDoc(doc(db,'users',uid),{referralCode:code});
+          await setDoc(doc(db,'referrals',code),{uid,createdAt:serverTimestamp()});
+        }catch{}
+      }
       if(window._N&&window._N.renderSettings) window._N.renderSettings();
       onSnapshot(doc(db,'users',uid),snap=>{
         if(!snap.exists()) return;
