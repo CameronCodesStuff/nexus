@@ -1211,6 +1211,11 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
         <button id="notif-toggle-btn" onclick="N.toggleNotifications()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-display);font-size:9px;letter-spacing:2px;padding:7px 14px;border-radius:7px;cursor:pointer;transition:all 0.2s;min-width:64px;">—</button>
       </div>
     </div>
+    <div class="settings-section" id="settings-banner-section"></div>
+    <div class="settings-section" id="settings-emoji-section"></div>
+    <div class="settings-section" id="settings-font-section"></div>
+    <div class="settings-section" id="settings-effect-section"></div>
+    <div class="settings-section" id="settings-bio-section"></div>
   </div>
 </div>
 
@@ -1441,7 +1446,7 @@ import {
   getFirestore, collection, doc, setDoc, getDoc, getDocs,
   addDoc, updateDoc, deleteDoc, onSnapshot, query, where,
   orderBy, limitToLast, startAfter, endBefore, limit,
-  serverTimestamp, arrayUnion, arrayRemove, increment
+  serverTimestamp, deleteField, arrayUnion, arrayRemove, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
@@ -2784,6 +2789,9 @@ function setupChatsListener(){
     });
     renderSidebar();
     if(!_retroDone){_retroDone=true;setTimeout(retroCheckAchs,500);}
+  }, err=>{
+    // Silently ignore permission-denied — can happen on stale chat docs or rule mismatches
+    if(err.code!=='permission-denied') console.warn('[NEXUS] chats listener:',err.code);
   });
   // Live listener for all users so online dots stay current.
   // Falls back to own-doc-only listener if rules deny collection reads.
@@ -2843,10 +2851,15 @@ function getBannerInfo(uid){
     'neon':'linear-gradient(135deg,#00ff87,#60efff)',
   };
   var t=u.banner||'default';
-  if(t==='data'&&u.bannerData) return {bg:'',imgSrc:u.bannerData};
-  if(t==='url'&&u.bannerUrl)   return {bg:'',imgSrc:u.bannerUrl};
+  // Only use image sources when the type explicitly matches — never fall through
+  // to image display if type has been changed to a preset name
+  if(t==='data'&&u.bannerData&&typeof u.bannerData==='string'&&u.bannerData.length>10)
+    return {bg:'',imgSrc:u.bannerData};
+  if(t==='url'&&u.bannerUrl&&typeof u.bannerUrl==='string'&&u.bannerUrl.startsWith('http'))
+    return {bg:'',imgSrc:u.bannerUrl};
   if(B[t]) return {bg:B[t],imgSrc:''};
-  return null;
+  // Unknown type — fall back to default gradient rather than nothing
+  return {bg:B['default'],imgSrc:''};
 }
 function bannerStripHtml(uid,cls){
   var b=getBannerInfo(uid);
@@ -2991,6 +3004,8 @@ function subMsgs(cid){
     msgPageMap[cid].oldestDoc=snap.docs[0]||null;
     msgPageMap[cid].hasMore=snap.docs.length>=MSG_PAGE_SIZE;
     if(acid===cid){ renderMsgs(cid); markRead(cid); }
+  }, err=>{
+    if(err.code!=='permission-denied') console.warn('[NEXUS] messages listener:',err.code);
   });
   clsnrs[cid] = unsub;
   window._activeMsgUnsub = unsub;
@@ -4077,18 +4092,7 @@ function renderSettings(){
   }
 
   // ── BANNER SECTION ──
-  let bannerSection=$('settings-banner-section');
-  if(!bannerSection){
-    const modal=document.querySelector('#settings-modal .modal');
-    if(modal){
-      bannerSection=document.createElement('div');
-      bannerSection.id='settings-banner-section';
-      bannerSection.className='settings-section';
-      const last=modal.querySelector('.settings-section:last-of-type');
-      if(last) modal.insertBefore(bannerSection,last);
-      else modal.appendChild(bannerSection);
-    }
-  }
+  const bannerSection=$('settings-banner-section');
   if(bannerSection){
     const BANNER_PRESETS=[
       {id:'default',  label:'DEFAULT',  style:'background:linear-gradient(135deg,var(--accent),var(--accent2))'},
@@ -4134,18 +4138,7 @@ function renderSettings(){
   }
 
   // ── BIO SECTION ──
-  let bioSection=$('settings-bio-section');
-  if(!bioSection){
-    const modal=document.querySelector('#settings-modal .modal');
-    if(modal){
-      bioSection=document.createElement('div');
-      bioSection.id='settings-bio-section';
-      bioSection.className='settings-section';
-      const last=modal.querySelector('.settings-section:last-of-type');
-      if(last) modal.insertBefore(bioSection,last);
-      else modal.appendChild(bioSection);
-    }
-  }
+  const bioSection=$('settings-bio-section');
   if(bioSection){
     const rawPic=cud?.profilePic||'';
     const curPic=esc(rawPic);
@@ -4293,7 +4286,7 @@ function sendMsgNotification(chatId, senderName, text){
 
 async function saveBanner(presetId){
   try{
-    await updateDoc(doc(db,'users',cu.uid),{banner:presetId,bannerUrl:'',bannerData:''});
+    await updateDoc(doc(db,'users',cu.uid),{banner:presetId,bannerUrl:deleteField(),bannerData:deleteField()});
     cud={...cud,banner:presetId,bannerUrl:'',bannerData:''};
     uCache[cu.uid]={...uCache[cu.uid],banner:presetId,bannerUrl:'',bannerData:''};
     // Re-render settings to show selection
@@ -4310,7 +4303,7 @@ async function saveBannerUrl(){
   const url=($('banner-url-input')?.value||'').trim();
   if(!url){toast('Enter a URL.','danger');return;}
   try{
-    await updateDoc(doc(db,'users',cu.uid),{banner:'url',bannerUrl:url,bannerData:''});
+    await updateDoc(doc(db,'users',cu.uid),{banner:'url',bannerUrl:url,bannerData:deleteField()});
     cud={...cud,banner:'url',bannerUrl:url,bannerData:''};
     uCache[cu.uid]={...uCache[cu.uid],banner:'url',bannerUrl:url,bannerData:''};
     toast('Banner URL set!','success');
