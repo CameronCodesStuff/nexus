@@ -1207,7 +1207,8 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
         <button id="notif-toggle-btn" onclick="N.toggleNotifications()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-display);font-size:9px;letter-spacing:2px;padding:7px 14px;border-radius:7px;cursor:pointer;transition:all 0.2s;min-width:64px;">—</button>
       </div>
     </div>
-    <div class="settings-section" id="settings-banner-section"></div>
+    <div class="settings-section" id="settings-profile-banner-section"></div>
+    <div class="settings-section" id="settings-sidebar-banner-section"></div>
     <div class="settings-section" id="settings-emoji-section"></div>
     <div class="settings-section" id="settings-font-section"></div>
     <div class="settings-section" id="settings-effect-section"></div>
@@ -4084,11 +4085,11 @@ function renderSettings(){
   }
 
 
-  // ---- BANNER SECTION ----
-  var _bEl = document.getElementById('settings-banner-section');
-  if (_bEl) {
-    var _bmc  = (cud && cud.msgCount) || 0;
-    var _blist = [
+  // ---- PROFILE BANNER SECTION ----
+  // Colour/image for the banner shown on your profile modal when someone taps your name.
+  var _pbEl = document.getElementById('settings-profile-banner-section');
+  if (_pbEl) {
+    var _pbList = [
       {id:'default', label:'DEFAULT', bg:'linear-gradient(135deg,var(--accent),var(--accent2))'},
       {id:'sunset',  label:'SUNSET',  bg:'linear-gradient(135deg,#ff6b35,#f7c948,#ff3366)'},
       {id:'ocean',   label:'OCEAN',   bg:'linear-gradient(135deg,#0052d4,#4364f7,#6fb1fc)'},
@@ -4102,25 +4103,14 @@ function renderSettings(){
       {id:'lava',    label:'LAVA',    bg:'linear-gradient(135deg,#200122,#6f0000)'},
       {id:'neon',    label:'NEON',    bg:'linear-gradient(135deg,#00ff87,#60efff)'}
     ];
-    function _mkBCards(curId, saveFn, urlInputId, urlSaveFn, fileInputId, fileSaveFn) {
-      return _blist.map(function(p) {
-        var sel = p.id === curId ? ' selected' : '';
-        return '<div class="banner-card' + sel + '" style="background:' + p.bg + ';" onclick="N.' + saveFn + '(\'' + p.id + '\');"><span>' + p.label + '</span></div>';
-      }).join('');
-    }
-    // ── Profile banner (shown on your profile modal) ──────────────────────
-    var _pbCur   = (cud && cud.banner)     || 'default';
-    var _pbCards = _mkBCards(_pbCur, 'saveBanner', 'banner-url-input', 'saveBannerUrl', 'banner-file-input', 'saveBannerFile');
-    // ── Sidebar banner (shown in chat list + find friends, unlocks at 20k) ─
-    var _sbCur   = (cud && cud.sideBanner) || 'default';
-    var _sbCards = _mkBCards(_sbCur, 'saveSideBanner', 'side-banner-url-input', 'saveSideBannerUrl', 'side-banner-file-input', 'saveSideBannerFile');
-    var _sbLock  = _bmc >= 20000
-      ? '<p style="font-size:11px;color:var(--success);font-family:var(--font-mono);margin:0 0 10px;">UNLOCKED - shows in sidebar + find friends</p>'
-      : '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Locked - shows at 20,000 msgs (' + (20000 - _bmc).toLocaleString() + ' to go)</p>';
-    _bEl.innerHTML =
-      // ── Profile banner ──
-      '<div class="settings-label">PROFILE BANNER</div>'
-      + '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Shows on your profile card when others tap your name.</p>'
+    var _pbCur   = (cud && cud.banner) || 'default';
+    var _pbCards = _pbList.map(function(p) {
+      var sel = p.id === _pbCur ? ' selected' : '';
+      return '<div class="banner-card' + sel + '" style="background:' + p.bg + ';" onclick="N.saveBanner(\'' + p.id + '\');"><span>' + p.label + '</span></div>';
+    }).join('');
+    _pbEl.innerHTML =
+        '<div class="settings-label">PROFILE BANNER</div>'
+      + '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Shown on your profile card when someone taps your name.</p>'
       + '<div class="banner-grid">' + _pbCards + '</div>'
       + '<div class="settings-label" style="margin-top:8px;">CUSTOM IMAGE URL</div>'
       + '<div style="display:flex;gap:8px;margin-bottom:8px;">'
@@ -4131,22 +4121,73 @@ function renderSettings(){
       + '<label class="btn-small primary" style="cursor:pointer;display:inline-block;">'
       +   'UPLOAD IMAGE'
       +   '<input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="N.saveBannerFile(this)">'
-      + '</label>'
-      // ── Sidebar banner ──
-      + '<div class="settings-label" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">SIDEBAR BANNER</div>'
-      + _sbLock
-      + '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Shows behind your name in the chat list and find friends.</p>'
-      + '<div class="banner-grid">' + _sbCards + '</div>'
-      + '<div class="settings-label" style="margin-top:8px;">CUSTOM IMAGE URL</div>'
-      + '<div style="display:flex;gap:8px;margin-bottom:8px;">'
-      +   '<input class="modal-input" id="side-banner-url-input" placeholder="https://example.com/image.jpg"'
-      +   ' value="' + esc((cud && cud.sideBannerUrl) || '') + '" style="flex:1;">'
-      +   '<button class="btn-small primary" onclick="N.saveSideBannerUrl()">SET</button>'
-      + '</div>'
-      + '<label class="btn-small primary" style="cursor:pointer;display:inline-block;">'
-      +   'UPLOAD IMAGE'
-      +   '<input type="file" id="side-banner-file-input" accept="image/*" style="display:none" onchange="N.saveSideBannerFile(this)">'
       + '</label>';
+  }
+
+  // ---- SIDEBAR BANNER SECTION ----
+  // Colour strip shown behind your name in the chat list and find friends.
+  // Colour presets unlock at 20k. Image/GIF upload unlocks at 30k.
+  var _sbEl = document.getElementById('settings-sidebar-banner-section');
+  if (_sbEl) {
+    var _sbmc  = (cud && cud.msgCount) || 0;
+    var _sbList = [
+      {id:'default', label:'DEFAULT', bg:'linear-gradient(135deg,var(--accent),var(--accent2))'},
+      {id:'sunset',  label:'SUNSET',  bg:'linear-gradient(135deg,#ff6b35,#f7c948,#ff3366)'},
+      {id:'ocean',   label:'OCEAN',   bg:'linear-gradient(135deg,#0052d4,#4364f7,#6fb1fc)'},
+      {id:'forest',  label:'FOREST',  bg:'linear-gradient(135deg,#0f9b58,#38ef7d)'},
+      {id:'galaxy',  label:'GALAXY',  bg:'linear-gradient(135deg,#09091a,#2d0057,#4b0082,#000080)'},
+      {id:'fire',    label:'FIRE',    bg:'linear-gradient(135deg,#ff4500,#ff8c00,#ffd700)'},
+      {id:'ice',     label:'ICE',     bg:'linear-gradient(135deg,#a8edea,#fed6e3,#a8edea)'},
+      {id:'midnight',label:'MIDNIGHT',bg:'linear-gradient(135deg,#0a0a0a,#1a1a2e,#16213e)'},
+      {id:'candy',   label:'CANDY',   bg:'linear-gradient(135deg,#f953c6,#b91d73)'},
+      {id:'aurora',  label:'AURORA',  bg:'linear-gradient(135deg,#00c9ff,#92fe9d)'},
+      {id:'lava',    label:'LAVA',    bg:'linear-gradient(135deg,#200122,#6f0000)'},
+      {id:'neon',    label:'NEON',    bg:'linear-gradient(135deg,#00ff87,#60efff)'}
+    ];
+    var _sbCur   = (cud && cud.sideBanner) || 'default';
+    var _sbCards = _sbList.map(function(p) {
+      var sel = p.id === _sbCur ? ' selected' : '';
+      return '<div class="banner-card' + sel + '" style="background:' + p.bg + ';" onclick="N.saveSideBanner(\'' + p.id + '\');"><span>' + p.label + '</span></div>';
+    }).join('');
+
+    var _sbHTML = '<div class="settings-label">SIDEBAR BANNER</div>'
+      + '<p style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin:0 0 10px;">Shows behind your name in the chat list and find friends. Separate from your profile banner.</p>';
+
+    if (_sbmc < 20000) {
+      // Fully locked
+      _sbHTML += '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
+        + '<div style="font-size:18px;margin-bottom:6px;">LOCKED</div>'
+        + '<div style="font-size:12px;color:var(--text-dim);">Unlocks at <b style="color:var(--accent);">20,000 messages</b></div>'
+        + '<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">' + (20000 - _sbmc).toLocaleString() + ' to go</div>'
+        + '</div>';
+    } else {
+      // 20k+ — show colour presets
+      _sbHTML += '<div style="font-size:10px;color:var(--success);font-family:var(--font-mono);margin-bottom:8px;">COLOURS UNLOCKED</div>'
+        + '<div class="banner-grid">' + _sbCards + '</div>';
+
+      if (_sbmc >= 30000) {
+        // 30k+ — also show image/gif upload
+        _sbHTML += '<div style="font-size:10px;color:var(--success);font-family:var(--font-mono);margin:10px 0 6px;">IMAGE / GIF UNLOCKED</div>'
+          + '<div class="settings-label" style="margin-top:4px;">IMAGE OR GIF URL</div>'
+          + '<div style="display:flex;gap:8px;margin-bottom:8px;">'
+          +   '<input class="modal-input" id="side-banner-url-input" placeholder="https://example.com/banner.gif"'
+          +   ' value="' + esc((cud && cud.sideBannerUrl) || '') + '" style="flex:1;">'
+          +   '<button class="btn-small primary" onclick="N.saveSideBannerUrl()">SET</button>'
+          + '</div>'
+          + '<label class="btn-small primary" style="cursor:pointer;display:inline-block;">'
+          +   'UPLOAD IMAGE / GIF'
+          +   '<input type="file" id="side-banner-file-input" accept="image/*,image/gif" style="display:none" onchange="N.saveSideBannerFile(this)">'
+          + '</label>';
+      } else {
+        // 20k-29,999 — show image lock teaser
+        _sbHTML += '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px;text-align:center;">'
+          + '<div style="font-size:12px;color:var(--text-dim);">Image / GIF upload unlocks at <b style="color:var(--accent);">30,000 messages</b></div>'
+          + '<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">' + (30000 - _sbmc).toLocaleString() + ' to go</div>'
+          + '</div>';
+      }
+    }
+
+    _sbEl.innerHTML = _sbHTML;
   }
 
   // ── BIO SECTION ──
@@ -4350,6 +4391,7 @@ async function saveSideBanner(presetId){
   }catch(e){toast('Save failed: '+e.message,'danger');}
 }
 async function saveSideBannerUrl(){
+  if((cud?.msgCount||0)<30000){toast('Image/GIF URL unlocks at 30,000 messages.','danger');return;}
   const url=($('side-banner-url-input')?.value||'').trim();
   if(!url){toast('Enter a URL.','danger');return;}
   try{
@@ -4362,7 +4404,8 @@ async function saveSideBannerUrl(){
 }
 function saveSideBannerFile(input){
   const file=input.files[0];if(!file)return;
-  if(file.size>600000){toast('Image too large. Max ~600KB.','danger');input.value='';return;}
+  if((cud?.msgCount||0)<30000){toast('Image upload unlocks at 30,000 messages.','danger');input.value='';return;}
+  if(file.size>1500000){toast('File too large. Max ~1.5MB.','danger');input.value='';return;}
   const reader=new FileReader();
   reader.onload=async e=>{
     const data=e.target.result;
