@@ -6257,8 +6257,9 @@ async function loadStreaksPanel(){
         const b=document.createElement('button');b.className='btn-small';b.style.fontSize='9px';
         b.textContent=label;
         b.onclick=async()=>{
-          const today=new Date().toISOString().slice(0,10);
-          const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+          const today=getDailyKey();
+          const _yd=new Date();_yd.setDate(_yd.getDate()-1);
+          const yesterday=_yd.getFullYear()+'-'+String(_yd.getMonth()+1).padStart(2,'0')+'-'+String(_yd.getDate()).padStart(2,'0');
           const updates={loginStreak:streak,totalCompleteDays:days,lastLoginDay:yesterday};
           await updateDoc(doc(db,'users',u.id),updates).catch(e=>toast('Error: '+e.message,'danger'));
           if(uCache[u.id]) Object.assign(uCache[u.id],updates);
@@ -7424,18 +7425,41 @@ const DAILY_CHALLENGES=[
   {id:'dc_file',     label:'Share a file or image',     reward:20,  check:()=>(cud?.dailyFileSent||false)},
 ];
 
-function getDailyKey(){ return new Date().toISOString().slice(0,10); }
+function getDailyKey(){
+  // Use local date, not UTC — UTC shifts the date boundary and causes false resets
+  // for users in UTC+ timezones (e.g. NZ at 11pm local = next UTC day already)
+  const d=new Date();
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
 
 async function checkLoginStreak(){
   if(!cu||!cud) return;
   const today=getDailyKey();
-  if(cud.lastLoginDay===today) return; // already checked in today
 
-  const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  // Always read fresh from Firestore — cud may be stale from a previous session
+  // or populated before the onSnapshot fired with the latest data.
+  let freshData=null;
+  try{
+    const freshSnap=await getDoc(doc(db,'users',cu.uid));
+    freshData=freshSnap.exists()?freshSnap.data():null;
+  }catch{}
+  // Merge fresh data into cud so the rest of the app stays current
+  if(freshData){cud={...cud,...freshData};uCache[cu.uid]={...uCache[cu.uid],...freshData};}
+
+  if(cud.lastLoginDay===today) return; // already logged in today (local date)
+
+  // Calculate yesterday using local date arithmetic, not 86400000ms subtraction.
+  // Subtracting 24h is wrong on DST transition days (NZ observes DST).
+  const yd=new Date();yd.setDate(yd.getDate()-1);
+  const yesterday=yd.getFullYear()+'-'+String(yd.getMonth()+1).padStart(2,'0')+'-'+String(yd.getDate()).padStart(2,'0');
+
   const prev=cud.lastLoginDay||'';
   let streak=(cud.loginStreak||0);
   if(prev===yesterday) streak++;
-  else if(prev!==today) streak=1; // streak broken or first time
+  else if(prev!==today) streak=1; // streak broken or first login
 
   const updates={lastLoginDay:today,loginStreak:streak,
     dailyMsgCount:0,dailyReactCount:0,dailyReplied:false,
