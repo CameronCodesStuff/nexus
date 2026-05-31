@@ -2813,8 +2813,12 @@ function setupChatsListener(){
       usersUnsub=onSnapshot(doc(db,'users',cu.uid), ownSnap=>{
         if(!ownSnap.exists()) return;
         const d=ownSnap.data();
-        uCache[cu.uid]={...uCache[cu.uid],...d};
-        if(!cud?._impersonated&&cud){cud={...cud,...d};}
+        // Full replace so deleted Firestore fields (e.g. bannerData after colour preset) are cleared
+        uCache[cu.uid]={...d};
+        if(!cud?._impersonated&&cud){
+          // Explicitly null out fields that may have been deleted in Firestore
+          cud={...cud,...d,bannerData:d.bannerData??null,bannerUrl:d.bannerUrl??null};
+        }
         renderSidebar();
         if(acid) refreshChatHeader();
       }, ()=>{});
@@ -2834,7 +2838,8 @@ function refreshChatHeader(){
 // ── SIDEBAR ────────────────────────────────────
 
 function getBannerInfo(uid){
-  var u=uCache[uid]||{};
+  // Own user: always use cud (updated synchronously on save)
+  var u=(uid===cu?.uid&&cud)?{...cud}:(uCache[uid]||{});
   if((u.msgCount||0)<20000) return null;
   var B={
     'default':'linear-gradient(135deg,var(--accent),var(--accent2))',
@@ -4113,28 +4118,25 @@ function renderSettings(){
       const sel=p.id===curBanner?' selected':'';
       return '<div class="banner-card'+sel+'" style="'+p.style+'" onclick="N.saveBanner(\''+p.id+'\')"><span>'+p.label+'</span></div>';
     }).join('');
-    var _bannerMc=cud&&cud.msgCount||0,_bannerUnlocked=_bannerMc>=20000;
-    if(!_bannerUnlocked){
-      bannerSection.innerHTML='<div class="settings-label">PROFILE BANNER</div>'
-        +'<div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;">'
-        +'<div style="font-size:24px;margin-bottom:8px;">\uD83D\uDD12</div>'
-        +'<div style="font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:var(--text-dim);margin-bottom:6px;">LOCKED</div>'
-        +'<div style="font-size:12px;color:var(--text-dim);">Unlocks at <span style="color:var(--accent);font-weight:700;">20,000 messages</span></div>'
-        +'<div style="font-size:11px;color:var(--text-dim);margin-top:4px;font-family:var(--font-mono);">'+(20000-_bannerMc).toLocaleString()+' to go</div>'
-        +'</div>';
-    } else {
-    bannerSection.innerHTML='<div class="settings-label">PROFILE BANNER <span style="font-size:9px;font-family:var(--font-mono);color:var(--success);margin-left:6px;">✓ UNLOCKED</span></div>'
+    const _bannerMc=(cud?.msgCount)||0,_bannerUnlocked=_bannerMc>=20000;
+    const _lockNote=!_bannerUnlocked
+      ? '<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">🔒 Banners show to others at <span style="color:var(--accent);font-weight:700;">20,000 msgs</span> · '+(20000-_bannerMc).toLocaleString()+' to go</div>'
+      : '';
+    bannerSection.innerHTML='<div class="settings-label">PROFILE BANNER'
+      +(_bannerUnlocked?' <span style="font-size:9px;font-family:var(--font-mono);color:var(--success);margin-left:6px;">✓ UNLOCKED</span>':'')
+      +'</div>'
+      +_lockNote
       +'<div class="banner-grid">'+bannerRows+'</div>'
       +'<div class="settings-label" style="margin-top:10px;">CUSTOM IMAGE URL</div>'
       +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
-      +'<input class="modal-input" id="banner-url-input" placeholder="https://example.com/image.jpg" value="'+esc(cud?.bannerUrl||'')+'" style="flex:1;">'
+      +'<input class="modal-input" id="banner-url-input" placeholder="https://example.com/image.jpg" '
+      +'value="'+esc(cud?.bannerUrl||'')+'" style="flex:1;">'
       +'<button class="btn-small primary" onclick="N.saveBannerUrl()">SET</button>'
       +'</div>'
       +'<label class="btn-small primary" style="cursor:pointer;display:inline-block;">'
       +'📁 UPLOAD BANNER'
       +'<input type="file" id="banner-file-input" accept="image/*" style="display:none" onchange="N.saveBannerFile(this)">'
       +'</label>';
-    }
   }
 
   // ── BIO SECTION ──
@@ -4286,9 +4288,9 @@ function sendMsgNotification(chatId, senderName, text){
 
 async function saveBanner(presetId){
   try{
-    await updateDoc(doc(db,'users',cu.uid),{banner:presetId,bannerUrl:deleteField(),bannerData:deleteField()});
-    cud={...cud,banner:presetId,bannerUrl:'',bannerData:''};
-    uCache[cu.uid]={...uCache[cu.uid],banner:presetId,bannerUrl:'',bannerData:''};
+    await updateDoc(doc(db,'users',cu.uid),{banner:presetId,bannerUrl:null,bannerData:null});
+    cud={...cud,banner:presetId,bannerUrl:null,bannerData:null};
+    uCache[cu.uid]={...uCache[cu.uid],banner:presetId,bannerUrl:null,bannerData:null};
     // Re-render settings to show selection
     const cards=document.querySelectorAll('.banner-card');
     cards.forEach(c=>{
@@ -4303,9 +4305,9 @@ async function saveBannerUrl(){
   const url=($('banner-url-input')?.value||'').trim();
   if(!url){toast('Enter a URL.','danger');return;}
   try{
-    await updateDoc(doc(db,'users',cu.uid),{banner:'url',bannerUrl:url,bannerData:deleteField()});
-    cud={...cud,banner:'url',bannerUrl:url,bannerData:''};
-    uCache[cu.uid]={...uCache[cu.uid],banner:'url',bannerUrl:url,bannerData:''};
+    await updateDoc(doc(db,'users',cu.uid),{banner:'url',bannerUrl:url,bannerData:null});
+    cud={...cud,banner:'url',bannerUrl:url,bannerData:null};
+    uCache[cu.uid]={...uCache[cu.uid],banner:'url',bannerUrl:url,bannerData:null};
     toast('Banner URL set!','success');
     renderSettings();
   }catch(e){toast('Save failed: '+e.message,'danger');}
