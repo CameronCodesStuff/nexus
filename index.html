@@ -9751,6 +9751,45 @@ async function retroCheckAchs(){
   if((cud?.bestLbPos||99)<=3) toGrant.push('podium');
   if((cud?.bestLbPos||99)===1) toGrant.push('champion');
 
+  // ── Inferred retro grants for achievements whose tracking fields didn't exist yet ──
+  // speed_demon: if someone has ever sent 100+ msgs in a day we can't know for sure,
+  // but if they have 500+ total messages they almost certainly had at least one busy day
+  if(!_achCache.has('speed_demon') && msgs>=500) toGrant.push('speed_demon');
+
+  // on_a_roll: msgStreakDays wasn't tracked before. Infer from loginStreak —
+  // if someone has a loginStreak of 7+ they almost certainly also sent messages on those days
+  if(!_achCache.has('on_a_roll') && (cud?.loginStreak||0)>=7) toGrant.push('on_a_roll');
+
+  // loyal: chatMsgCounts wasn't tracked. If someone has 500+ total messages
+  // it's near-certain they sent 50+ in at least one chat
+  if(!_achCache.has('loyal') && msgs>=500) toGrant.push('loyal');
+
+  // card_shark: bjHandsWon wasn't tracked. If bjChips > starting amount (500)
+  // they've won hands. Grant if they have any chips above 0 (means they've played)
+  if(!_achCache.has('card_shark') && (cud?.bjChips||0)>0) toGrant.push('card_shark');
+
+  // eagle_eye: shellBestStreak wasn't tracked. If shellScore > 10 they've won
+  // enough games that a 5-streak is very likely to have occurred at some point
+  if(!_achCache.has('eagle_eye') && (cud?.shellScore||0)>=10) toGrant.push('eagle_eye');
+
+  // completionist: can infer from all game score fields being > 0
+  // Some users may have played before scores were tracked — use msgCount as proxy:
+  // if they have scores in at least 6 of 8 games, grant it (they may have missed 1-2)
+  const _gamesPlayed2=[(cud?.nexusEnergy||0)>0,(cud?.flapBest||0)>0,(cud?.bestWpm||0)>0,
+    (cud?.driftBest||0)>0,(cud?.bjChips||0)>0,(cud?.shellScore||0)>0,
+    (cud?.driveBest||0)>0,(cud?.whackBest||0)>0];
+  const _gamesCount2=_gamesPlayed2.filter(Boolean).length;
+  if(!_achCache.has('completionist') && _gamesCount2>=6) toGrant.push('completionist');
+
+  // podium/champion: bestLbPos wasn't tracked before syncLeaderboardRoles ran.
+  // Check live position now — if they're top 3 currently, grant it
+  // (handled by syncLeaderboardRoles which runs on lb open — but also check msgCount:
+  // the #1 message sender definitely qualifies for podium)
+  // These are already handled above via bestLbPos if available.
+  // For older users without bestLbPos, grant podium if they have 10k+ msgs
+  // (likely to have been in top 3 at some point)
+  if(!_achCache.has('podium') && msgs>=10000) toGrant.push('podium');
+
   // ── Deduplicate and filter already-unlocked ──
   const genuinelyNew=[...new Set(toGrant)].filter(id=>!_achCache.has(id));
   if(!genuinelyNew.length) return;
