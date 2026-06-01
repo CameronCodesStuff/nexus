@@ -3516,7 +3516,7 @@ function openModal(id){
   if(id==='changelog-modal')openChangelog();
   if(id==='feedback-modal')openFeedback();
   if(id==='achievements-modal')openAchievementsModal();
-  if(id==='lb-modal'){lbCurrentTab='msgs';lbCurrentSection='main';lbSection('main');syncLeaderboardRoles();
+  if(id==='lb-modal'){lbCurrentTab='overall';lbCurrentSection='main';lbSection('main');syncLeaderboardRoles();
     // Auto-refresh leaderboard every 30s while open
     window._lbRefreshInterval=setInterval(function(){
       if(document.getElementById('lb-modal')?.classList.contains('active')){
@@ -7766,8 +7766,10 @@ async function assignStreakKingFromLeaderboard(){
 }
 
 async function checkStreakKing(myStreak, forceUid){
-  // forceUid: explicitly crown this uid (used by leaderboard which knows true #1)
-  // Otherwise just checks if current user deserves it
+  // forceUid: explicitly crown this uid (only supplied by assignStreakKingFromLeaderboard
+  // which has read all users and knows the true #1).
+  // Without forceUid (regular user path), we only handle dethronement of ourselves
+  // — we never self-crown, because we can't see everyone else's streak.
   try{
     const skRef=doc(db,'config','streakKing');
     const skDoc=await getDoc(skRef).catch(()=>null);
@@ -7777,6 +7779,15 @@ async function checkStreakKing(myStreak, forceUid){
     const candidateUid=forceUid||cu?.uid;
     const candidateStreak=myStreak||0;
     if(!candidateUid) return;
+    // Without a forceUid, only allow this call to dethrone (not crown)
+    // so regular users can't crown themselves just by having a higher streak today.
+    if(!forceUid) {
+      // Just update the king's stored streak if they are already king and streak changed
+      if(currentKingUid===candidateUid&&candidateStreak!==currentKingStreak){
+        await setDoc(skRef,{uid:candidateUid,streak:candidateStreak,ts:serverTimestamp()},{merge:true});
+      }
+      return;
+    }
     if(candidateStreak>currentKingStreak||(candidateStreak===currentKingStreak&&currentKingUid===candidateUid)){
       await setDoc(skRef,{uid:candidateUid,streak:candidateStreak,ts:serverTimestamp()},{merge:true});
       if(currentKingUid!==candidateUid){
@@ -9790,7 +9801,7 @@ function fmtTime(mins){
 let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
-  main:  [{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
+  main:  [{id:'overall',label:'★ OVERALL'},{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
   games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'}],
 };
 let lbCurrentSection='main';
@@ -10817,7 +10828,29 @@ async function renderLeaderboard(tab){
   try{
     const snap=await getDocs(collection(db,'users'));
     let users=snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(tab==='msgs'){
+    if(tab==='overall'){
+      // ── Overall score: percentile-rank each category, sum for composite ──
+      // Categories: msgs, time, followers, referrals, streak
+      // Each user gets 0-100 points per category based on where they rank
+      // relative to the max value. This keeps it fair regardless of scale.
+      const allU=users.filter(u=>(u.msgCount||0)+(u.minutesOnSite||0)+(u.followerCount||0)+(u.referralCount||0)+(u.loginStreak||0)>0);
+      const maxMsgs   =Math.max(1,...allU.map(u=>u.msgCount||0));
+      const maxTime   =Math.max(1,...allU.map(u=>u.minutesOnSite||0));
+      const maxFollow =Math.max(1,...allU.map(u=>u.followerCount||0));
+      const maxRef    =Math.max(1,...allU.map(u=>u.referralCount||0));
+      const maxStreak =Math.max(1,...allU.map(u=>u.loginStreak||0));
+      // Weights: msgs=35%, time=25%, followers=15%, referrals=10%, streak=15%
+      allU.forEach(u=>{
+        const sMsgs  =((u.msgCount||0)/maxMsgs)*35;
+        const sTime  =((u.minutesOnSite||0)/maxTime)*25;
+        const sFollow=((u.followerCount||0)/maxFollow)*15;
+        const sRef   =((u.referralCount||0)/maxRef)*10;
+        const sStreak=((u.loginStreak||0)/maxStreak)*15;
+        u._overallScore=Math.round(sMsgs+sTime+sFollow+sRef+sStreak);
+        u._scoreBreakdown={msgs:Math.round(sMsgs),time:Math.round(sTime),follow:Math.round(sFollow),ref:Math.round(sRef),streak:Math.round(sStreak)};
+      });
+      users=allU.filter(u=>u._overallScore>0).sort((a,b)=>b._overallScore-a._overallScore).slice(0,20);
+    } else if(tab==='msgs'){
       users=users.filter(u=>(u.msgCount||0)>0).sort((a,b)=>(b.msgCount||0)-(a.msgCount||0)).slice(0,20);
     } else if(tab==='time'){
       users=users.filter(u=>(u.minutesOnSite||0)>0).sort((a,b)=>(b.minutesOnSite||0)-(a.minutesOnSite||0)).slice(0,20);
@@ -10865,7 +10898,11 @@ async function renderLeaderboard(tab){
       const avH=avatarHtml(u.id,'34px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;
       // Stat value
       let statVal,statLabel;
-      if(tab==='msgs'){
+      if(tab==='overall'){
+        statVal=u._overallScore||0;
+        const br=u._scoreBreakdown||{};
+        statLabel=statVal+' pts overall';
+      } else if(tab==='msgs'){
         statVal=u.msgCount||0;statLabel=statVal.toLocaleString()+' messages';
       } else if(tab==='time'){
         const mins=u.minutesOnSite||0;
@@ -10903,7 +10940,16 @@ async function renderLeaderboard(tab){
         +'<div class="lb-stat">'+statLabel+'</div>';
       row.appendChild(info);
       // Badge for time/energy tab
-      if(tab==='time'){
+      if(tab==='overall'){
+        const br=u._scoreBreakdown||{};
+        const badge=document.createElement('div');
+        badge.style.cssText='display:flex;flex-direction:column;align-items:flex-end;gap:2px;min-width:80px;';
+        badge.innerHTML='<div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--accent);">'+(u._overallScore||0)+' pts</div>'
+          +'<div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);white-space:nowrap;">'
+          +'💬'+(br.msgs||0)+' ⏱'+(br.time||0)+' 👥'+(br.follow||0)+' 🔗'+(br.ref||0)+' 🔥'+(br.streak||0)
+          +'</div>';
+        row.appendChild(badge);
+      } else if(tab==='time'){
         const mins=u.minutesOnSite||0;
         const tc=getTimeClass(mins);
         const badge=document.createElement('div');
