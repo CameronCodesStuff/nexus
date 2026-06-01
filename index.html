@@ -5723,6 +5723,44 @@ function openProfileModal(uid){
           ${isBlocked?'✓ UNBLOCK':'🚫 BLOCK'}
         </button>
       </div>`:''}
+
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        ${(()=>{
+          const _created=u.createdAt?.toMillis?u.createdAt.toMillis():null;
+          const _lsRaw=u.lastSeen;
+          const _lastMs=_lsRaw?.toMillis?_lsRaw.toMillis():(_lsRaw?new Date(_lsRaw).getTime():null);
+          const _fmtDate=ms=>{
+            if(!ms) return 'Unknown';
+            return new Date(ms).toLocaleDateString('en-NZ',{day:'numeric',month:'short',year:'numeric'});
+          };
+          const _fmtAgo=ms=>{
+            if(!ms) return 'Unknown';
+            const diff=Date.now()-ms;
+            const mins=Math.floor(diff/60000);
+            const hrs=Math.floor(mins/60);
+            const days=Math.floor(hrs/24);
+            if(mins<2) return 'just now';
+            if(mins<60) return mins+'m ago';
+            if(hrs<24) return hrs+'h ago';
+            if(days<7) return days+'d ago';
+            return _fmtDate(ms);
+          };
+          const _lastStr=u.online?'<span style="color:var(--success);">Online now</span>':_fmtAgo(_lastMs);
+          const _rowStyle='display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);';
+          const _labelStyle='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);';
+          const _valStyle='font-size:11px;font-family:var(--font-mono);color:var(--text);font-weight:600;';
+          return '<div style="display:flex;flex-direction:column;gap:6px;">'
+            +'<div style="'+_rowStyle+'">'
+            +  '<span style="'+_labelStyle+'">📅 ACCOUNT CREATED</span>'
+            +  '<span style="'+_valStyle+'">'+_fmtDate(_created)+'</span>'
+            +'</div>'
+            +'<div style="'+_rowStyle+'">'
+            +  '<span style="'+_labelStyle+'">🕐 LAST ACTIVE</span>'
+            +  '<span style="'+_valStyle+'">'+_lastStr+'</span>'
+            +'</div>'
+            +'</div>';
+        })()}
+      </div>
     </div>`;
   openModal('profile-modal');
 }
