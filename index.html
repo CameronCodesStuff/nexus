@@ -9714,6 +9714,43 @@ async function retroCheckAchs(){
   const savedTheme=cud?.theme||null;
   if(savedTheme&&savedTheme!=='default') toGrant.push('change_theme');
 
+  // ── New retro checks for achievements added later ──
+  if(msgs>=1000)  toGrant.push('getting_started');
+  if(msgs>=5000)  toGrant.push('regular_contrib');
+  if(msgs>=10000) toGrant.push('ten_k');
+  if(msgs>=25000) toGrant.push('veteran_voice');
+  if(msgs>=50000) toGrant.push('nexus_legend');
+  if((cud?.dailyMsgCount||0)>=100) toGrant.push('speed_demon');
+  if((cud?.msgStreakDays||0)>=7)   toGrant.push('on_a_roll');
+  const _rcc=cud?.chatMsgCounts||{};
+  if(Object.values(_rcc).some(n=>n>=50)) toGrant.push('loyal');
+  if((cud?.followerCount||0)>=25) toGrant.push('popular');
+  if((cud?.referralCount||0)>=10) toGrant.push('headhunter');
+  const _rnow=Date.now();
+  const _rcreated=cud?.createdAt?.toMillis?cud.createdAt.toMillis():_rnow;
+  const _rageDays=(_rnow-_rcreated)/(1000*60*60*24);
+  if(_rageDays>=30)  toGrant.push('settled_in');
+  if(_rageDays>=90)  toGrant.push('regular_member');
+  if(_rageDays>=365) toGrant.push('anniversary');
+  const _rtl=cud?.totalLoginDays||0;
+  if(_rtl>=30)  toGrant.push('committed');
+  if(_rtl>=100) toGrant.push('lifer');
+  const _rmins=cud?.minutesOnSite||0;
+  if(_rmins>=1440)  toGrant.push('invested');
+  if(_rmins>=6000)  toGrant.push('dedicated_time');
+  if(_rmins>=60000) toGrant.push('time_1000');
+  if((cud?.flapBest||0)>=100)      toGrant.push('bird_watcher');
+  if((cud?.bjHandsWon||0)>=10)     toGrant.push('card_shark');
+  if((cud?.shellBestStreak||0)>=5) toGrant.push('eagle_eye');
+  if((cud?.bestWpm||0)>=50)  toGrant.push('fast_fingers');
+  if((cud?.bestWpm||0)>=100) toGrant.push('keyboard_warrior');
+  const _rAllPlayed=[(cud?.nexusEnergy||0)>0,(cud?.flapBest||0)>0,(cud?.bestWpm||0)>0,
+    (cud?.driftBest||0)>0,(cud?.bjChips||0)>0,(cud?.shellScore||0)>0,
+    (cud?.driveBest||0)>0,(cud?.whackBest||0)>0].every(Boolean);
+  if(_rAllPlayed) toGrant.push('completionist');
+  if((cud?.bestLbPos||99)<=3) toGrant.push('podium');
+  if((cud?.bestLbPos||99)===1) toGrant.push('champion');
+
   // ── Deduplicate and filter already-unlocked ──
   const genuinelyNew=[...new Set(toGrant)].filter(id=>!_achCache.has(id));
   if(!genuinelyNew.length) return;
