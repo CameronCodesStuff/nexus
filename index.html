@@ -2168,13 +2168,13 @@ function getRank(n){
 // ── THEME ──────────────────────────────────────
 let curTheme = 'default'; // loaded from cud.theme in enterApp
 
-function applyTheme(id){
+function applyTheme(id, _silent){
   if(id!==curTheme) unlockAch('change_theme');
   curTheme=id;
-  if(!silent) updateDoc(doc(db,'users',cu?.uid||'x'),{theme:id}).catch(()=>{});
+  if(!_silent&&cu) updateDoc(doc(db,'users',cu.uid),{theme:id}).catch(()=>{});
   document.documentElement.setAttribute('data-theme',id==='default'?'':id);
 }
-applyTheme(curTheme); // safe: curTheme is declared above
+applyTheme(curTheme, true); // startup: apply without saving
 
 // ── USERNAME/EMAIL ─────────────────────────────
 const toEmail=u=>u.toLowerCase().trim()+'@nexus.local';
