@@ -1464,12 +1464,18 @@ const BgEffects={
   },
 
   start(name){
+    // Apply effect without saving — used on startup/login before user interaction
     this.stop();
     this.current=name||this.current;
-    if(cu) updateDoc(doc(db,'users',cu.uid),{bgEffect:this.current}).catch(()=>{});
     const fn=this['run_'+this.current];
     if(fn) fn.call(this);
-    else this.run_stars.call(this); // fallback
+    else this.run_stars.call(this);
+  },
+
+  set(name){
+    // Apply effect AND save to Firestore — used when user picks an effect in settings
+    this.start(name);
+    if(cu) updateDoc(doc(db,'users',cu.uid),{bgEffect:this.current}).catch(()=>{});
   },
 
   resize(cv){cv.width=innerWidth;cv.height=innerHeight;},
@@ -9144,7 +9150,7 @@ function updateMyStatusDot(){
 // ── BG EFFECT ────────────────────────────────────
 function setBgEffect(id){
   unlockAch('bg_effect');
-  BgEffects.start(id);
+  BgEffects.set(id);
   // Update selected card in settings
   document.querySelectorAll('.effect-card').forEach(c=>{
     c.classList.toggle('selected', c.id==='ec-'+id);
