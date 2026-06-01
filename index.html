@@ -2679,7 +2679,44 @@ async function enterApp(){
     startTimeTracking();
   }
   // Apply saved display preferences
-  // ── Load all user prefs from Firestore (cud) ──────────────────────────
+  // -- Check achievements on login --
+  (()=>{
+    if(!cud) return;
+    const _cr=cud?.createdAt?.toMillis?cud.createdAt.toMillis():Date.now();
+    const _ad=(Date.now()-_cr)/(1000*60*60*24);
+    if(_ad>=30)  unlockAch('settled_in');
+    if(_ad>=90)  unlockAch('regular_member');
+    if(_ad>=365) unlockAch('anniversary');
+    const _m=cud?.minutesOnSite||0;
+    if(_m>=1440)  unlockAch('invested');
+    if(_m>=6000)  unlockAch('dedicated_time');
+    if(_m>=60000) unlockAch('time_1000');
+    if((cud?.followerCount||0)>=25)  unlockAch('popular');
+    if((cud?.referralCount||0)>=10)  unlockAch('headhunter');
+    if((cud?.flapBest||0)>=100)      unlockAch('bird_watcher');
+    if((cud?.bjHandsWon||0)>=10)     unlockAch('card_shark');
+    if((cud?.shellBestStreak||0)>=5) unlockAch('eagle_eye');
+    if((cud?.bestWpm||0)>=50)   unlockAch('fast_fingers');
+    if((cud?.bestWpm||0)>=100)  unlockAch('keyboard_warrior');
+    if((cud?.msgCount||0)>=1000)  unlockAch('getting_started');
+    if((cud?.msgCount||0)>=5000)  unlockAch('regular_contrib');
+    if((cud?.msgCount||0)>=10000) unlockAch('ten_k');
+    if((cud?.msgCount||0)>=25000) unlockAch('veteran_voice');
+    if((cud?.msgCount||0)>=50000) unlockAch('nexus_legend');
+    if((cud?.totalLoginDays||0)>=30)  unlockAch('committed');
+    if((cud?.totalLoginDays||0)>=100) unlockAch('lifer');
+    if((cud?.msgStreakDays||0)>=7)    unlockAch('on_a_roll');
+    if((cud?.dailyMsgCount||0)>=100)  unlockAch('speed_demon');
+    const _cc=cud?.chatMsgCounts||{};
+    if(Object.values(_cc).some(n=>n>=50)) unlockAch('loyal');
+    const _ap=[(cud?.nexusEnergy||0)>0,(cud?.flapBest||0)>0,(cud?.bestWpm||0)>0,
+      (cud?.driftBest||0)>0,(cud?.bjChips||0)>0,(cud?.shellScore||0)>0,
+      (cud?.driveBest||0)>0,(cud?.whackBest||0)>0].every(Boolean);
+    if(_ap) unlockAch('completionist');
+    if((cud?.bestLbPos||99)<=3) unlockAch('podium');
+    if((cud?.bestLbPos||99)===1) unlockAch('champion');
+  })();
+    // ── Load all user prefs from Firestore (cud) ──────────────────────────
   if(cud){
     // Theme
     if(cud.theme) { curTheme=cud.theme; applyTheme(cud.theme,true); }
@@ -12225,9 +12262,21 @@ async function bjEndRound(result){
   if(result==='blackjack'){
     won=Math.floor(bjBet*2.5);bjChips+=won;
     msg='🃏 BLACKJACK! +'+won+' CHIPS';type='blackjack';
+    if(cu&&!cud?._impersonated){
+      const _nbj=(cud?.bjHandsWon||0)+1;
+      cud={...cud,bjHandsWon:_nbj};uCache[cu.uid]={...uCache[cu.uid],bjHandsWon:_nbj};
+      updateDoc(doc(db,'users',cu.uid),{bjHandsWon:_nbj}).catch(()=>{});
+      if(_nbj>=10) unlockAch('card_shark');
+    }
   } else if(result==='win'||result==='dealer_bust'){
     won=bjBet*2;bjChips+=won;
     msg=(result==='dealer_bust'?'DEALER BUSTS — ':'YOU WIN — ')+'+'+(bjBet)+' CHIPS';type='win';
+    if(cu&&!cud?._impersonated){
+      const _nbj=(cud?.bjHandsWon||0)+1;
+      cud={...cud,bjHandsWon:_nbj};uCache[cu.uid]={...uCache[cu.uid],bjHandsWon:_nbj};
+      updateDoc(doc(db,'users',cu.uid),{bjHandsWon:_nbj}).catch(()=>{});
+      if(_nbj>=10) unlockAch('card_shark');
+    }
   } else if(result==='push'){
     bjChips+=bjBet;
     msg='PUSH — BET RETURNED';type='push';
