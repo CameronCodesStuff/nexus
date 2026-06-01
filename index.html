@@ -2715,6 +2715,12 @@ async function enterApp(){
     if(_ap) unlockAch('completionist');
     if((cud?.bestLbPos||99)<=3) unlockAch('podium');
     if((cud?.bestLbPos||99)===1) unlockAch('champion');
+    // Nexus Fan: check if already following owner
+    if(Array.isArray(cud?.following)&&cud.following.length>0){
+      getDocs(query(collection(db,'users'),where('username','==','owner'))).then(_owS=>{
+        if(!_owS.empty&&cud.following.includes(_owS.docs[0].id)) unlockAch('nexus_fan');
+      }).catch(()=>{});
+    }
   })();
     // ── Load all user prefs from Firestore (cud) ──────────────────────────
   if(cud){
@@ -8728,6 +8734,13 @@ async function followUser(uid){
     if(uCache[uid]) uCache[uid].followerCount=fc;
     // Check popular for the person being followed (if it's us on another device, cud won't update)
     if(uid===cu.uid){cud={...cud,followerCount:fc};if(fc>=25)unlockAch('popular');}
+    // Nexus Fan: following the owner
+    if(Array.isArray(cud?.following)&&cud.following.includes(uid)){
+      // Check if the followed user is the owner
+      getDocs(query(collection(db,'users'),where('username','==','owner'))).then(owSnap=>{
+        if(!owSnap.empty&&owSnap.docs[0].id===uid) unlockAch('nexus_fan');
+      }).catch(()=>{});
+    }
     toast('✓ Following @'+(uCache[uid]?.username||uid),'success');
     openProfileModal(uid); // refresh
   }catch(e){toast('Failed: '+e.message,'danger');}
@@ -9599,6 +9612,8 @@ const ACHIEVEMENTS=[
   // ── Leaderboard ───────────────────────────────────────────────────────
   {id:'podium',          icon:'🥈', name:'Podium',             desc:'Reach top 3 on any leaderboard',            reward:300, secret:false},
   {id:'champion',        icon:'🥇', name:'Champion',           desc:'Reach #1 on any leaderboard',               reward:500, secret:false},
+  // ── Special ──────────────────────────────────────────────────────────────────
+  {id:'nexus_fan',        icon:'🌟', name:'Nexus Fan',           desc:'Follow the Nexus owner',                    reward:5000,secret:false},
 ];
 
 const ACH_KEY='nexus_achievements';
@@ -9788,6 +9803,13 @@ async function retroCheckAchs(){
   if(_rAllPlayed) toGrant.push('completionist');
   if((cud?.bestLbPos||99)<=3) toGrant.push('podium');
   if((cud?.bestLbPos||99)===1) toGrant.push('champion');
+  // nexus_fan: check if following owner
+  if(Array.isArray(cud?.following)&&cud.following.length>0){
+    try{
+      const _owSnap=await getDocs(query(collection(db,'users'),where('username','==','owner')));
+      if(!_owSnap.empty&&cud.following.includes(_owSnap.docs[0].id)) toGrant.push('nexus_fan');
+    }catch{}
+  }
 
   // ── Inferred retro grants for achievements whose tracking fields didn't exist yet ──
   // speed_demon: if someone has ever sent 100+ msgs in a day we can't know for sure,
