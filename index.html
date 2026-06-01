@@ -8651,6 +8651,8 @@ async function followUser(uid){
     const fc=(theirData.followerCount||0)+1;
     await updateDoc(theirRef,{followerCount:fc}).catch(()=>{});
     if(uCache[uid]) uCache[uid].followerCount=fc;
+    // Check popular for the person being followed (if it's us on another device, cud won't update)
+    if(uid===cu.uid){cud={...cud,followerCount:fc};if(fc>=25)unlockAch('popular');}
     toast('✓ Following @'+(uCache[uid]?.username||uid),'success');
     openProfileModal(uid); // refresh
   }catch(e){toast('Failed: '+e.message,'danger');}
@@ -10791,6 +10793,24 @@ const NUMBER_ONE_ROLE='#1';
 
 async function syncLeaderboardRoles(){
   try{
+    const _lbSnap2=await getDocs(collection(db,'users'));
+    const _lbU=_lbSnap2.docs.map(d=>({id:d.id,...d.data()}));
+    const _flds=['msgCount','minutesOnSite','followerCount','referralCount','loginStreak',
+      'nexusEnergy','flapBest','bestWpm','driftBest','bjChips','shellScore','driveBest','longestEra','whackBest'];
+    let _best=99;
+    for(const field of _flds){
+      const sorted=_lbU.filter(u=>(u[field]||0)>0).sort((a,b)=>(b[field]||0)-(a[field]||0));
+      const pos=sorted.findIndex(u=>u.id===cu?.uid)+1;
+      if(pos>0&&pos<_best) _best=pos;
+    }
+    if(_best<99&&_best<(cud?.bestLbPos||99)){
+      updateDoc(doc(db,'users',cu.uid),{bestLbPos:_best}).catch(()=>{});
+      cud={...cud,bestLbPos:_best};uCache[cu.uid]={...uCache[cu.uid],bestLbPos:_best};
+    }
+    if((cud?.bestLbPos||99)<=3) unlockAch('podium');
+    if((cud?.bestLbPos||99)===1) unlockAch('champion');
+  }catch(_le){}
+  try{
     const snap=await getDocs(collection(db,'users'));
     const allUsers=snap.docs.map(d=>({id:d.id,...d.data()}));
     // Find which uid is #1 on each board
@@ -11687,6 +11707,8 @@ window.addEventListener('message',async function(e){
         uCache[cu.uid]={...uCache[cu.uid],whackBest:s};
         toast('🔨 New Whack-A-Mole record: '+s+' pts!','success');
         syncLeaderboardRoles().catch(()=>{});
+        const _aP=[(cud?.nexusEnergy||0)>0,(cud?.flapBest||0)>0,(cud?.bestWpm||0)>0,(cud?.driftBest||0)>0,(cud?.bjChips||0)>0,(cud?.shellScore||0)>0,(cud?.driveBest||0)>0,(cud?.whackBest||0)>0].every(Boolean);
+        if(_aP) unlockAch('completionist');
       }catch(ex){}
     }
   }
