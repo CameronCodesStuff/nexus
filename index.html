@@ -3315,6 +3315,9 @@ async function sendFile(file){
           fileData:e.target.result,reactions:{}
         });
         await updateDoc(doc(db,'chats',acid),{lastMessage:`📎 ${file.name}`,lastTs:serverTimestamp(),lastSenderUid:cu.uid,lastSenderName:cud?.displayName||'User'});
+        await updateDoc(doc(db,'users',cu.uid),{dailyFileSent:true}).catch(()=>{});
+        cud={...cud,dailyFileSent:true};uCache[cu.uid]={...uCache[cu.uid],dailyFileSent:true};
+        markDailyChallengeDone('dc_file');
       }catch(err){
         toast('File too large for Firestore (max ~750KB). '+err.message,'danger');
       }
@@ -3364,6 +3367,9 @@ async function sendFileViaStorage(file){
           });
           const preview=isVideo?`🎬 ${file.name}`:`📎 ${file.name}`;
           await updateDoc(doc(db,'chats',acid),{lastMessage:preview,lastTs:serverTimestamp(),lastSenderUid:cu.uid,lastSenderName:cud?.displayName||'User'});
+          await updateDoc(doc(db,'users',cu.uid),{dailyFileSent:true}).catch(()=>{});
+          cud={...cud,dailyFileSent:true};uCache[cu.uid]={...uCache[cu.uid],dailyFileSent:true};
+          markDailyChallengeDone('dc_file');
           toast('File sent!','success');
         }catch(err){
           toast('Send failed: '+err.message,'danger');
