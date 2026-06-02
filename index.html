@@ -9226,10 +9226,12 @@ async function restoreAllDefaults(){
 
 // ── CURSOR TRAIL ─────────────────────────────────
 let _cursorTrailType='none';
-let _cursorCanvas=null,_cursorCtx=null,_cursorParticles=[],_cursorSmear=[],_cursorRainbowHue=0;
+let _cursorCanvas=null,_cursorCtx=null,_cursorParticles=[],_cursorSmear=[],_cursorRainbowHue=0,_cursorGen=0;
 
 function applyCursorTrail(type){
-  // Always fully reset so single-click re-applies correctly
+  // Increment generation so any running loop from a previous trail self-terminates
+  _cursorGen++;
+  const _myGen=_cursorGen;
   _cursorTrailType=type;
   if(_cursorCanvas){_cursorCanvas.remove();_cursorCanvas=null;_cursorCtx=null;}
   _cursorParticles=[];_cursorSmear=[];_cursorRainbowHue=0;
@@ -9276,7 +9278,7 @@ function applyCursorTrail(type){
 
   // ── RENDER LOOP ───────────────────────────────────
   (function loop(){
-    if(!_cursorCanvas) return;
+    if(_cursorGen!==_myGen||!_cursorCanvas) return; // old loop: self-terminate
     const cx=_cursorCtx;
     cx.clearRect(0,0,_cursorCanvas.width,_cursorCanvas.height);
     const now=Date.now();
