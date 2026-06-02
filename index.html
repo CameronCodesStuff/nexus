@@ -6656,6 +6656,8 @@ function renderAnnouncePanel(){
     <div class="settings-label">── FULLSCREEN POPUP ──</div>
     <input class="modal-input" id="popup-title-input" placeholder="Popup title (e.g. IMPORTANT UPDATE)" style="margin-bottom:8px;">
     <textarea class="modal-input" id="popup-text-input" placeholder="Popup message text…" rows="4" style="margin-bottom:10px;resize:vertical;font-family:var(--font-mono);font-size:12px;"></textarea>
+    <input class="modal-input" id="popup-link-url-input" placeholder="Link URL (optional) — e.g. https://example.com" style="margin-bottom:6px;">
+    <input class="modal-input" id="popup-link-label-input" placeholder="Link button label (optional) — e.g. READ MORE" style="margin-bottom:10px;">
     <div class="settings-label">WAIT TIME BEFORE CONTINUE</div>
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--font-mono);cursor:pointer;"><input type="radio" name="popup-wait" value="0" checked> Instant</label>
@@ -7327,12 +7329,15 @@ async function adminSendPopup(){
   const title=document.getElementById('popup-title-input')?.value.trim()||'';
   const text=document.getElementById('popup-text-input')?.value.trim()||'';
   if(!text){toast('Enter popup message text.','danger');return;}
+  const linkUrl=(document.getElementById('popup-link-url-input')?.value.trim()||'');
+  const linkLabel=(document.getElementById('popup-link-label-input')?.value.trim()||'');
   const wait=parseInt(document.querySelector('input[name="popup-wait"]:checked')?.value||'0');
   const freq=document.querySelector('input[name="popup-freq"]:checked')?.value||'once';
   // Store in Firestore config/popup
   try{
     await setDoc(doc(db,'config','popup'),{
       active:true, title, text, wait, freq,
+      linkUrl: linkUrl||null, linkLabel: linkLabel||null,
       id: Date.now().toString(), // unique id so "once" tracking works
       createdAt: serverTimestamp()
     });
@@ -7382,6 +7387,18 @@ function showPopupAnnounce(d){
   if(!overlay) return;
   document.getElementById('popup-title').textContent=d.title||'ANNOUNCEMENT';
   document.getElementById('popup-text').textContent=d.text||'';
+  // Link button
+  const _linkWrap=document.getElementById('popup-link-wrap');
+  const _linkBtn=document.getElementById('popup-link-btn');
+  if(_linkWrap&&_linkBtn){
+    if(d.linkUrl){
+      _linkBtn.href=d.linkUrl;
+      _linkBtn.textContent=d.linkLabel||'OPEN LINK';
+      _linkWrap.style.display='block';
+    } else {
+      _linkWrap.style.display='none';
+    }
+  }
   overlay.style.display='flex';
   const btn=document.getElementById('popup-continue-btn');
   const countdown=document.getElementById('popup-countdown');
@@ -13597,6 +13614,9 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
   <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:520px;width:100%;position:relative;box-shadow:0 0 60px rgba(0,0,0,0.8);">
     <div id="popup-title" style="font-family:var(--font-display);font-size:16px;letter-spacing:3px;color:var(--accent);margin-bottom:16px;text-align:center;"></div>
     <div id="popup-text" style="font-family:var(--font-mono);font-size:13px;color:var(--text);line-height:1.7;text-align:center;margin-bottom:24px;white-space:pre-wrap;"></div>
+    <div id="popup-link-wrap" style="display:none;text-align:center;margin-bottom:16px;">
+      <a id="popup-link-btn" href="#" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:var(--bg3);border:1px solid var(--accent);color:var(--accent);font-family:var(--font-display);font-size:11px;letter-spacing:2px;padding:10px 24px;border-radius:8px;text-decoration:none;transition:background 0.15s;" onmouseover="this.style.background='rgba(68,102,255,0.15)'" onmouseout="this.style.background='var(--bg3)'"></a>
+    </div>
     <div style="text-align:center;">
       <button id="popup-continue-btn" onclick="N.closePopupAnnounce()" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:var(--font-display);font-size:12px;letter-spacing:3px;padding:12px 32px;border-radius:8px;cursor:pointer;transition:opacity 0.15s;" disabled>
         <span id="popup-countdown"></span>
