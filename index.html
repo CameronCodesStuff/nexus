@@ -8505,7 +8505,12 @@ async function markDailyChallengeDone(challengeId){
   // Called from various actions (send msg, react, etc.)
   if(!cu||!cud) return;
   const today=getDailyKey();
-  if((cud.dailyChallengeDay||'')!==today) return; // day not initialised yet
+  // If dailyChallengeDay is stale, reset done list for today
+  if((cud.dailyChallengeDay||'')!==today){
+    cud={...cud,dailyChallengesDone:[],dailyChallengeDay:today};
+    uCache[cu.uid]={...uCache[cu.uid],dailyChallengesDone:[],dailyChallengeDay:today};
+    updateDoc(doc(db,'users',cu.uid),{dailyChallengesDone:[],dailyChallengeDay:today}).catch(()=>{});
+  }
   const done=Array.isArray(cud.dailyChallengesDone)?[...cud.dailyChallengesDone]:[];
   if(done.includes(challengeId)) return;
   done.push(challengeId);
