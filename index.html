@@ -8744,13 +8744,10 @@ async function followUser(uid){
     await updateDoc(myRef,{following:myFollowing});
     cud={...cud,following:myFollowing};
     uCache[cu.uid]={...uCache[cu.uid],following:myFollowing};
-    // Increment their follower count
-    const theirData=(await getDoc(theirRef).catch(()=>null))?.data()||{};
-    const fc=(theirData.followerCount||0)+1;
-    await updateDoc(theirRef,{followerCount:fc}).catch(()=>{});
-    if(uCache[uid]) uCache[uid].followerCount=fc;
-    // Check popular for the person being followed (if it's us on another device, cud won't update)
-    if(uid===cu.uid){cud={...cud,followerCount:fc};if(fc>=25)unlockAch('popular');}
+    // Increment their follower count atomically
+    await updateDoc(theirRef,{followerCount:increment(1)}).catch(()=>{});
+    const _newFc=(uCache[uid]?.followerCount||0)+1;
+    if(uCache[uid]) uCache[uid].followerCount=_newFc;
     // Nexus Fan: following the owner
     if(Array.isArray(cud?.following)&&cud.following.includes(uid)){
       // Check if the followed user is the owner
@@ -8769,10 +8766,9 @@ async function unfollowUser(uid){
     await updateDoc(doc(db,'users',cu.uid),{following:myFollowing});
     cud={...cud,following:myFollowing};
     uCache[cu.uid]={...uCache[cu.uid],following:myFollowing};
-    const theirData=(await getDoc(doc(db,'users',uid)).catch(()=>null))?.data()||{};
-    const fc=Math.max(0,(theirData.followerCount||1)-1);
-    await updateDoc(doc(db,'users',uid),{followerCount:fc}).catch(()=>{});
-    if(uCache[uid]) uCache[uid].followerCount=fc;
+    await updateDoc(doc(db,'users',uid),{followerCount:increment(-1)}).catch(()=>{});
+    const _newFcU=Math.max(0,(uCache[uid]?.followerCount||1)-1);
+    if(uCache[uid]) uCache[uid].followerCount=_newFcU;
     toast('Unfollowed','success');
     openProfileModal(uid);
   }catch(e){toast('Failed: '+e.message,'danger');}
