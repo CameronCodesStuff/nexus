@@ -6367,7 +6367,7 @@ function openProfileModal(uid){
             if(days<7) return days+'d ago';
             return _fmtDate(ms);
           };
-          const _lastStr=u.online?'<span style="color:var(--success);">Online now</span>':_fmtAgo(_lastMs);
+          const _lastStr=isOnline(u)?'<span style="color:var(--success);">Online now</span>':_fmtAgo(_lastMs);
           const _rowStyle='display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);';
           const _labelStyle='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);';
           const _valStyle='font-size:11px;font-family:var(--font-mono);color:var(--text);font-weight:600;';
@@ -9489,10 +9489,8 @@ async function followUser(uid){
     await updateDoc(myRef,{following:myFollowing});
     cud={...cud,following:myFollowing};
     uCache[cu.uid]={...uCache[cu.uid],following:myFollowing};
-    // Increment their follower count atomically
+    // Increment their follower count atomically — let onSnapshot update uCache
     await updateDoc(theirRef,{followerCount:increment(1)}).catch(()=>{});
-    const _newFc=(uCache[uid]?.followerCount||0)+1;
-    if(uCache[uid]) uCache[uid].followerCount=_newFc;
     // Nexus Fan: following the owner
     if(Array.isArray(cud?.following)&&cud.following.includes(uid)){
       // Check if the followed user is the owner
@@ -9502,7 +9500,7 @@ async function followUser(uid){
     }
     toast('✓ Following @'+(uCache[uid]?.username||uid),'success');
     window._followInProgress=null;
-    openProfileModal(uid); // refresh
+    setTimeout(()=>openProfileModal(uid),350); // let onSnapshot update count first
   }catch(e){window._followInProgress=null;toast('Failed: '+e.message,'danger');}
 }
 async function unfollowUser(uid){
@@ -9513,10 +9511,8 @@ async function unfollowUser(uid){
     cud={...cud,following:myFollowing};
     uCache[cu.uid]={...uCache[cu.uid],following:myFollowing};
     await updateDoc(doc(db,'users',uid),{followerCount:increment(-1)}).catch(()=>{});
-    const _newFcU=Math.max(0,(uCache[uid]?.followerCount||1)-1);
-    if(uCache[uid]) uCache[uid].followerCount=_newFcU;
     toast('Unfollowed','success');
-    openProfileModal(uid);
+    setTimeout(()=>openProfileModal(uid),350); // let onSnapshot update count first
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
 function isFollowing(uid){return Array.isArray(cud?.following)&&cud.following.includes(uid);}
