@@ -8183,7 +8183,10 @@ function renderDailyModal(){
   const el=document.getElementById('daily-modal-content');
   if(!el) return;
   const today=getDailyKey();
-  const done=Array.isArray(cud?.dailyChallengesDone)?cud.dailyChallengesDone:[];
+  // Only treat challenges as done if they were completed TODAY — stale data from
+  // previous days must be ignored regardless of what Firestore currently holds.
+  const challengeDay=cud?.dailyChallengeDay||'';
+  const done=(challengeDay===today&&Array.isArray(cud?.dailyChallengesDone))?cud.dailyChallengesDone:[];
   const streak=cud?.loginStreak||0;
   const totalDays=cud?.totalCompleteDays||0;
   const weekKey=getWeekKey();
