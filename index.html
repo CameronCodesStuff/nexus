@@ -8348,7 +8348,7 @@ async function checkLoginStreak(){
   const updates={lastLoginDay:today,loginStreak:streak,
     dailyMsgCount:0,dailyReactCount:0,dailyReplied:false,
     dailyVoice:false,dailyDmOpen:false,dailyEmojiMsg:false,dailyFileSent:false,
-    dailyChallengeDay:today};
+    dailyChallengeDay:today,dailyChallengesDone:[]};
 
   // Role grants
   const roles=Array.isArray(cud.roles)?[...cud.roles]:[];
