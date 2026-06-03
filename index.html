@@ -7206,6 +7206,13 @@ function renderAdminPanel(){
         <div class="admin-action-desc">Delete all [HELP REQUEST] messages from owner DMs.</div>
       </div>
       <button class="btn-small" style="border-color:var(--danger);color:var(--danger);" onclick="N.adminClearTickets()">CLEAR TICKETS</button>
+    </div>
+    <div class="admin-action">
+      <div class="admin-action-info">
+        <div style="font-weight:600;">Reset Everyone's Daily Challenges</div>
+        <div class="admin-action-desc">Clears dailyChallengesDone for all users so challenges refresh immediately. Use if daily reset is stuck.</div>
+      </div>
+      <button class="btn-small" style="border-color:#f0b824;color:#f0b824;" onclick="N.adminResetAllDailyChallenges()">RESET DAILIES</button>
     </div>`;
 }
 
@@ -7305,6 +7312,43 @@ async function adminClearTickets(){
     toast('Cleared '+count+' help ticket messages.','success');
     loadHelpTickets();
   }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function adminResetAllDailyChallenges(){
+  if(!confirm('Reset daily challenges for ALL users? This clears their done list so everyone gets fresh challenges today.')) return;
+  toast('Resetting daily challenges for all users…','danger');
+  try{
+    const today=getDailyKey();
+    const snap=await getDocs(collection(db,'users'));
+    let count=0;
+    const batch_size=400;
+    let ops=[];
+    for(const userDoc of snap.docs){
+      ops.push(updateDoc(userDoc.ref,{
+        dailyChallengesDone:[],
+        dailyChallengeDay:today,
+        dailyMsgCount:0,
+        dailyReactCount:0,
+        dailyReplied:false,
+        dailyVoice:false,
+        dailyDmOpen:false,
+        dailyEmojiMsg:false,
+        dailyFileSent:false
+      }));
+      count++;
+      if(ops.length>=batch_size){
+        await Promise.all(ops);
+        ops=[];
+      }
+    }
+    if(ops.length) await Promise.all(ops);
+    // Also reset own cud immediately
+    if(cu&&cud){
+      const resetFields={dailyChallengesDone:[],dailyChallengeDay:today,dailyMsgCount:0,dailyReactCount:0,dailyReplied:false,dailyVoice:false,dailyDmOpen:false,dailyEmojiMsg:false,dailyFileSent:false};
+      cud={...cud,...resetFields};uCache[cu.uid]={...uCache[cu.uid],...resetFields};
+    }
+    toast('✅ Reset daily challenges for '+count+' users.','success');
+  }catch(e){toast('Reset failed: '+e.message,'danger');}
 }
 
 // ── OWNER LEADERBOARD EDITOR ───────────────────────
@@ -13720,7 +13764,7 @@ window._N = {
   openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
-  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast,
+  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast, adminResetAllDailyChallenges,
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
   saveNote, clearNote,
