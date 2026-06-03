@@ -7046,7 +7046,10 @@ async function loadStreaksPanel(){
     html+='<div style="padding:10px 14px;background:linear-gradient(135deg,rgba(255,215,0,0.06),rgba(255,140,0,0.04));border:1px solid rgba(255,215,0,0.25);border-radius:10px;margin-bottom:14px;">'
       +'<div style="font-size:10px;font-family:var(--font-display);letter-spacing:2px;color:#ffd700;margin-bottom:8px;">👑 STREAK KING</div>'
       +'<div id="op-streak-king-info" style="font-size:12px;font-family:var(--font-mono);color:var(--text-dim);">Loading…</div>'
-      +'<button class="btn-small" style="margin-top:8px;font-size:10px;" onclick="N.opResetStreakKing()">Reset Streak King</button>'
+      +'<div style="display:flex;gap:6px;margin-top:8px;">'
+      +'<button class="btn-small" style="font-size:10px;" onclick="N.opResetStreakKing()">Reset King</button>'
+      +'<button class="btn-small primary" style="font-size:10px;" onclick="N.assignStreakKingFromLeaderboard().then(()=>{N.ownerTab(\'streaks\');}).catch(()=>{})">⟳ Recalculate Now</button>'
+      +'</div>'
       +'</div>';
 
     panel.innerHTML=html;
@@ -8470,82 +8473,76 @@ function showStreakMilestone(streak){
 }
 
 async function assignStreakKingFromLeaderboard(){
-  // Only the owner has permission to read all users — everyone else just checks their own streak
+  // Only the owner can read all users. Regular users skip — the owner's
+  // automatic interval keeps the crown accurate for everyone.
+  if(!isOwner||!cu||!cud) return;
   try{
-    if(isOwner){
-      const snap=await getDocs(collection(db,'users'));
-      const users=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>(u.loginStreak||0)>0);
-      if(!users.length) return;
-      users.sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0));
-      await checkStreakKing(users[0].loginStreak||0, users[0].id);
-    } else if(cu&&cud){
-      // Regular user: just check if they personally beat the current king
-      await checkStreakKing(cud.loginStreak||0);
-    }
-  }catch(e){/* silently ignore permission errors */}
-}
+    const snap=await getDocs(collection(db,'users'));
+    const users=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Sort by streak descending; ties broken by uid for stability
+    users.sort((a,b)=>(b.loginStreak||0)-(a.loginStreak||0)||(a.id>b.id?1:-1));
 
-async function checkStreakKing(myStreak, forceUid){
-  // forceUid: explicitly crown this uid (only supplied by assignStreakKingFromLeaderboard
-  // which has read all users and knows the true #1).
-  // Without forceUid (regular user path), we only handle dethronement of ourselves
-  // — we never self-crown, because we can't see everyone else's streak.
-  try{
+    const rightfulKingUid = users.length?(users[0].loginStreak||0)>0?users[0].id:'':'';
+    const rightfulKingStreak = rightfulKingUid?(users[0].loginStreak||0):0;
+
+    // Read current crown state
     const skRef=doc(db,'config','streakKing');
     const skDoc=await getDoc(skRef).catch(()=>null);
     const skData=skDoc?.exists?.()?skDoc.data():{};
-    const currentKingStreak=skData.streak||0;
     const currentKingUid=skData.uid||'';
-    const candidateUid=forceUid||cu?.uid;
-    const candidateStreak=myStreak||0;
-    if(!candidateUid) return;
-    // Without a forceUid, only allow this call to dethrone (not crown)
-    // so regular users can't crown themselves just by having a higher streak today.
-    if(!forceUid) {
-      // Just update the king's stored streak if they are already king and streak changed
-      if(currentKingUid===candidateUid&&candidateStreak!==currentKingStreak){
-        await setDoc(skRef,{uid:candidateUid,streak:candidateStreak,ts:serverTimestamp()},{merge:true});
-      }
+
+    // Strip streak_king from every user who shouldn't have it
+    const wrongHolders=snap.docs.filter(d=>{
+      const roles=d.data().roles||[];
+      return roles.includes('streak_king')&&d.id!==rightfulKingUid;
+    });
+    await Promise.all(wrongHolders.map(d=>{
+      const cleaned=(d.data().roles||[]).filter(r=>r!=='streak_king');
+      return updateDoc(d.ref,{roles:cleaned}).catch(()=>{});
+    }));
+    // Update local cud if we were wrongly holding it
+    if(wrongHolders.some(d=>d.id===cu.uid)&&cud){
+      const cleaned=(cud.roles||[]).filter(r=>r!=='streak_king');
+      cud={...cud,roles:cleaned};uCache[cu.uid]={...uCache[cu.uid],roles:cleaned};
+    }
+
+    if(!rightfulKingUid){
+      // Nobody has a streak — clear the config record
+      if(currentKingUid) await setDoc(skRef,{uid:'',streak:0,username:'',ts:serverTimestamp()});
       return;
     }
-    if(candidateStreak>currentKingStreak||(candidateStreak===currentKingStreak&&currentKingUid===candidateUid)){
-      await setDoc(skRef,{uid:candidateUid,streak:candidateStreak,ts:serverTimestamp()},{merge:true});
-      if(currentKingUid!==candidateUid){
-        // Crown new king in Firestore
-        const newKingRef=doc(db,'users',candidateUid);
-        const newKingSnap=await getDoc(newKingRef).catch(()=>null);
-        if(newKingSnap?.exists?.()){
-          const nRoles=Array.isArray(newKingSnap.data().roles)?[...newKingSnap.data().roles]:[];
-          if(!nRoles.includes('streak_king')){
-            nRoles.push('streak_king');
-            await updateDoc(newKingRef,{roles:nRoles}).catch(()=>{});
-          }
-        }
-        // Update local state if we are the one being crowned
-        if(candidateUid===cu?.uid&&cud){
-          const roles=Array.isArray(cud.roles)?[...cud.roles]:[];
-          if(!roles.includes('streak_king')){
-            roles.push('streak_king');
-            cud={...cud,roles};uCache[cu.uid]={...uCache[cu.uid],roles};
-            toast('👑 You are the STREAK KING!','success');
-          }
-        }
-        // Dethrone old king
-        if(currentKingUid&&currentKingUid!==candidateUid){
-          const oldRef=doc(db,'users',currentKingUid);
-          const oldSnap=await getDoc(oldRef).catch(()=>null);
-          if(oldSnap?.exists?.()){
-            const oldRoles=(oldSnap.data().roles||[]).filter(r=>r!=='streak_king');
-            await updateDoc(oldRef,{roles:oldRoles}).catch(()=>{});
-          }
-          if(currentKingUid===cu?.uid&&cud){
-            const newRoles=(cud.roles||[]).filter(r=>r!=='streak_king');
-            cud={...cud,roles:newRoles};uCache[cu.uid]={...uCache[cu.uid],roles:newRoles};
-          }
+
+    // Crown the rightful king if not already
+    const rightfulSnap=snap.docs.find(d=>d.id===rightfulKingUid);
+    if(rightfulSnap){
+      const rRoles=Array.isArray(rightfulSnap.data().roles)?[...rightfulSnap.data().roles]:[];
+      if(!rRoles.includes('streak_king')){
+        rRoles.push('streak_king');
+        await updateDoc(rightfulSnap.ref,{roles:rRoles}).catch(()=>{});
+        if(rightfulKingUid===cu.uid&&cud){
+          cud={...cud,roles:rRoles};uCache[cu.uid]={...uCache[cu.uid],roles:rRoles};
+          toast('👑 You are the STREAK KING!','success');
         }
       }
     }
-  }catch(e){console.warn('Streak King check failed',e);}
+
+    // Update config record
+    const rightfulData=rightfulSnap?.data()||{};
+    await setDoc(skRef,{
+      uid:rightfulKingUid,
+      streak:rightfulKingStreak,
+      username:rightfulData.username||rightfulData.displayName||rightfulKingUid,
+      ts:serverTimestamp()
+    }).catch(()=>{});
+
+  }catch(e){console.warn('assignStreakKingFromLeaderboard failed',e);}
+}
+
+// Kept for back-compat; login streak update calls this to refresh the crown after streak changes.
+async function checkStreakKing(myStreak, forceUid){
+  // After a login streak update, just re-run the authoritative assignment.
+  // The old per-user crowning logic was unreliable — let the full scan handle it.
+  await assignStreakKingFromLeaderboard().catch(()=>{});
 }
 
 async function markDailyChallengeDone(challengeId){
@@ -13764,7 +13761,7 @@ window._N = {
   openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
-  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast, adminResetAllDailyChallenges,
+  ownerTab, loadRolesPanel, replyToTicket, openOwnerPortal, adminWipeAllChats, adminBroadcast, adminResetAllDailyChallenges, assignStreakKingFromLeaderboard,
   adminClearTickets, adminResetMsgs, openOwnerModal,
   setStatus, toggleStatusPicker, updateMyStatusDot,
   saveNote, clearNote,
