@@ -12573,11 +12573,16 @@ function openWhackGame(){
 
 function openInkDefense(){
   setActivity('playing Ink Defense');
-  const tab=window.open('about:blank','_blank','noopener');
-  if(!tab){toast('Allow pop-ups for this site to open the game.','danger');return;}
-  tab.document.open();
-  tab.document.write(_INK_DEFENSE_HTML);
-  tab.document.close();
+  try{
+    const blob=new Blob([_INK_DEFENSE_HTML],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const tab=window.open(url,'_blank');
+    if(!tab){toast('Allow pop-ups for this site to open the game.','danger');URL.revokeObjectURL(url);return;}
+    // Revoke after a short delay to allow the tab to load
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }catch(e){
+    toast('Could not open game: '+e.message,'danger');
+  }
 }
 
 function closeWhackGame(){
