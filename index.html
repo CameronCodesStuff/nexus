@@ -3097,6 +3097,47 @@ async function enterApp(){
         assignStreakKingFromLeaderboard().catch(()=>{});
       },5*60*1000);
     }).catch(()=>{});
+    // ── GitHub Pages update detector ──────────────────────────────────────
+    (function(){
+      let _lastEtag=null;
+      let _updateShown=false;
+      async function checkForPageUpdate(){
+        if(_updateShown) return; // only nag once per session
+        try{
+          const res=await fetch(window.location.href,{method:'HEAD',cache:'no-store'});
+          const etag=res.headers.get('etag')||res.headers.get('last-modified')||'';
+          if(!etag) return;
+          if(_lastEtag===null){_lastEtag=etag;return;} // baseline
+          if(etag!==_lastEtag){
+            _updateShown=true;
+            clearInterval(window._updatePollInterval);
+            // Show persistent banner for 5s then fade
+            const banner=document.createElement('div');
+            banner.id='nexus-update-banner';
+            banner.style.cssText=[
+              'position:fixed','top:18px','left:50%','transform:translateX(-50%)',
+              'background:linear-gradient(135deg,rgba(68,102,255,0.95),rgba(0,212,255,0.9))',
+              'color:#fff','font-family:Orbitron,monospace','font-size:12px',
+              'font-weight:700','letter-spacing:2px','padding:10px 22px',
+              'border-radius:10px','border:1px solid rgba(255,255,255,0.25)',
+              'box-shadow:0 4px 24px rgba(68,102,255,0.5)','z-index:99999',
+              'cursor:pointer','text-align:center','white-space:nowrap',
+              'transition:opacity 0.6s ease'
+            ].join(';');
+            banner.textContent='🔄 Page updated — click to refresh';
+            banner.title='A new version of NEXUS is available';
+            banner.onclick=()=>window.location.reload();
+            document.body.appendChild(banner);
+            setTimeout(()=>{banner.style.opacity='0';setTimeout(()=>banner.remove(),700);},5000);
+          }
+        }catch(e){}
+      }
+      // Poll every 2 minutes
+      if(window._updatePollInterval) clearInterval(window._updatePollInterval);
+      window._updatePollInterval=setInterval(checkForPageUpdate,2*60*1000);
+      checkForPageUpdate(); // baseline check immediately
+    })();
+    // ─────────────────────────────────────────────────────────────────────
     // Ensure referral code exists — use the one already in Firestore if present,
     // only generate a new one if the user genuinely doesn't have one yet.
     (async()=>{
@@ -11679,7 +11720,7 @@ function endGame(){
   setTimeout(()=>{
     const isNewBest=score>best;if(isNewBest)best=score;bestVal.textContent=best;
     // Report score to parent (Nexus)
-    try{window.parent.postMessage({type:'whackScore',score:best},'*');}catch(e){}
+    try{(window.opener&&!window.opener.closed?window.opener:window.parent).postMessage({type:'whackScore',score:best},'*');}catch(e){}
     document.getElementById('overlay-title').textContent=score>=300?'LEGENDARY!':score>=150?'GREAT WORK!':'GAME OVER';
     document.getElementById('overlay-sub').textContent='READY FOR ANOTHER ROUND?';
     document.getElementById('final-score-wrap').style.display='block';
@@ -12605,13 +12646,14 @@ function closeDriveGame(){
 
 function openWhackGame(){
   setActivity('playing Whack-A-Mole');
-  const overlay=document.getElementById('whack-game-overlay');
-  if(!overlay) return;
-  overlay.style.display='flex';
-  const iframe=document.getElementById('whack-game-iframe');
-  if(iframe&&!iframe._loaded){
-    iframe._loaded=true;
-    iframe.srcdoc=_WHACK_SRCDOC||'';
+  try{
+    const blob=new Blob([_WHACK_SRCDOC],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const tab=window.open(url,'_blank');
+    if(!tab){toast('Allow pop-ups for this site to open the game.','danger');URL.revokeObjectURL(url);return;}
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }catch(e){
+    toast('Could not open game: '+e.message,'danger');
   }
 }
 
@@ -12630,10 +12672,7 @@ function openInkDefense(){
 }
 
 function closeWhackGame(){
-  const overlay=document.getElementById('whack-game-overlay');
-  if(overlay) overlay.style.display='none';
-  const iframe=document.getElementById('whack-game-iframe');
-  if(iframe){iframe._loaded=false;iframe.srcdoc='';}
+  // Game now runs in its own tab — nothing to close from here
 }
 
 // Listen for score from Whack-A-Mole
@@ -14320,14 +14359,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
   </iframe>
 </div>
 
-<!-- Whack-A-Mole Overlay -->
-<div id="whack-game-overlay" style="display:none;position:fixed;inset:0;background:#050818;z-index:9999;flex-direction:column;align-items:center;justify-content:center;">
-  <button onclick="N.closeWhackGame()" style="position:absolute;top:16px;right:20px;background:rgba(255,230,0,0.15);border:1px solid rgba(255,230,0,0.4);color:#FFE600;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:bold;z-index:10000;">✕ CLOSE</button>
-  <iframe id="whack-game-iframe"
-    style="width:100vw;height:100vh;border:none;display:block;"
-    sandbox="allow-scripts allow-same-origin">
-  </iframe>
-</div>
+<!-- Whack-A-Mole: now opens in new tab -->
 
 <!-- Longest Game Ever Overlay -->
 <div id="longest-game-overlay" style="display:none;position:fixed;inset:0;background:#06080f;z-index:9999;flex-direction:column;">
