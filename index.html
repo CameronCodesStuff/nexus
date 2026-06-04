@@ -12882,7 +12882,7 @@ function renderCommunityGames(filter){
     likeBtn.style.cssText='background:none;border:1px solid '+(isLiked?'#e74c3c':'var(--border)')+';color:'+(isLiked?'#e74c3c':'var(--text-dim)')+';font-size:12px;padding:4px 10px;border-radius:5px;cursor:pointer;transition:all 0.15s;';
     likeBtn.textContent='♥ '+likeCount;
     likeBtn.title=isLiked?'Unlike':'Like';
-    likeBtn.onclick=function(){toggleCommunityLike(g.id);};
+    likeBtn.onclick=function(){toggleCommunityLike(g.id,likeBtn);};
 
     actions.appendChild(playBtn);
     actions.appendChild(favBtn);
@@ -12919,23 +12919,29 @@ async function toggleCommunityFav(id){
   renderCommunityGames();
 }
 
-async function toggleCommunityLike(id){
+async function toggleCommunityLike(id,btn){
   if(!cu||!cud) return;
   const likes={...(cud.likedGames||{})};
   const wasLiked=likes[id]===true;
-  likes[id]=!wasLiked;
+  const nowLiked=!wasLiked;
+  likes[id]=nowLiked;
   cud={...cud,likedGames:likes};
   uCache[cu.uid]={...uCache[cu.uid],likedGames:likes};
+  // Update the button immediately so count feels instant
+  const g=COMMUNITY_GAMES.find(x=>x.id===id);
+  if(g) g.globalLikes=Math.max(0,(g.globalLikes||0)+(wasLiked?-1:1));
+  if(btn){
+    btn.textContent='♥ '+(g?g.globalLikes:0);
+    btn.style.borderColor=nowLiked?'#e74c3c':'var(--border)';
+    btn.style.color=nowLiked?'#e74c3c':'var(--text-dim)';
+    btn.title=nowLiked?'Unlike':'Like';
+  }
   await updateDoc(doc(db,'users',cu.uid),{likedGames:likes}).catch(()=>{});
-  // Update global like count in a dedicated Firestore doc
+  // Update global like count in Firestore
   try{
     const gRef=doc(db,'communityGameStats',id);
     await setDoc(gRef,{likes:increment(wasLiked?-1:1)},{merge:true});
-    // Update local registry count for re-render
-    const g=COMMUNITY_GAMES.find(x=>x.id===id);
-    if(g) g.globalLikes=Math.max(0,(g.globalLikes||0)+(wasLiked?-1:1));
   }catch(e){}
-  renderCommunityGames();
 }
 
 async function loadCommunityGameStats(){
