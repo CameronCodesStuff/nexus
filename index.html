@@ -6625,6 +6625,38 @@ async function openCreditsModal(){
     </div>`;
 }
 
+// ── COMMUNITY CREATOR CARD ──────────────────────
+async function makeCommunityCreatorCard(username){
+  // Reuse the same lookup logic as credits makeCard
+  let u=Object.values(uCache).find(x=>(x.username||'').toLowerCase()===username.toLowerCase());
+  let uid=u?._id||(Object.entries(uCache).find(([,v])=>(v.username||'').toLowerCase()===username.toLowerCase())||[])[0];
+  if(!u||!uid){
+    try{
+      const s=await getDocs(query(collection(db,'users'),where('username','==',username.toLowerCase())));
+      if(!s.empty){uid=s.docs[0].id;u=s.docs[0].data();u._id=uid;uCache[uid]=u;}
+    }catch{}
+  }
+  const nm=u?.displayName||username;
+  const rank=getRank(u?.msgCount||0);
+  const fontStyle=uid?getUserFontStyle(uid):'';
+  const roleBadgesHtml=uid?getRoleBadge(uid):'';
+  const emoji=uid?userEmoji(uid):'👤';
+  const picHtml=u?.profilePic?`<img src="${esc(u.profilePic)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.style.display='none'">`:`<span style="font-size:20px;">${emoji}</span>`;
+
+  const card=document.createElement('div');
+  card.className='credits-card';
+  card.style.cssText='cursor:pointer;margin-bottom:0;';
+  if(uid) card.onclick=()=>openProfileModal(uid);
+  card.innerHTML=`
+    <div class="credits-avatar" style="overflow:hidden;padding:0;font-size:22px;">${picHtml}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="credits-name ${rank.c}" style="${fontStyle};-webkit-text-fill-color:unset;">${esc(nm)}</div>
+      ${roleBadgesHtml?`<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px;">${roleBadgesHtml}</div>`:''}
+      <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">@${esc(username.toLowerCase())} · ${u?.msgCount||0} msgs · ${rank.l}</div>
+    </div>`;
+  return card;
+}
+
 // ── HELP ────────────────────────────────────────
 async function sendHelp(){
   const msg=($('help-input')?.value||'').trim();
@@ -12793,19 +12825,37 @@ function renderCommunityGames(filter){
     titleRow.appendChild(tagEl);
     info.appendChild(titleRow);
 
-    // Creators
-    const creatorsEl=document.createElement('div');
-    creatorsEl.style.cssText='font-size:10px;color:var(--text-dim);margin-top:3px;font-family:var(--font-mono);';
-    creatorsEl.textContent='by ';
-    g.creators.forEach(function(c,ci){
-      const cspan=document.createElement('span');
-      cspan.style.cssText='color:var(--accent);cursor:pointer;';
-      cspan.textContent='@'+c;
-      cspan.onclick=function(){openProfileByUsername(c);};
-      creatorsEl.appendChild(cspan);
-      if(ci<g.creators.length-1) creatorsEl.appendChild(document.createTextNode(', '));
-    });
-    info.appendChild(creatorsEl);
+    // Creators label
+    const creatorsLabel=document.createElement('div');
+    creatorsLabel.style.cssText='font-size:9px;color:var(--text-dim);margin-top:6px;font-family:var(--font-mono);letter-spacing:2px;text-transform:uppercase;';
+    creatorsLabel.textContent='Created by';
+    info.appendChild(creatorsLabel);
+
+    // Creator cards container — filled async
+    const creatorsCards=document.createElement('div');
+    creatorsCards.style.cssText='margin-top:6px;display:flex;flex-direction:column;gap:6px;';
+    info.appendChild(creatorsCards);
+    // Placeholder while loading
+    const loadingSpan=document.createElement('div');
+    loadingSpan.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);padding:4px 0;';
+    loadingSpan.textContent='Loading…';
+    creatorsCards.appendChild(loadingSpan);
+    // Async load creator cards
+    (function(creators, container){
+      Promise.all(creators.map(function(c){ return makeCommunityCreatorCard(c); }))
+        .then(function(cards){
+          container.innerHTML='';
+          cards.forEach(function(c){ container.appendChild(c); });
+        }).catch(function(){
+          container.innerHTML='';
+          creators.forEach(function(c){
+            const fb=document.createElement('div');
+            fb.style.cssText='font-size:10px;color:var(--accent);font-family:var(--font-mono);';
+            fb.textContent='@'+c;
+            container.appendChild(fb);
+          });
+        });
+    })(g.creators, creatorsCards);
 
     // Description
     const descEl=document.createElement('div');
