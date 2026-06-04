@@ -11234,6 +11234,8 @@ function normalMoleSVG(){
   <path d="M72 112 Q74 125 72 128" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
   <path d="M82 108 Q86 120 84 124" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
 </svg>\`;
+
+const _BUTTON_MASH_HTML = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>THE BUTTON</title>\n<style>\n*{margin:0;padding:0;box-sizing:border-box}\nhtml,body{width:100%;height:100%;overflow:hidden;background:#0a0005;font-family:'Segoe UI',Arial,sans-serif;user-select:none;cursor:default}\n#bg{position:fixed;inset:0;z-index:0}\n#ui{position:fixed;inset:0;z-index:10;pointer-events:none}\n#counter-wrap{position:absolute;top:22px;left:50%;transform:translateX(-50%);text-align:center}\n#counter{font-size:42px;font-weight:900;color:#fff;letter-spacing:3px;font-family:monospace;text-shadow:0 0 30px rgba(255,30,60,0.7)}\n#counter-label{font-size:10px;letter-spacing:5px;color:rgba(255,255,255,0.35);margin-top:2px;font-family:monospace}\n#progress-bar-wrap{position:absolute;top:96px;left:50%;transform:translateX(-50%);width:280px}\n#progress-bar-bg{width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden}\n#progress-bar-fill{height:100%;width:0%;background:linear-gradient(90deg,#ff1a3c,#ff6644);border-radius:3px;transition:width 0.1s linear;box-shadow:0 0 8px rgba(255,26,60,0.6)}\n#progress-pct{font-size:9px;font-family:monospace;color:rgba(255,255,255,0.25);letter-spacing:3px;text-align:center;margin-top:5px}\n#speed-wrap{position:absolute;top:130px;left:50%;transform:translateX(-50%);text-align:center}\n#speed{font-size:10px;font-family:monospace;color:rgba(255,255,255,0.2);letter-spacing:2px}\n#warning{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-size:13px;font-family:monospace;letter-spacing:3px;color:#ff3355;opacity:0;pointer-events:none;transition:opacity 0.3s;text-shadow:0 0 12px rgba(255,51,85,0.8)}\n#btn-wrap{position:absolute;pointer-events:auto;transition:none}\n#btn{width:110px;height:110px;border-radius:50%;background:radial-gradient(circle at 38% 35%,#ff5555,#cc0022,#880011);border:3px solid rgba(255,80,80,0.5);box-shadow:0 0 30px rgba(255,30,60,0.5),0 4px 20px rgba(0,0,0,0.8),inset 0 2px 4px rgba(255,150,150,0.2);cursor:pointer;transition:transform 0.07s,box-shadow 0.07s;position:relative;pointer-events:auto}\n#btn::after{content:'';position:absolute;top:18%;left:25%;width:35%;height:25%;background:rgba(255,200,200,0.18);border-radius:50%;filter:blur(4px)}\n#btn:active{transform:scale(0.91);box-shadow:0 0 16px rgba(255,30,60,0.5),0 2px 8px rgba(0,0,0,0.8)}\n#btn.punish{animation:shake 0.18s ease;border-color:rgba(255,255,100,0.8);box-shadow:0 0 40px rgba(255,200,0,0.8),0 4px 20px rgba(0,0,0,0.8)}\n@keyframes shake{0%{transform:rotate(-6deg) scale(1.05)}25%{transform:rotate(6deg) scale(1.05)}50%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}100%{transform:rotate(0deg) scale(1)}}\n#complete-overlay{display:none;position:fixed;inset:0;background:rgba(5,0,10,0.95);z-index:999;align-items:center;justify-content:center;flex-direction:column;gap:18px;text-align:center;padding:30px}\n#complete-overlay.show{display:flex}\n.co-title{font-size:52px;font-weight:900;letter-spacing:8px;background:linear-gradient(135deg,#ffb300,#ff6600,#ffcc44);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}\n.co-sub{font-size:12px;letter-spacing:6px;color:rgba(255,200,100,0.5);font-family:monospace}\n.co-role{background:linear-gradient(135deg,#1a0e00,#3d2200);color:#ffb300;border:1px solid #cc8800;font-size:11px;font-family:monospace;letter-spacing:3px;padding:8px 22px;border-radius:6px;display:inline-block;margin:4px 0;animation:dedicated-glow 2s ease infinite}\n@keyframes dedicated-glow{0%,100%{box-shadow:0 0 6px rgba(255,180,0,0.6)}50%{box-shadow:0 0 20px rgba(255,200,0,1),0 0 40px rgba(255,160,0,0.4)}}\n.co-desc{font-size:13px;color:rgba(255,255,255,0.45);font-family:monospace;line-height:1.8;max-width:380px}\n.co-close{background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);color:#ffb300;font-family:monospace;font-size:11px;letter-spacing:3px;padding:10px 28px;cursor:pointer;border-radius:6px;transition:all 0.2s;margin-top:8px}\n.co-close:hover{background:rgba(255,180,0,0.25)}\n.star{position:absolute;border-radius:50%;background:#fff}\n</style>\n</head>\n<body>\n<div id=\"bg\"></div>\n<div id=\"ui\">\n  <div id=\"counter-wrap\">\n    <div id=\"counter\">0</div>\n    <div id=\"counter-label\">/ 10,000 CLICKS</div>\n  </div>\n  <div id=\"progress-bar-wrap\">\n    <div id=\"progress-bar-bg\"><div id=\"progress-bar-fill\"></div></div>\n    <div id=\"progress-pct\">0.00%</div>\n  </div>\n  <div id=\"speed-wrap\"><div id=\"speed\">CPS: 0.0</div></div>\n  <div id=\"warning\">&#9888; AUTOCLICKER DETECTED &#9888;</div>\n</div>\n<div id=\"btn-wrap\"><button id=\"btn\"></button></div>\n<div id=\"complete-overlay\">\n  <div class=\"co-title\">DEDICATED</div>\n  <div class=\"co-sub\">10,000 CLICKS ACHIEVED</div>\n  <div class=\"co-role\">&#x1F4AB; DEDICATED</div>\n  <div class=\"co-desc\">You actually did it.<br>10,000 clicks. Every single one.<br>The <strong style=\"color:#ffb300\">DEDICATED</strong> role is yours.</div>\n  <button class=\"co-close\" onclick=\"closeGame()\">CLOSE</button>\n</div>\n<script>\nvar TARGET=10000;\nvar THRESHOLD=18;\nvar CPS_WIN=800;\nvar clicks=0,done=false,btnX=0,btnY=0,moveTimeout=null,clickTimes=[],punishActive=false;\nvar btn=document.getElementById('btn');\nvar btnWrap=document.getElementById('btn-wrap');\nvar counter=document.getElementById('counter');\nvar fill=document.getElementById('progress-bar-fill');\nvar pct=document.getElementById('progress-pct');\nvar speedEl=document.getElementById('speed');\nvar warning=document.getElementById('warning');\nvar overlay=document.getElementById('complete-overlay');\nvar bg=document.getElementById('bg');\n\n(function(){\n  for(var i=0;i<120;i++){\n    var s=document.createElement('div');\n    s.className='star';\n    var size=Math.random()*2+0.5;\n    var a1=0.05+Math.random()*0.15;\n    var a2=0.3+Math.random()*0.5;\n    var dur=(2+Math.random()*5).toFixed(1)+'s';\n    var delay=(-Math.random()*5).toFixed(1)+'s';\n    s.style.width=size+'px';\n    s.style.height=size+'px';\n    s.style.left=Math.random()*100+'%';\n    s.style.top=Math.random()*100+'%';\n    s.style.opacity=a1;\n    s.style.animation='none';\n    (function(el,_a1,_a2,_dur,_delay){\n      var start=null;\n      function tick(ts){\n        if(!start) start=ts;\n        var elapsed=(ts-start)/1000;\n        var cycle=parseFloat(_dur);\n        var t=((elapsed-parseFloat(_delay))%cycle+cycle)%cycle/cycle;\n        var alpha=_a1+(_a2-_a1)*Math.abs(Math.sin(t*Math.PI));\n        el.style.opacity=alpha;\n        requestAnimationFrame(tick);\n      }\n      setTimeout(function(){requestAnimationFrame(tick);},Math.max(0,parseFloat(_delay)*-1000));\n    })(s,a1,a2,dur,delay);\n    bg.appendChild(s);\n  }\n})();\n\nfunction clampPos(x,y){\n  var s=110;\n  return [Math.max(0,Math.min(x,window.innerWidth-s)),Math.max(90,Math.min(y,window.innerHeight-s-10))];\n}\nfunction placeBtn(x,y,animate){\n  var c=clampPos(x,y);btnX=c[0];btnY=c[1];\n  btnWrap.style.transition=animate?'left 0.55s cubic-bezier(0.22,1,0.36,1),top 0.55s cubic-bezier(0.22,1,0.36,1)':'none';\n  btnWrap.style.left=btnX+'px';\n  btnWrap.style.top=btnY+'px';\n}\nfunction initPos(){\n  placeBtn((window.innerWidth-110)/2,(window.innerHeight-110)/2,false);\n}\nfunction moveButton(){\n  if(done)return;\n  var s=110,pad=20;\n  var progress=clicks/TARGET;\n  var spread=0.3+progress*0.7;\n  var cx=(window.innerWidth-s)/2,cy=(window.innerHeight-s)/2;\n  var rx=(window.innerWidth-s-2*pad)/2*spread;\n  var ry=(window.innerHeight-s-90-2*pad)/2*spread;\n  var x=cx+(Math.random()*2-1)*rx;\n  var y=cy+(Math.random()*2-1)*ry;\n  placeBtn(x,y,true);\n}\nfunction getMoveInterval(){\n  var p=clicks/TARGET;\n  if(p<0.05)return 8000;if(p<0.15)return 4000;if(p<0.30)return 2500;\n  if(p<0.50)return 1600;if(p<0.70)return 1000;if(p<0.85)return 650;\n  if(p<0.95)return 400;return 260;\n}\nfunction scheduleMoveTimeout(){\n  if(moveTimeout)clearTimeout(moveTimeout);\n  moveTimeout=setTimeout(function(){moveButton();scheduleMoveTimeout();},getMoveInterval());\n}\nfunction getRecentCPS(){\n  var now=Date.now();\n  clickTimes=clickTimes.filter(function(t){return now-t<CPS_WIN;});\n  return clickTimes.length/(CPS_WIN/1000);\n}\nfunction punish(){\n  if(punishActive)return;punishActive=true;\n  var penalty=Math.min(clicks,200+Math.floor(Math.random()*150));\n  clicks=Math.max(0,clicks-penalty);\n  warning.style.opacity='1';\n  btn.classList.add('punish');\n  moveButton();\n  setTimeout(function(){warning.style.opacity='0';},1800);\n  setTimeout(function(){btn.classList.remove('punish');punishActive=false;},220);\n  updateUI();\n}\nfunction updateUI(){\n  counter.textContent=clicks.toLocaleString();\n  var p=Math.min(100,(clicks/TARGET)*100);\n  fill.style.width=p+'%';\n  pct.textContent=p.toFixed(2)+'%';\n  var g=Math.round(30+p*1.5);\n  counter.style.textShadow='0 0 30px rgba(255,'+g+',60,'+(0.4+p*0.005)+')';\n  if(p>80){fill.style.background='linear-gradient(90deg,#ff9900,#ffcc00)';}\n  else if(p>50){fill.style.background='linear-gradient(90deg,#ff3300,#ff7700)';}\n  else{fill.style.background='linear-gradient(90deg,#ff1a3c,#ff6644)';}\n}\nsetInterval(function(){\n  var cps=getRecentCPS();\n  speedEl.textContent='CPS: '+cps.toFixed(1);\n  if(cps>=THRESHOLD&&!done)punish();\n},150);\nbtn.addEventListener('click',function(e){\n  if(done)return;\n  e.preventDefault();\n  var now=Date.now();\n  clickTimes.push(now);\n  if(getRecentCPS()>=THRESHOLD){punish();return;}\n  clicks++;\n  updateUI();\n  if(clicks>1){\n    var jitter=12+Math.min(50,(clicks/TARGET)*80);\n    var c=clampPos(btnX+(Math.random()*2-1)*jitter,btnY+(Math.random()*2-1)*jitter);\n    btnWrap.style.transition='left 0.12s ease,top 0.12s ease';\n    btnX=c[0];btnY=c[1];\n    btnWrap.style.left=c[0]+'px';btnWrap.style.top=c[1]+'px';\n  }\n  if(clicks>=TARGET){done=true;if(moveTimeout)clearTimeout(moveTimeout);setTimeout(complete,400);}\n});\nfunction complete(){\n  overlay.classList.add('show');\n  try{var t=window.opener&&!window.opener.closed?window.opener:null;if(t)t.postMessage({type:'buttonMashComplete'},'*');}catch(e){}\n}\nfunction closeGame(){window.close();}\nwindow.addEventListener('keydown',function(e){if(e.code==='Space'||e.code==='Enter'||e.code==='NumpadEnter')e.preventDefault();});\ndocument.addEventListener('contextmenu',function(e){e.preventDefault();});\nwindow.addEventListener('resize',function(){var c=clampPos(btnX,btnY);placeBtn(c[0],c[1],false);});\ninitPos();\nscheduleMoveTimeout();\nupdateUI();\n<\/script>\n</body>\n</html>";
 }
 
 function goldMoleSVG(){
@@ -12667,6 +12669,19 @@ function openInkDefense(){
   }
 }
 
+function openButtonMashGame(){
+  setActivity('playing The Button');
+  try{
+    const blob=new Blob([_BUTTON_MASH_HTML],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const tab=window.open(url,'_blank');
+    if(!tab){toast('Allow pop-ups for this site to open the game.','danger');URL.revokeObjectURL(url);return;}
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }catch(e){
+    toast('Could not open game: '+e.message,'danger');
+  }
+}
+
 function closeWhackGame(){
   // Game now runs in its own tab — nothing to close from here
 }
@@ -13678,6 +13693,27 @@ window.addEventListener('message',async function(e){
       cud={...cud,nexusGameSave:_updates.nexusGameSave};
     }catch{}
   }
+  if(e.data&&e.data.type==='buttonMashComplete'){
+    if(cu&&cud&&!cud?._impersonated){
+      (async()=>{
+        try{
+          const curRoles=Array.isArray(cud?.roles)?cud.roles:(cud?.role?[cud.role]:[]);
+          if(!curRoles.includes('dedicated')){
+            const newRoles=[...curRoles,'dedicated'];
+            await updateDoc(doc(db,'users',cu.uid),{roles:newRoles,role:newRoles[0]});
+            cud={...cud,roles:newRoles,role:newRoles[0]};
+            uCache[cu.uid]={...uCache[cu.uid],roles:newRoles,role:newRoles[0]};
+            toast('💫 DEDICATED role unlocked! 10,000 clicks achieved!','success');
+            renderProfile&&renderProfile();
+            renderSidebar&&renderSidebar();
+          } else {
+            toast('💫 10,000 clicks! (You already have DEDICATED)','success');
+          }
+        }catch(e){toast('Role save failed: '+e.message,'danger');}
+      })();
+    }
+    return;
+  }
   if(e.data.type==='inkDefenseScore'){
     const inkWave=e.data.wave||0;
     if(cu&&cud&&!cud?._impersonated){
@@ -13809,7 +13845,7 @@ window._N = {
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
   openWhackGame, closeWhackGame,
-  openInkDefense,
+  openInkDefense, openButtonMashGame,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
   toggleNotifications, updateNotifSettingsUI,
@@ -14097,6 +14133,11 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
         <span style="font-size:16px;width:22px;text-align:center;">🏯</span>
         <span style="flex:1;">垒守 Ink Defense</span>
         <span style="font-size:9px;font-family:var(--font-mono);color:#c9930a;letter-spacing:1px;">TOWER DEF</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openButtonMashGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🔴</span>
+        <span style="flex:1;">The Button</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#ff3355;letter-spacing:1px;">DEDICATED</span>
       </button>
 
     </div>
