@@ -3040,6 +3040,39 @@ function listenForInboxChanges(){
   });
 }
 
+// Watch for invites the current user SENT that have been accepted,
+// then add the acceptee to the chat (inviter has write permission).
+let _acceptedInviteUnsub=null;
+function listenForAcceptedInvites(){
+  if(_acceptedInviteUnsub) _acceptedInviteUnsub();
+  if(!cu) return;
+  const q=query(collection(db,'invites'),where('fromUid','==',cu.uid),where('status','==','accepted'));
+  _acceptedInviteUnsub=onSnapshot(q,async snap=>{
+    for(const ch of snap.docChanges()){
+      if(ch.type!=='added'&&ch.type!=='modified') continue;
+      const inv=ch.doc.data();
+      const invId=ch.doc.id;
+      const acceptedUid=inv.acceptedBy||inv.toUid;
+      const chatId=inv.chatId;
+      if(!acceptedUid||!chatId) continue;
+      try{
+        await updateDoc(doc(db,'chats',chatId),{members:arrayUnion(acceptedUid)});
+        await deleteDoc(doc(db,'invites',invId));
+        try{
+          const acceptedUser=uCache[acceptedUid];
+          const name=acceptedUser?.displayName||inv.toName||'Someone';
+          await addDoc(collection(db,'chats',chatId,'messages'),{
+            senderUid:'system',senderName:'system',
+            text:'👋 '+name+' joined the group.',
+            ts:serverTimestamp(),type:'system',reactions:{}
+          });
+          await updateDoc(doc(db,'chats',chatId),{lastMessage:'👋 '+name+' joined',lastTs:serverTimestamp()});
+        }catch(_){}
+      }catch(_){}
+    }
+  });
+}
+
 function updateInboxBadge(){
   const badge=$('inbox-badge');
   const icon=$('inbox-icon');
@@ -3087,6 +3120,7 @@ async function enterApp(){
     setupPresence();
     listenForIncomingCalls();
     listenForInboxChanges();
+    listenForAcceptedInvites();
   }
   // Auto-detect mobile if screen width is phone-sized
   if(window.innerWidth<=600&&cud?.mobileMode===undefined){
@@ -4222,42 +4256,25 @@ async function acceptInvite(iid,cid,type){
       markDailyChallengeDone('dc_dm');
       closeModal('inbox-modal');openChat(chatRef.id);toast('DM accepted!','success');
     } else {
-      // Try direct join; if rules block it, use REST API with fresh auth token
-      let _joined=false;
+      // Mark invite as accepted — the inviter's listener will add the member
+      // since they already have write permission to the chat.
+      await setDoc(doc(db,'invites',iid),{status:'accepted',acceptedAt:serverTimestamp()},{merge:true});
+      closeModal('inbox-modal');
+      toast('Group invite accepted! Joining now...','success');
+      // Also try direct join in case rules allow the invitee to self-add
       try{
         await updateDoc(doc(db,'chats',cid),{members:arrayUnion(cu.uid)});
-        _joined=true;
-      }catch(_e){
-        try{
-          const _tok=await cu.getIdToken(true);
-          const _snap=await getDoc(doc(db,'chats',cid));
-          const _mbs=(_snap.exists()?_snap.data().members:[])||[];
-          if(!_mbs.includes(cu.uid)){
-            const _newMbs=[..._mbs,cu.uid];
-            const _url='https://firestore.googleapis.com/v1/projects/'+FB.projectId+'/databases/(default)/documents/chats/'+cid;
-            const _r=await fetch(_url,{
-              method:'PATCH',
-              headers:{'Authorization':'Bearer '+_tok,'Content-Type':'application/json'},
-              body:JSON.stringify({fields:{members:{arrayValue:{values:_newMbs.map(function(m){return {stringValue:m};})}}}})});
-            if(_r.ok) _joined=true;
-          } else {_joined=true;}
-        }catch(_e2){}
-      }
-      if(_joined){
-        await deleteDoc(doc(db,'invites',iid)).catch(function(){});
+        await deleteDoc(doc(db,'invites',iid)).catch(()=>{});
         try{
           await addDoc(collection(db,'chats',cid,'messages'),{
             senderUid:'system',senderName:'system',
-            text:'👋 '+(cud&&cud.displayName||'Someone')+' joined the group.',
+            text:'👋 '+(cud?.displayName||'Someone')+' joined the group.',
             ts:serverTimestamp(),type:'system',reactions:{}
           });
-          await updateDoc(doc(db,'chats',cid),{lastMessage:'👋 '+(cud&&cud.displayName||'Someone')+' joined',lastTs:serverTimestamp()});
-        }catch(_e3){}
-        closeModal('inbox-modal');openChat(cid);toast('Joined the group!','success');
-      } else {
-        await updateDoc(doc(db,'invites',iid),{status:'accepted',acceptedBy:cu.uid}).catch(function(){});
-        closeModal('inbox-modal');
-        toast('Request sent! The group owner will add you shortly.','success');
+        }catch(_){}
+        openChat(cid);
+      }catch(_){
+        // Rules blocked direct join — inviter will process it via their listener
       }
     }
   }catch(e){toast('Error: '+e.message,'danger');}
