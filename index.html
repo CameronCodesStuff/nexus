@@ -589,7 +589,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
   /* ── ROLES ── */
   /* Ensure role badge text is always visible regardless of parent colour */
-  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one{
+  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-team-member{
     -webkit-text-fill-color:initial !important;
   }
   @keyframes number-one-shine{0%,100%{background-position:0% center;box-shadow:0 0 8px rgba(255,215,0,0.6),0 0 20px rgba(255,180,0,0.3);}50%{background-position:200% center;box-shadow:0 0 16px rgba(255,215,0,1),0 0 32px rgba(255,180,0,0.6);}}
@@ -613,6 +613,11 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   @keyframes owner-pulse{0%,100%{transform:scale(1);filter:brightness(1);}50%{transform:scale(1.08);filter:brightness(1.5);}}
   .role-owner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite,owner-pulse 2s ease infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);-webkit-text-fill-color:initial;}
 
+
+  /* ── TEAM MEMBER ROLE ── */
+  @keyframes team-shift{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
+  @keyframes team-pulse{0%,100%{transform:scale(1);box-shadow:0 0 8px rgba(0,212,255,0.6),0 0 20px rgba(68,102,255,0.4);}50%{transform:scale(1.06);box-shadow:0 0 18px rgba(0,212,255,1),0 0 36px rgba(68,102,255,0.7);}}
+  .role-team-member{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:3px;padding:3px 10px;border-radius:5px;background:linear-gradient(270deg,#001a40,#003380,#00d4ff,#4466ff,#00d4ff,#003380,#001a40);background-size:400%;color:#fff;border:1px solid rgba(0,212,255,0.7);animation:team-shift 3s ease infinite,team-pulse 2.5s ease infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 0 10px rgba(0,212,255,0.9),0 1px 3px rgba(0,0,0,0.9);-webkit-text-fill-color:initial;}
 
   /* ── BG EFFECT PICKER ── */
   .effect-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
@@ -1023,6 +1028,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
             <button onclick="window.open('https://cameroncodesstuff.github.io/hub/','_blank');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🌐 Cameron's Hub</button>
+            <button onclick="N.openModal('team-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(68,102,255,0.05));border:none;color:#00d4ff;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;" onmouseover="this.style.background='rgba(0,212,255,0.18)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(0,212,255,0.08),rgba(68,102,255,0.05))'">◈ Team</button>
             <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
             <button onclick="N.openGamesHub();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎮 Games</button>
 
@@ -1263,6 +1269,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
       <div class="auth-tab" id="op-tab-announce" onclick="N.ownerTab('announce')" style="font-size:10px;">ANNOUNCE</div>
       <div class="auth-tab" id="op-tab-leaderboards" onclick="N.ownerTab('leaderboards')" style="font-size:10px;">LEADERBOARDS</div>
       <div class="auth-tab" id="op-tab-games" onclick="N.ownerTab('games')" style="font-size:10px;color:#00ff88;">GAMES</div>
+      <div class="auth-tab" id="op-tab-team" onclick="N.ownerTab('team')" style="font-size:10px;color:#00d4ff;">TEAM</div>
     </div>
     <div id="op-panel-tickets"></div>
     <div id="op-panel-users" style="display:none;"></div>
@@ -1272,6 +1279,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
     <div id="op-panel-announce" style="display:none;"></div>
     <div id="op-panel-leaderboards" style="display:none;max-height:420px;overflow-y:auto;"></div>
     <div id="op-panel-games" style="display:none;"></div>
+    <div id="op-panel-team" style="display:none;"></div>
   </div>
 </div>
 
@@ -6660,7 +6668,7 @@ async function loadGameSubmissions(){
       <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:4px;">by ${esc((sub.creators||[]).join(', '))} · @${esc(sub.submittedBy||'?')}</div>
       <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;line-height:1.5;">${esc(sub.desc||'')}</div>
       ${sub.link?`<a href="${esc(sub.link)}" target="_blank" style="font-size:10px;color:var(--accent);font-family:var(--font-mono);word-break:break-all;">${esc(sub.link)}</a>`:''}
-      ${sub.fileData?`<div style="font-size:10px;color:#00ff88;font-family:var(--font-mono);margin-top:4px;">📎 ${esc(sub.fileName||'file.html')}</div>`:''}
+      ${sub.fileData?`<div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><span style="font-size:10px;color:#00ff88;font-family:var(--font-mono);">📎 ${esc(sub.fileName||'file.html')}</span><button onclick="N.downloadGameFile('${sub._uid}')" style="background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.35);color:#00ff88;font-family:var(--font-mono);font-size:9px;padding:2px 8px;border-radius:4px;cursor:pointer;">&#11015; DOWNLOAD</button></div>`:''}
       <div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">${sub.submittedAt?new Date(sub.submittedAt).toLocaleString():''}</div>
       ${isPending?`<div style="display:flex;gap:6px;margin-top:10px;">
         <button onclick="N.approveGameSubmission('${sub._uid}')" style="background:rgba(0,255,136,0.12);border:1px solid #00ff88;color:#00ff88;font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:1px;padding:5px 14px;border-radius:5px;cursor:pointer;">✓ APPROVE</button>
@@ -6856,7 +6864,7 @@ function openOwnerModal(){
 
 function ownerTab(tab){
   ownerCurrentTab=tab;
-  ['tickets','users','roles','streaks','admin','announce','leaderboards','games'].forEach(t=>{
+  ['tickets','users','roles','streaks','admin','announce','leaderboards','games','team'].forEach(t=>{
     const btn=document.getElementById('op-tab-'+t);
     const panel=document.getElementById('op-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -6870,6 +6878,7 @@ function ownerTab(tab){
   if(tab==='announce') renderAnnouncePanel();
   if(tab==='leaderboards') loadOwnerLeaderboards();
   if(tab==='games') loadGameSubmissions();
+  if(tab==='team') loadTeamApplications();
   // Populate owner banner
   const nameEl=document.getElementById('op-owner-name');
   const infoEl=document.getElementById('op-owner-info');
@@ -7138,8 +7147,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','tester','beginner_tester','bugfinder','feedback','og','easter','referral','cool_guy','github','codetype','dedicated','elite'];
-const ROLE_LABELS={owner:'Owner',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite'};
+const ROLE_OPTS=['owner','team_member','tester','beginner_tester','bugfinder','feedback','og','easter','referral','cool_guy','github','codetype','dedicated','elite'];
+const ROLE_LABELS={owner:'Owner',team_member:'Team Member',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -7161,7 +7170,7 @@ async function loadRolesPanel(){
     panel.appendChild(searchWrap);
     const hint=document.createElement('div');
     hint.style.cssText='font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:12px;';
-    hint.textContent='Tick roles to assign multiple. codetype, dedicated, elite are owner-only.';
+    hint.textContent='Tick roles to assign multiple. codetype, dedicated, elite, team_member are owner-only.';
     panel.appendChild(hint);
     const listEl=document.createElement('div');
     listEl.id='roles-panel-list';
@@ -9087,7 +9096,7 @@ function setDisplayPref(key,val){
 function applyDisplayPrefs(){
   const p=getDisplayPrefs();
   // Roles
-  document.querySelectorAll('.role-veteran,.role-devoted,.role-streak-king,.role-daily-ops,.role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-easter,.role-referral,.role-beginner-tester,.role-codetype,.role-dedicated,.role-elite').forEach(el=>{
+  document.querySelectorAll('.role-veteran,.role-devoted,.role-streak-king,.role-daily-ops,.role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-easter,.role-referral,.role-beginner-tester,.role-codetype,.role-dedicated,.role-elite,.role-team-member').forEach(el=>{
     el.style.display=p.showRoles?'':'none';
   });
   // Particles
@@ -9858,6 +9867,7 @@ function getRoleBadge(uid){
     codetype:     '<span class="role-codetype">&gt;_ CODETYPE</span>',
     dedicated:    '<span class="role-dedicated">💫 DEDICATED</span>',
     elite:        '<span class="role-elite">★ ELITE</span>',
+    team_member:  '<span class="role-team-member">◈ TEAM MEMBER</span>',
   };
   return roles.map(r=>map[r]||'').join('');
 }
@@ -13093,6 +13103,102 @@ async function submitCommunityGame(){
   }
 }
 
+function downloadGameFile(uid){
+  var u=uCache[uid]||{};
+  var sub=u.pendingGameSubmission||{};
+  if(!sub.fileData){toast('No file attached.','danger');return;}
+  var b=new Blob([sub.fileData],{type:'text/html'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(b);
+  a.download=sub.fileName||'game.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},5000);
+}
+
+async function submitTeamApplication(){
+  var why=(document.getElementById('team-why')&&document.getElementById('team-why').value||'').trim();
+  var skills=(document.getElementById('team-skills')&&document.getElementById('team-skills').value||'').trim();
+  var activity=(document.getElementById('team-activity')&&document.getElementById('team-activity').value)||'';
+  var extra=(document.getElementById('team-extra')&&document.getElementById('team-extra').value||'').trim();
+  if(!why){toast('Please tell us why you want to join.','danger');return;}
+  if(!skills){toast('Please tell us what you can contribute.','danger');return;}
+  var btn=document.getElementById('team-apply-btn');
+  if(btn){btn.disabled=true;btn.textContent='SUBMITTING...';}
+  try{
+    var payload={why:why,skills:skills,activity:activity,extra:extra,
+      submittedBy:(cud&&cud.username)||(cu&&cu.uid)||'unknown',
+      submittedByUid:(cu&&cu.uid)||'',displayName:(cud&&cud.displayName)||'',
+      msgCount:(cud&&cud.msgCount)||0,status:'pending',submittedAt:Date.now()};
+    await updateDoc(doc(db,'users',cu.uid),{teamApplication:payload});
+    cud=Object.assign({},cud,{teamApplication:payload});
+    uCache[cu.uid]=Object.assign({},uCache[cu.uid],{teamApplication:payload});
+    toast('Application submitted! The owner will review it.','success');
+    closeModal('team-modal');
+  }catch(e){toast('Submission failed: '+e.message,'danger');}
+  finally{if(btn){btn.disabled=false;btn.textContent='APPLY NOW';}}
+}
+async function loadTeamApplications(){
+  var panel=document.getElementById('op-panel-team');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading...</div>';
+  try{
+    var snap=await getDocs(collection(db,'users'));
+    var pending=[],approved=[],rejected=[];
+    snap.forEach(function(d){
+      var app=d.data().teamApplication;if(!app) return;
+      var e=Object.assign({},app,{_uid:d.id});
+      if(app.status==='pending')pending.push(e);
+      else if(app.status==='approved')approved.push(e);
+      else if(app.status==='rejected')rejected.push(e);
+    });
+    if(!pending.length&&!approved.length&&!rejected.length){
+      panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">No applications yet.</div>';return;
+    }
+    var mkCard=function(a,isPending){
+      return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg2);">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">'
+          +'<span style="font-size:13px;font-weight:700;color:var(--text);">'+esc(a.displayName||a.submittedBy)+'</span>'
+          +'<span class="role-team-member" style="font-size:8px;">◈ TEAM MEMBER</span>'
+          +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(a.submittedBy)+' · '+(a.msgCount||0)+' msgs</span>'
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:3px;"><span style="color:rgba(0,212,255,0.8);">WHY:</span> '+esc(a.why||'')+'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:3px;"><span style="color:rgba(68,102,255,0.9);">SKILLS:</span> '+esc(a.skills||'')+'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:3px;"><span style="color:var(--accent);">ACTIVITY:</span> '+esc(a.activity||'—')+'</div>'
+        +(a.extra?'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:3px;"><span style="color:var(--text);">EXTRA:</span> '+esc(a.extra)+'</div>':'')
+        +'<div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-top:4px;">'+(a.submittedAt?new Date(a.submittedAt).toLocaleString():'')+'</div>'
+        +(isPending?'<div style="display:flex;gap:6px;margin-top:10px;">'
+          +'<button onclick="N.approveTeamApplication('+a._uid+')" style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.5);color:#00d4ff;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 14px;border-radius:5px;cursor:pointer;">✓ APPROVE</button>'
+          +'<button onclick="N.rejectTeamApplication('+a._uid+')" style="background:rgba(212,43,43,0.12);border:1px solid var(--danger);color:var(--danger);font-family:var(--font-mono);font-size:10px;font-weight:700;padding:5px 14px;border-radius:5px;cursor:pointer;">✕ REJECT</button>'
+        +'</div>':'')+'</div>';
+    };
+    var mkSection=function(items,label,col,isPending){
+      if(!items.length)return '';
+      return '<div style="font-size:9px;letter-spacing:3px;color:'+col+';font-family:var(--font-mono);margin:14px 0 8px;border-bottom:1px solid '+col+'44;padding-bottom:4px;">'+label+' ('+items.length+')</div>'+items.map(function(a){return mkCard(a,isPending);}).join('');
+    };
+    panel.innerHTML=mkSection(pending,'⏳ PENDING','#f0b824',true)+mkSection(approved,'✓ APPROVED','#00d4ff',false)+mkSection(rejected,'✕ REJECTED','#e74c3c',false);
+  }catch(e){panel.innerHTML='<div style="color:var(--danger);font-size:12px;font-family:var(--font-mono);padding:10px;">Error: '+esc(e.message)+'</div>';}
+}
+async function approveTeamApplication(uid){
+  if(!confirm('Approve and grant TEAM MEMBER role?'))return;
+  try{
+    var userRef=doc(db,'users',uid);var snap=await getDoc(userRef);if(!snap.exists())return;
+    var u=snap.data();var app=u.teamApplication||{};
+    var roles=Array.isArray(u.roles)?u.roles.slice():[];
+    if(roles.indexOf('team_member')<0)roles.push('team_member');
+    await updateDoc(userRef,{roles:roles,role:roles[0],teamApplication:Object.assign({},app,{status:'approved',approvedAt:Date.now()})});
+    if(uCache[uid])uCache[uid]=Object.assign({},uCache[uid],{roles:roles,role:roles[0]});
+    toast('Team Member role granted!','success');loadTeamApplications();
+  }catch(e){toast('Approve failed: '+e.message,'danger');}
+}
+async function rejectTeamApplication(uid){
+  if(!confirm('Reject this application?'))return;
+  try{
+    var userRef=doc(db,'users',uid);var snap=await getDoc(userRef);
+    var app=(snap.exists()?snap.data().teamApplication:null)||{};
+    await updateDoc(userRef,{teamApplication:Object.assign({},app,{status:'rejected',rejectedAt:Date.now()})});
+    toast('Application rejected.','success');loadTeamApplications();
+  }catch(e){toast('Reject failed: '+e.message,'danger');}
+}
 async function loadCommunityGameStats(){
   // Load global like counts from Firestore into the local registry
   try{
@@ -14299,6 +14405,7 @@ window._N = {
   openInkDefense, openButtonMashGame,
   openCommunityGames, renderCommunityGames, openCommunityGame, toggleCommunityFav, toggleCommunityLike, openProfileByUsername,
   submitCommunityGame, loadGameSubmissions, approveGameSubmission, rejectGameSubmission,
+  submitTeamApplication, loadTeamApplications, approveTeamApplication, rejectTeamApplication, downloadGameFile,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
   toggleNotifications, updateNotifSettingsUI,
@@ -14596,6 +14703,63 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
         <span style="font-size:9px;font-family:var(--font-mono);color:#ff3355;letter-spacing:1px;">DEDICATED</span>
       </button>
 
+    </div>
+  </div>
+</div>
+
+<!-- Team Modal -->
+<div id="team-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('team-modal')">
+  <div class="modal" style="width:480px;max-height:88vh;overflow-y:auto;padding:0;">
+    <div style="background:linear-gradient(135deg,#000d1a 0%,#001a40 40%,#003380 70%,#001a40 100%);padding:32px 28px 24px;position:relative;overflow:hidden;border-radius:16px 16px 0 0;">
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,0.25) 0%,transparent 65%);pointer-events:none;"></div>
+      <button class="modal-close" onclick="N.closeModal('team-modal')" style="position:absolute;top:14px;right:14px;">&#10005;</button>
+      <div style="font-family:'Orbitron',monospace;font-size:10px;letter-spacing:6px;color:rgba(0,212,255,0.6);margin-bottom:8px;position:relative;">CAMERONCODESSTUFF</div>
+      <div style="font-family:'Orbitron',monospace;font-size:28px;font-weight:900;letter-spacing:6px;background:linear-gradient(90deg,#4466ff,#00d4ff,#ffffff,#00d4ff,#4466ff);background-size:300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:team-shift 3s ease infinite;position:relative;">TEAM</div>
+      <div style="margin-top:10px;font-size:12px;color:rgba(255,255,255,0.55);font-family:var(--font-mono);line-height:1.7;position:relative;max-width:380px;">Join the CameronCodesStuff team. The goal is to build a team of people willing to help <span style="color:#00d4ff;">test</span>, <span style="color:#4466ff;">manage</span> and <span style="color:#fff;">support</span> current and future projects.</div>
+      <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px;position:relative;">
+        <div style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:20px;padding:4px 12px;font-size:10px;font-family:var(--font-mono);color:#00d4ff;">&#129514; Testing</div>
+        <div style="background:rgba(68,102,255,0.1);border:1px solid rgba(68,102,255,0.3);border-radius:20px;padding:4px 12px;font-size:10px;font-family:var(--font-mono);color:#4466ff;">&#9881; Management</div>
+        <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:10px;font-family:var(--font-mono);color:rgba(255,255,255,0.6);">&#128172; Support</div>
+        <div style="background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.2);border-radius:20px;padding:4px 12px;font-size:10px;font-family:var(--font-mono);color:rgba(0,212,255,0.7);">&#128274; Members-Only Access</div>
+      </div>
+    </div>
+    <div style="padding:18px 28px 0;background:var(--bg2);">
+      <div style="font-size:9px;font-family:'Orbitron',monospace;letter-spacing:4px;color:var(--text-dim);margin-bottom:12px;">TEAM MEMBER ROLE</div>
+      <div style="display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:14px 16px;">
+        <div style="font-size:24px;">&#128100;</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:4px;">Your Name <span class="role-team-member">&#9672; TEAM MEMBER</span></div>
+          <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">Exclusive badge &middot; 2nd highest role &middot; Member-only access</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:20px 28px 28px;background:var(--bg2);border-radius:0 0 16px 16px;">
+      <div style="font-size:9px;font-family:'Orbitron',monospace;letter-spacing:4px;color:var(--text-dim);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">APPLICATION</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:5px;">WHY DO YOU WANT TO JOIN? *</div>
+          <textarea id="team-why" placeholder="Tell us why you want to be part of the team…" maxlength="500" rows="3" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 11px;border-radius:7px;outline:none;resize:vertical;" onfocus="this.style.borderColor='rgba(0,212,255,0.6)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
+        <div>
+          <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:5px;">WHAT CAN YOU CONTRIBUTE? *</div>
+          <textarea id="team-skills" placeholder="Testing, design, moderation, ideas, coding…" maxlength="400" rows="2" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 11px;border-radius:7px;outline:none;resize:vertical;" onfocus="this.style.borderColor='rgba(0,212,255,0.6)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
+        <div>
+          <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:5px;">HOW ACTIVE ARE YOU ON NEXUS?</div>
+          <select id="team-activity" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 11px;border-radius:7px;outline:none;">
+            <option value="">Select…</option>
+            <option value="daily">Daily</option>
+            <option value="few_week">A few times a week</option>
+            <option value="weekly">Weekly</option>
+            <option value="occasional">Occasionally</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:5px;">ANYTHING ELSE?</div>
+          <textarea id="team-extra" placeholder="Previous experience, other projects, Discord tag…" maxlength="300" rows="2" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 11px;border-radius:7px;outline:none;resize:vertical;" onfocus="this.style.borderColor='rgba(0,212,255,0.6)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        </div>
+        <button id="team-apply-btn" onclick="N.submitTeamApplication()" style="width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(68,102,255,0.15));border:1px solid rgba(0,212,255,0.5);color:#00d4ff;font-family:'Orbitron',monospace;font-size:11px;font-weight:900;letter-spacing:4px;padding:13px;border-radius:8px;cursor:pointer;transition:all 0.2s;margin-top:4px;" onmouseover="this.style.background='rgba(0,212,255,0.3)';this.style.boxShadow='0 0 20px rgba(0,212,255,0.3)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(0,212,255,0.2),rgba(68,102,255,0.15))';this.style.boxShadow='none'">APPLY NOW</button>
+      </div>
     </div>
   </div>
 </div>
