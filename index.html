@@ -3099,43 +3099,67 @@ async function enterApp(){
     }).catch(()=>{});
     // ── GitHub Pages update detector ──────────────────────────────────────
     (function(){
-      let _lastEtag=null;
+      let _lastFingerprint=null;
       let _updateShown=false;
       async function checkForPageUpdate(){
-        if(_updateShown) return; // only nag once per session
+        if(_updateShown) return;
         try{
-          const res=await fetch(window.location.href,{method:'HEAD',cache:'no-store'});
-          const etag=res.headers.get('etag')||res.headers.get('last-modified')||'';
-          if(!etag) return;
-          if(_lastEtag===null){_lastEtag=etag;return;} // baseline
-          if(etag!==_lastEtag){
+          // Fetch the page itself (not HEAD — GitHub Pages often strips ETag/Last-Modified
+          // from HEAD responses). We just read the first 2KB to get a stable fingerprint
+          // without downloading the full ~1MB file every poll.
+          const res=await fetch(window.location.href+'?_t='+Date.now(),{
+            cache:'no-store',
+            headers:{'Range':'bytes=0-2047'}
+          });
+          // Fall back to full fetch if range not supported
+          const text=await res.text();
+          // Use a short slice as fingerprint — stable across polls if unchanged,
+          // different if the file was redeployed
+          const fp=text.slice(0,512);
+          if(!fp) return;
+          if(_lastFingerprint===null){_lastFingerprint=fp;return;} // baseline
+          if(fp!==_lastFingerprint){
             _updateShown=true;
             clearInterval(window._updatePollInterval);
-            // Show persistent banner for 5s then fade
-            const banner=document.createElement('div');
-            banner.id='nexus-update-banner';
-            banner.style.cssText=[
-              'position:fixed','top:18px','left:50%','transform:translateX(-50%)',
-              'background:linear-gradient(135deg,rgba(68,102,255,0.95),rgba(0,212,255,0.9))',
-              'color:#fff','font-family:Orbitron,monospace','font-size:12px',
-              'font-weight:700','letter-spacing:2px','padding:10px 22px',
-              'border-radius:10px','border:1px solid rgba(255,255,255,0.25)',
-              'box-shadow:0 4px 24px rgba(68,102,255,0.5)','z-index:99999',
-              'cursor:pointer','text-align:center','white-space:nowrap',
-              'transition:opacity 0.6s ease'
-            ].join(';');
-            banner.textContent='🔄 Page updated — click to refresh';
-            banner.title='A new version of NEXUS is available';
-            banner.onclick=()=>window.location.reload();
-            document.body.appendChild(banner);
-            setTimeout(()=>{banner.style.opacity='0';setTimeout(()=>banner.remove(),700);},5000);
+            showUpdateBanner();
           }
         }catch(e){}
       }
-      // Poll every 2 minutes
+      function showUpdateBanner(){
+        // Remove any existing banner first
+        const existing=document.getElementById('nexus-update-banner');
+        if(existing) existing.remove();
+        const banner=document.createElement('div');
+        banner.id='nexus-update-banner';
+        banner.style.cssText=[
+          'position:fixed','top:18px','left:50%','transform:translateX(-50%)',
+          'background:linear-gradient(135deg,rgba(68,102,255,0.97),rgba(0,212,255,0.95))',
+          'color:#fff','font-family:Orbitron,monospace','font-size:12px',
+          'font-weight:700','letter-spacing:2px','padding:12px 26px',
+          'border-radius:10px','border:1px solid rgba(255,255,255,0.3)',
+          'box-shadow:0 4px 32px rgba(68,102,255,0.65),0 0 0 1px rgba(0,212,255,0.3)',
+          'z-index:99999','cursor:pointer','text-align:center','white-space:nowrap',
+          'opacity:1','transition:opacity 0.6s ease'
+        ].join(';');
+        banner.textContent='🔄 New update available — click to refresh';
+        banner.title='A new version of NEXUS has been deployed';
+        banner.onclick=()=>window.location.reload();
+        document.body.appendChild(banner);
+        // Stay visible for 10 seconds, then fade out
+        setTimeout(()=>{
+          banner.style.opacity='0';
+          setTimeout(()=>{
+            banner.remove();
+            // Re-show after 30s if user hasn't refreshed
+            setTimeout(showUpdateBanner, 30000);
+          },700);
+        },10000);
+      }
+      // Poll every 90 seconds
       if(window._updatePollInterval) clearInterval(window._updatePollInterval);
-      window._updatePollInterval=setInterval(checkForPageUpdate,2*60*1000);
-      checkForPageUpdate(); // baseline check immediately
+      window._updatePollInterval=setInterval(checkForPageUpdate,90*1000);
+      // Take baseline immediately, then first real check after 90s
+      checkForPageUpdate();
     })();
     // ─────────────────────────────────────────────────────────────────────
     // Ensure referral code exists — use the one already in Firestore if present,
