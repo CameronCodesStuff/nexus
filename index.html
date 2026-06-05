@@ -11124,14 +11124,24 @@ let timeTrackInterval=null;
 
 function startTimeTracking(){
   if(timeTrackInterval) clearInterval(timeTrackInterval);
-  // Add 1 minute every 60 seconds the user is on the page
   timeTrackInterval=setInterval(async()=>{
-    if(!cu||document.hidden) return; // don't count time when tab is hidden
+    if(!cu||document.hidden) return;
     try{
+      const today=getDailyKey();
+      const weekKey=getWeekKey();
       const newMins=(cud?.minutesOnSite||0)+1;
-      await updateDoc(doc(db,'users',cu.uid),{minutesOnSite:newMins});
-      cud={...cud,minutesOnSite:newMins};
-      uCache[cu.uid]={...uCache[cu.uid],minutesOnSite:newMins};
+      const newDayMins=(cud?.lastTimeDay===today?(cud?.dailyMinutes||0):0)+1;
+      const newWeekMins=(cud?.lastTimeWeek===weekKey?(cud?.weeklyMinutes||0):0)+1;
+      const fields={
+        minutesOnSite:newMins,
+        dailyMinutes:newDayMins,
+        weeklyMinutes:newWeekMins,
+        lastTimeDay:today,
+        lastTimeWeek:weekKey
+      };
+      await updateDoc(doc(db,'users',cu.uid),fields);
+      cud={...cud,...fields};
+      uCache[cu.uid]={...uCache[cu.uid],...fields};
     }catch{}
   },60000);
 }
@@ -13950,51 +13960,94 @@ async function loadTeamTickets(){
   if(!panel) return;
   panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading…</div>';
   try{
-    const snap=await getDocs(query(collection(db,'helpTickets'),orderBy('ts','desc'),limit(50)));
+    // No orderBy to avoid needing a Firestore index — sort client-side
+    const snap=await getDocs(query(collection(db,'helpTickets'),limit(100)));
     if(snap.empty){
-      panel.innerHTML='<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:10px;text-align:center;">No open help tickets.</div>';
+      panel.innerHTML='<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:10px;text-align:center;">No help tickets yet.</div>';
       return;
     }
+    // Sort: escalated first, then open, then resolved; within each group newest first
+    const docs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    docs.sort(function(a,b){
+      const statusRank=function(t){
+        if(t.escalated&&t.status!=='resolved') return 0;
+        if(t.status==='resolved') return 2;
+        return 1;
+      };
+      const sr=statusRank(a)-statusRank(b);
+      if(sr!==0) return sr;
+      return (b.ts?.toMillis?.()||0)-(a.ts?.toMillis?.()||0);
+    });
     panel.innerHTML='';
-    snap.forEach(function(tDoc){
-      const t=tDoc.data();
+    docs.forEach(function(t){
       const u=uCache[t.fromUid]||{};
-      const rank=getRank(u.msgCount||t.displayName?0:0);
+      const isEscalated=t.escalated===true&&t.status!=='resolved';
+      const isResolved=t.status==='resolved';
       const card=document.createElement('div');
-      card.style.cssText='border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg2);';
-      const ts=t.ts?.toMillis?.()||0;
-      const isEscalated=t.escalated===true;
-      card.style.cssText='border:1px solid '+(isEscalated?'rgba(255,69,58,0.6)':'var(--border)')+';border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg2);';
+      const borderCol=isEscalated?'rgba(255,69,58,0.6)':isResolved?'rgba(0,255,136,0.35)':'var(--border)';
+      card.style.cssText='border:1px solid '+borderCol+';border-radius:8px;padding:12px;margin-bottom:8px;background:var(--bg2);opacity:'+(isResolved?'0.6':'1')+';';
+      // Status badges
       const topRow=document.createElement('div');
       topRow.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;';
       if(isEscalated){
-        const esc_badge=document.createElement('span');
-        esc_badge.style.cssText='font-size:8px;font-family:var(--font-mono);background:rgba(255,69,58,0.2);border:1px solid rgba(255,69,58,0.6);color:#ff453a;padding:1px 6px;border-radius:3px;letter-spacing:1px;';
-        esc_badge.textContent='⚠ ESCALATED';
-        topRow.appendChild(esc_badge);
+        const eb=document.createElement('span');
+        eb.style.cssText='font-size:8px;font-family:var(--font-mono);background:rgba(255,69,58,0.2);border:1px solid rgba(255,69,58,0.6);color:#ff453a;padding:1px 6px;border-radius:3px;letter-spacing:1px;';
+        eb.textContent='⚠ ESCALATED';
+        topRow.appendChild(eb);
       }
-      topRow.innerHTML+='<span style="font-size:12px;font-weight:700;color:var(--text);">'+esc(t.displayName||u.displayName||t.fromUid||'?')+'</span>'
-        +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(t.username||u.username||'')+'</span>';
+      if(isResolved){
+        const rb=document.createElement('span');
+        rb.style.cssText='font-size:8px;font-family:var(--font-mono);background:rgba(0,255,136,0.12);border:1px solid rgba(0,255,136,0.4);color:#00ff88;padding:1px 6px;border-radius:3px;letter-spacing:1px;';
+        rb.textContent='✓ RESOLVED';
+        topRow.appendChild(rb);
+      }
+      const nameEl=document.createElement('span');
+      nameEl.style.cssText='font-size:12px;font-weight:700;color:var(--text);';
+      nameEl.textContent=t.displayName||u.displayName||t.fromUid||'?';
+      const userEl=document.createElement('span');
+      userEl.style.cssText='font-size:9px;color:var(--text-dim);font-family:var(--font-mono);';
+      userEl.textContent='@'+(t.username||u.username||'');
+      topRow.appendChild(nameEl);topRow.appendChild(userEl);
       const body=document.createElement('div');
-      body.style.cssText='font-size:11px;color:var(--text);line-height:1.6;margin-bottom:8px;';
+      body.style.cssText='font-size:11px;color:var(--text);line-height:1.6;margin-bottom:6px;';
       body.textContent=t.text||'';
+      const ts=t.ts?.toMillis?.()||0;
       const dateEl=document.createElement('div');
       dateEl.style.cssText='font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:8px;';
       dateEl.textContent=ts?new Date(ts).toLocaleString():'';
       card.appendChild(topRow);card.appendChild(body);card.appendChild(dateEl);
-      if(!isEscalated&&!isOwner){
-        const escBtn=document.createElement('button');
-        escBtn.style.cssText='background:rgba(255,69,58,0.1);border:1px solid rgba(255,69,58,0.5);color:#ff453a;font-family:var(--font-mono);font-size:9px;font-weight:700;padding:4px 12px;border-radius:5px;cursor:pointer;';
-        escBtn.textContent='⚠ ESCALATE TO OWNER';
-        escBtn.onclick=(function(id,c){return async function(){
+      if(!isResolved){
+        const btnRow=document.createElement('div');
+        btnRow.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+        // Escalate button (team members only, not already escalated)
+        if(!isEscalated&&!isOwner){
+          const escBtn=document.createElement('button');
+          escBtn.style.cssText='background:rgba(255,69,58,0.1);border:1px solid rgba(255,69,58,0.5);color:#ff453a;font-family:var(--font-mono);font-size:9px;font-weight:700;padding:4px 12px;border-radius:5px;cursor:pointer;';
+          escBtn.textContent='⚠ ESCALATE';
+          escBtn.onclick=(function(id,c,btn){return async function(){
+            try{
+              await updateDoc(doc(db,'helpTickets',id),{escalated:true,escalatedAt:serverTimestamp(),escalatedBy:cud.displayName||cu.uid});
+              btn.disabled=true;btn.textContent='⚠ ESCALATED';
+              c.style.borderColor='rgba(255,69,58,0.6)';
+              toast('Escalated to owner.','success');
+            }catch(e){toast('Failed: '+e.message,'danger');}
+          };})(t.id,card,escBtn);
+          btnRow.appendChild(escBtn);
+        }
+        // Resolve button (everyone can mark resolved)
+        const resBtn=document.createElement('button');
+        resBtn.style.cssText='background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.4);color:#00ff88;font-family:var(--font-mono);font-size:9px;font-weight:700;padding:4px 12px;border-radius:5px;cursor:pointer;';
+        resBtn.textContent='✓ MARK RESOLVED';
+        resBtn.onclick=(function(id,c){return async function(){
           try{
-            await updateDoc(doc(db,'helpTickets',id),{escalated:true,escalatedAt:serverTimestamp(),escalatedBy:cud.displayName||cu.uid});
-            c.style.borderColor='rgba(255,69,58,0.6)';
-            escBtn.disabled=true;escBtn.textContent='⚠ ESCALATED';
-            toast('Ticket escalated to owner.','success');
+            await updateDoc(doc(db,'helpTickets',id),{status:'resolved',resolvedAt:serverTimestamp(),resolvedBy:cud.displayName||cu.uid});
+            c.style.opacity='0.6';c.style.borderColor='rgba(0,255,136,0.35)';
+            resBtn.disabled=true;resBtn.textContent='✓ RESOLVED';
+            toast('Ticket marked resolved.','success');
           }catch(e){toast('Failed: '+e.message,'danger');}
-        };})(tDoc.id,card);
-        card.appendChild(escBtn);
+        };})(t.id,card);
+        btnRow.appendChild(resBtn);
+        card.appendChild(btnRow);
       }
       panel.appendChild(card);
     });
