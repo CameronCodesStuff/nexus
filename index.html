@@ -6655,43 +6655,79 @@ const _origOpenChat_mobile = window._N?.openChat;
 async function openCreditsModal(){
   const el=document.getElementById('credits-content');
   if(!el) return;
-  // Load live data for owner and j_frosty from Firestore
-  const makeCard=async(username, roleLine, badgeClass, badgeLabel)=>{
-    // Find user by username
-    let u=Object.values(uCache).find(x=>(x.username||'').toLowerCase()===username.toLowerCase());
-    if(!u){
-      try{
-        const s=await getDocs(query(collection(db,'users'),where('username','==',username.toLowerCase())));
-        if(!s.empty){u=s.docs[0].data();u._id=s.docs[0].id;uCache[s.docs[0].id]=u;}
-      }catch{}
-    }
-    const uid=u?._id||(Object.entries(uCache).find(([,v])=>(v.username||'').toLowerCase()===username.toLowerCase())||[])[0];
-    const nm=u?.displayName||username;
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
+
+  // Build a card from a user object + uid
+  const makeCardFromUser=async(uid,u,roleLine,badgeClass,badgeLabel,extraAttrs)=>{
+    const nm=u?.displayName||(u?.username||uid);
     const rank=getRank(u?.msgCount||0);
     const emoji=uid?userEmoji(uid):'👤';
     const fontStyle=uid?getUserFontStyle(uid):'';
     const roleBadges=uid?getRoleBadge(uid):'';
-    const picHtml=u?.profilePic?`<img src="${esc(u.profilePic)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.style.display='none'">`:emoji;
-    return `<div class="credits-card">
-      <div class="credits-avatar" style="overflow:hidden;padding:0;font-size:22px;">${picHtml}</div>
+    const picHtml=u?.profilePic?`<img src="${esc(u.profilePic)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.style.display='none'">`:`<span style="font-size:22px;">${emoji}</span>`;
+    return `<div class="credits-card" ${uid?`onclick="N.openProfileModal('${uid}')" style="cursor:pointer;"`:''}>
+      <div class="credits-avatar" style="overflow:hidden;padding:0;">${picHtml}</div>
       <div style="flex:1;min-width:0;">
         <div class="credits-name ${rank.c}" style="${fontStyle};-webkit-text-fill-color:unset;">${esc(nm)}</div>
-      ${roleBadges?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">${roleBadges}</div>`:''}
+        ${roleBadges?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;">${roleBadges}</div>`:''}
         <div class="credits-role">${roleLine}</div>
-        <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">@${esc(username.toLowerCase())} · ${u?.msgCount||0} msgs · ${rank.l}</div>
+        <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;">@${esc(u?.username||uid)} · ${u?.msgCount||0} msgs · ${rank.l}</div>
       </div>
-      <span class="credits-badge ${badgeClass}" ${badgeClass==='badge-tester'?'style="cursor:pointer;outline:none;" onclick="N.eggOpen()" title="🥚 Click me..."':''}>${badgeLabel}</span>
+      <span class="credits-badge ${badgeClass}" ${extraAttrs||''}>${badgeLabel}</span>
     </div>`;
   };
-  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
+
+  // Lookup by username helper
+  const lookupUsername=async(username)=>{
+    let u=Object.values(uCache).find(x=>(x.username||'').toLowerCase()===username.toLowerCase());
+    let uid=u?._id||(Object.entries(uCache).find(([,v])=>(v.username||'').toLowerCase()===username.toLowerCase())||[])[0];
+    if(!u){
+      try{
+        const s=await getDocs(query(collection(db,'users'),where('username','==',username.toLowerCase())));
+        if(!s.empty){uid=s.docs[0].id;u=s.docs[0].data();u._id=uid;uCache[uid]=u;}
+      }catch{}
+    }
+    return {uid,u};
+  };
+
+  const makeCard=async(username,roleLine,badgeClass,badgeLabel,extraAttrs)=>{
+    const {uid,u}=await lookupUsername(username);
+    return makeCardFromUser(uid,u,roleLine,badgeClass,badgeLabel,extraAttrs);
+  };
+
+  // ── OWNER (hardcoded) ──
   const ownerCard=await makeCard('owner','FOUNDER · LEAD DEVELOPER','badge-creator','CREATOR');
-  const testerCard=await makeCard('j_frosty','QUALITY ASSURANCE · TESTER','badge-tester','TESTER');
-  const btCard1=await makeCard('dhall666','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
-  const btCard2=await makeCard('god_slayer28','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
-  const btCard3=await makeCard('big_slayer069','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
-  const btCard4=await makeCard('unicorn','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
-  const btCard5=await makeCard('PrincessBohara','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
-  const btCard6=await makeCard('woxylow','BEGINNER TESTER','badge-btester','BEGINNER TESTER');
+
+  // ── TEAM MEMBERS (auto-fetched by role) ──
+  let teamCards='';
+  try{
+    const teamSnap=await getDocs(query(collection(db,'users'),where('roles','array-contains','team_member')));
+    const teamCards_arr=await Promise.all(teamSnap.docs.map(async d=>{
+      const u=d.data();u._id=d.id;uCache[d.id]=u;
+      return makeCardFromUser(d.id,u,'TEAM MEMBER','badge-creator','◈ TEAM','style="background:linear-gradient(270deg,#001a40,#003380,#00d4ff,#4466ff,#00d4ff,#003380,#001a40);background-size:400%;animation:team-shift 3s ease infinite;color:#fff;border:1px solid rgba(0,212,255,0.7);font-family:Orbitron,monospace;"');
+    }));
+    teamCards=teamCards_arr.join('');
+  }catch(e){teamCards=`<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:8px;">Could not load team members.</div>`;}
+
+  // ── TESTERS (hardcoded) ──
+  const testerCard=await makeCard('j_frosty','QUALITY ASSURANCE · TESTER','badge-tester','TESTER',
+    'style="cursor:pointer;outline:none;" onclick="N.eggOpen()" title="🥚 Click me..."');
+
+  // ── BEGINNER TESTERS (hardcoded) ──
+  const btNames=['dhall666','god_slayer28','big_slayer069','unicorn','PrincessBohara','woxylow'];
+  const btCards=(await Promise.all(btNames.map(n=>makeCard(n,'BEGINNER TESTER','badge-btester','BEGINNER TESTER')))).join('');
+
+  // ── OG USERS (auto-fetched by role) ──
+  let ogCards='';
+  try{
+    const ogSnap=await getDocs(query(collection(db,'users'),where('roles','array-contains','og')));
+    const ogCards_arr=await Promise.all(ogSnap.docs.map(async d=>{
+      const u=d.data();u._id=d.id;uCache[d.id]=u;
+      return makeCardFromUser(d.id,u,'OG USER — Early Supporter','badge-og','OG');
+    }));
+    ogCards=ogCards_arr.join('');
+  }catch(e){ogCards=`<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:8px;">Could not load OG users.</div>`;}
+
   el.innerHTML=`
     <div class="credits-hero">
       <div class="credits-nexus-logo">NEXUS</div>
@@ -6700,15 +6736,16 @@ async function openCreditsModal(){
     <div class="credits-body">
       <div class="credits-section-title"><span class="credits-star">✦</span> CREATORS</div>
       ${ownerCard}
+      ${teamCards?`
+      <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star" style="animation:team-shift 3s ease infinite,credits-spin 4s linear infinite;background:linear-gradient(90deg,#4466ff,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">◈</span> TEAM</div>
+      ${teamCards}`:''}
       <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star" style="animation-direction:reverse;">◈</span> TESTERS</div>
       ${testerCard}
       <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star" style="animation-direction:reverse;">◈</span> BEGINNER TESTERS</div>
-      ${btCard1}
-      ${btCard2}
-      ${btCard3}
-      ${btCard4}
-      ${btCard5}
-      ${btCard6}
+      ${btCards}
+      ${ogCards?`
+      <div style="margin-top:20px;" class="credits-section-title"><span class="credits-star">★</span> OG USERS</div>
+      ${ogCards}`:''}
       <div style="margin-top:24px;text-align:center;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:2;">
         Built with Firebase · WebRTC · Pure HTML<br>
         <span style="color:var(--accent);">© 2025 NEXUS</span> · All rights reserved
