@@ -13742,9 +13742,9 @@ async function loadTeamStats(){
     const rows=[
       ['👥','Total Users',userCount.toLocaleString(),'#00d4ff'],
       ['📰','Page Views',pageViews.toLocaleString(),'#9b00ff'],
-      ['☀️','Daily Active Time',fmtTime(dailyMs),'#00ff88'],
-      ['📅','Weekly Active Time',fmtTime(weeklyMs),'#f0b824'],
-      ['⏱️','All-Time Active',fmtTime(allTimeMs),'#00d4ff'],
+      ['☀️','Daily Active Time',fmtTime(dailyMins),'#00ff88'],
+      ['📅','Weekly Active Time',fmtTime(weeklyMins),'#f0b824'],
+      ['⏱️','All-Time Active',fmtTime(allTimeMins),'#00d4ff'],
     ];
     rows.forEach(function(r){
       const card=document.createElement('div');
