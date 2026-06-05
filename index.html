@@ -13514,7 +13514,7 @@ function _populateTPBanner(){
 
 function teamPortalTab(tab){
   teamPortalCurrentTab=tab;
-  ['feed','tickets','testing','suggestions','team','chat','stats'].forEach(function(t){
+  ['feed','tickets','testing','suggestions','team','chat','stats','games'].forEach(function(t){
     const btn=document.getElementById('tp-tab-'+t);
     const panel=document.getElementById('tp-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -13527,6 +13527,7 @@ function teamPortalTab(tab){
   if(tab==='team') loadTeamMembers();
   if(tab==='chat') loadTeamChat();
   if(tab==='stats') loadTeamStats();
+  if(tab==='games') loadTeamGames();
 }
 
 // ── TEAM FEED ──
@@ -13708,6 +13709,155 @@ async function loadTeamChat(){
     });
     msgs.scrollTop=msgs.scrollHeight;
   });
+}
+
+// ── TEAM GAMES REVIEW ──
+async function loadTeamGames(){
+  const panel=document.getElementById('tp-panel-games');
+  if(!panel) return;
+  panel.innerHTML='';
+  const hdr=document.createElement('div');
+  hdr.style.cssText='font-size:9px;letter-spacing:3px;color:#00d4ff;font-family:var(--font-mono);margin-bottom:14px;';
+  hdr.textContent='COMMUNITY GAMES ('+COMMUNITY_GAMES.length+') — Leave reviews to help the owner decide what to keep';
+  panel.appendChild(hdr);
+  if(!COMMUNITY_GAMES.length){
+    const em=document.createElement('div');
+    em.style.cssText='color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:10px;text-align:center;';
+    em.textContent='No community games yet.';
+    panel.appendChild(em);
+    return;
+  }
+  COMMUNITY_GAMES.forEach(function(g){
+    panel.appendChild(makeTeamGameCard(g));
+  });
+}
+
+function makeTeamGameCard(g){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:14px;margin-bottom:14px;background:var(--bg2);';
+
+  // Header row
+  const hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;';
+  const icon=document.createElement('span');
+  icon.style.cssText='font-size:22px;flex-shrink:0;line-height:1;';
+  icon.textContent=g.icon||'🎮';
+  const info=document.createElement('div');
+  info.style.cssText='flex:1;min-width:0;';
+  const titleRow=document.createElement('div');
+  titleRow.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;';
+  const titleEl=document.createElement('span');
+  titleEl.style.cssText='font-size:13px;font-weight:700;color:var(--text);';
+  titleEl.textContent=g.title||'Untitled';
+  const tagEl=document.createElement('span');
+  tagEl.style.cssText='font-size:8px;font-family:var(--font-mono);letter-spacing:1px;color:'+(g.tagColor||'#00d4ff')+';border:1px solid '+(g.tagColor||'#00d4ff')+'44;padding:1px 6px;border-radius:3px;';
+  tagEl.textContent=g.tag||'GAME';
+  titleRow.appendChild(titleEl);titleRow.appendChild(tagEl);
+  const creatorEl=document.createElement('div');
+  creatorEl.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:5px;';
+  creatorEl.textContent='by @'+(g.creators||[]).join(', @');
+  const descEl=document.createElement('div');
+  descEl.style.cssText='font-size:11px;color:var(--text-dim);line-height:1.5;margin-bottom:8px;';
+  descEl.textContent=g.desc||'';
+  const playBtn=document.createElement('button');
+  playBtn.style.cssText='background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:4px 14px;border-radius:5px;cursor:pointer;';
+  playBtn.textContent='▶ PLAY';
+  playBtn.onclick=function(){openCommunityGame(g.id);};
+  info.appendChild(titleRow);info.appendChild(creatorEl);info.appendChild(descEl);info.appendChild(playBtn);
+  hdr.appendChild(icon);hdr.appendChild(info);
+  wrap.appendChild(hdr);
+
+  // Reviews section
+  const revHdr=document.createElement('div');
+  revHdr.style.cssText='font-size:9px;letter-spacing:3px;color:var(--text-dim);font-family:var(--font-mono);margin:10px 0 6px;border-top:1px solid var(--border);padding-top:8px;';
+  revHdr.textContent='TEAM REVIEWS';
+  wrap.appendChild(revHdr);
+  const revList=document.createElement('div');
+  revList.id='cg-reviews-'+g.id;
+  wrap.appendChild(revList);
+  loadCommunityGameReviews(g.id, revList);
+
+  // Leave a review form
+  const formWrap=document.createElement('div');
+  formWrap.style.cssText='margin-top:10px;display:flex;flex-direction:column;gap:6px;';
+  const ratingRow=document.createElement('div');
+  ratingRow.style.cssText='display:flex;gap:6px;align-items:center;';
+  var selRating={val:0};
+  var stars=[1,2,3,4,5].map(function(n){
+    var s=document.createElement('span');
+    s.textContent='☆';
+    s.style.cssText='font-size:18px;cursor:pointer;color:var(--text-dim);transition:color 0.1s;';
+    s.dataset.n=n;
+    s.onclick=function(){
+      selRating.val=n;
+      stars.forEach(function(st){st.textContent=parseInt(st.dataset.n)<=n?'★':'☆';st.style.color=parseInt(st.dataset.n)<=n?'#f0b824':'var(--text-dim)';});
+    };
+    ratingRow.appendChild(s);
+    return s;
+  });
+  const rLabel=document.createElement('span');
+  rLabel.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);';
+  rLabel.textContent='Rate this game';
+  ratingRow.appendChild(rLabel);
+  const reviewTa=document.createElement('textarea');
+  reviewTa.placeholder='Your review… (bugs, fun factor, suggestions for improvement)';
+  reviewTa.maxLength=500;reviewTa.rows=3;
+  reviewTa.style.cssText='width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:8px 10px;border-radius:6px;outline:none;resize:vertical;';
+  const postBtn=document.createElement('button');
+  postBtn.style.cssText='background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:6px 16px;border-radius:6px;cursor:pointer;align-self:flex-end;';
+  postBtn.textContent='POST REVIEW';
+  postBtn.onclick=(function(gid,ta,sr,rl){
+    return async function(){
+      const text=(ta.value||'').trim();
+      if(!text){toast('Write a review first.','danger');return;}
+      if(!sr.val){toast('Please give a star rating.','danger');return;}
+      postBtn.disabled=true;postBtn.textContent='Posting…';
+      try{
+        await setDoc(doc(db,'communityGames',gid,'reviews',cu.uid),{
+          uid:cu.uid,displayName:cud.displayName||'',username:cud.username||'',
+          text:text,rating:sr.val,ts:serverTimestamp()
+        });
+        ta.value='';
+        sr.val=0;
+        stars.forEach(function(st){st.textContent='☆';st.style.color='var(--text-dim)';});
+        loadCommunityGameReviews(gid,rl);
+        toast('Review posted!','success');
+      }catch(e){toast('Failed: '+e.message,'danger');}
+      finally{postBtn.disabled=false;postBtn.textContent='POST REVIEW';}
+    };
+  })(g.id, reviewTa, selRating, revList);
+  formWrap.appendChild(ratingRow);formWrap.appendChild(reviewTa);formWrap.appendChild(postBtn);
+  wrap.appendChild(formWrap);
+  return wrap;
+}
+
+async function loadCommunityGameReviews(gameId, container){
+  try{
+    const snap=await getDocs(query(collection(db,'communityGames',gameId,'reviews'),orderBy('ts','desc')));
+    container.innerHTML='';
+    if(snap.empty){
+      const em=document.createElement('div');
+      em.style.cssText='color:var(--text-dim);font-size:10px;font-family:var(--font-mono);padding:4px 0 8px;';
+      em.textContent='No team reviews yet.';
+      container.appendChild(em);
+      return;
+    }
+    snap.forEach(function(rDoc){
+      const r=rDoc.data();
+      const card=document.createElement('div');
+      card.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px;';
+      const filled='★'.repeat(r.rating||0)+'☆'.repeat(5-(r.rating||0));
+      card.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+        +'<span style="font-size:11px;font-weight:700;color:var(--text);">'+esc(r.displayName||r.username||'Team Member')+'</span>'
+        +'<span style="font-size:12px;color:#f0b824;letter-spacing:1px;">'+filled+'</span>'
+        +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">'+(r.username?'@'+esc(r.username):'')+'</span>'
+        +'</div>'
+        +'<div style="font-size:11px;color:var(--text-dim);line-height:1.5;">'+esc(r.text||'')+'</div>';
+      container.appendChild(card);
+    });
+  }catch(e){
+    container.innerHTML='<div style="color:var(--danger);font-size:10px;font-family:var(--font-mono);">Failed to load reviews.</div>';
+  }
 }
 
 // ── STATS ──
@@ -15801,6 +15951,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
           <div class="auth-tab" id="tp-tab-team" onclick="N.teamPortalTab('team')" style="font-size:9px;">TEAM</div>
           <div class="auth-tab" id="tp-tab-chat" onclick="N.teamPortalTab('chat')" style="font-size:9px;">CHAT</div>
           <div class="auth-tab" id="tp-tab-stats" onclick="N.teamPortalTab('stats')" style="font-size:9px;">STATS</div>
+          <div class="auth-tab" id="tp-tab-games" onclick="N.teamPortalTab('games')" style="font-size:9px;">GAMES</div>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:14px 18px;">
@@ -15811,6 +15962,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
         <div id="tp-panel-team" style="display:none;"></div>
         <div id="tp-panel-chat" style="display:none;"></div>
         <div id="tp-panel-stats" style="display:none;"></div>
+        <div id="tp-panel-games" style="display:none;"></div>
       </div>
     </div>
 
