@@ -589,7 +589,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
   /* ── ROLES ── */
   /* Ensure role badge text is always visible regardless of parent colour */
-  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-team-member,.role-wpm130{
+  .role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-team-member,.role-wpm130,.role-trial-member{
     -webkit-text-fill-color:initial !important;
   }
   @keyframes number-one-shine{0%,100%{background-position:0% center;box-shadow:0 0 8px rgba(255,215,0,0.6),0 0 20px rgba(255,180,0,0.3);}50%{background-position:200% center;box-shadow:0 0 16px rgba(255,215,0,1),0 0 32px rgba(255,180,0,0.6);}}
@@ -613,6 +613,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   @keyframes owner-pulse{0%,100%{transform:scale(1);filter:brightness(1);}50%{transform:scale(1.08);filter:brightness(1.5);}}
   .role-owner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#ff0080,#ff8c00,#ffe100,#00ff88,#00c8ff,#9933ff,#ff0080);background-size:300%;color:#fff;border:none;animation:role-rainbow 2s linear infinite,owner-pulse 2s ease infinite;font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 1px 3px rgba(0,0,0,0.8);-webkit-text-fill-color:initial;}
 
+
+  /* ── TRIAL MEMBER ROLE ── */
+  @keyframes trial-pulse{0%,100%{box-shadow:0 0 4px rgba(255,180,0,0.5);}50%{box-shadow:0 0 12px rgba(255,180,0,0.9),0 0 24px rgba(255,140,0,0.4);}}
+  .role-trial-member{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#1a1000,#3d2800);color:#f0b824;border:1px solid rgba(240,184,36,0.5);animation:trial-pulse 2s ease infinite;font-weight:700;vertical-align:middle;margin-left:4px;text-shadow:0 0 6px rgba(240,184,36,0.6);-webkit-text-fill-color:initial;}
 
   /* ── 130WPM ROLE ── */
   @keyframes wpm-flow{0%{background-position:0% 50%;}50%{background-position:100% 50%;}100%{background-position:0% 50%;}}
@@ -1032,6 +1036,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 
             <button onclick="N.openModal('feedback-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⭐ Feedback</button>
             <button onclick="window.open('https://cameroncodesstuff.github.io/hub/','_blank');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🌐 Cameron's Hub</button>
+            <div id="trial-test-btn-wrap" style="display:none;">
+              <div style="height:1px;background:rgba(240,184,36,0.3);margin:4px 0;"></div>
+              <button onclick="N.openTrialTest();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08));border:none;color:#f0b824;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;" onmouseover="this.style.background='rgba(240,184,36,0.22)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08))'">&#9711; NEXUS Team Test</button>
+            </div>
             <button onclick="N.openModal('team-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(68,102,255,0.05));border:none;color:#00d4ff;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;" onmouseover="this.style.background='rgba(0,212,255,0.18)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(0,212,255,0.08),rgba(68,102,255,0.05))'">◈ Team</button>
             <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
             <button onclick="N.openGamesHub();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎮 Games</button>
@@ -6875,6 +6883,13 @@ async function checkOwnerAndShowBtn(){
     isOwner=!ownerSnap.empty&&ownerSnap.docs[0].id===cu.uid;
     const wrap=document.getElementById('owner-portal-btn-wrap');
     if(wrap) wrap.style.display=isOwner?'block':'none';
+    // Show trial test button only for trial_member (not full team_member)
+    const trialWrap=document.getElementById('trial-test-btn-wrap');
+    if(trialWrap){
+      const roles=Array.isArray(cud&&cud.roles)?cud.roles:[];
+      const isTrial=roles.includes('trial_member')&&!roles.includes('team_member');
+      trialWrap.style.display=isTrial?'block':'none';
+    }
   }catch{}
 }
 
@@ -7195,8 +7210,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','team_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','cool_guy','github','codetype','dedicated','elite'];
-const ROLE_LABELS={owner:'Owner',team_member:'Team Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite'};
+const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','cool_guy','github','codetype','dedicated','elite'];
+const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -9144,7 +9159,7 @@ function setDisplayPref(key,val){
 function applyDisplayPrefs(){
   const p=getDisplayPrefs();
   // Roles
-  document.querySelectorAll('.role-veteran,.role-devoted,.role-streak-king,.role-daily-ops,.role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-easter,.role-referral,.role-beginner-tester,.role-codetype,.role-dedicated,.role-elite,.role-team-member,.role-wpm130').forEach(el=>{
+  document.querySelectorAll('.role-veteran,.role-devoted,.role-streak-king,.role-daily-ops,.role-og,.role-feedback,.role-bugfinder,.role-tester,.role-owner,.role-number-one,.role-easter,.role-referral,.role-beginner-tester,.role-codetype,.role-dedicated,.role-elite,.role-team-member,.role-wpm130,.role-trial-member').forEach(el=>{
     el.style.display=p.showRoles?'':'none';
   });
   // Particles
@@ -9916,6 +9931,7 @@ function getRoleBadge(uid){
     dedicated:    '<span class="role-dedicated">💫 DEDICATED</span>',
     elite:        '<span class="role-elite">★ ELITE</span>',
     team_member:  '<span class="role-team-member">◈ TEAM MEMBER</span>',
+    trial_member: '<span class="role-trial-member">○ TRIAL MEMBER</span>',
     wpm130:       '<span class="role-wpm130">⌨ 130WPM+</span>',
   };
   return roles.map(r=>map[r]||'').join('');
@@ -13286,10 +13302,11 @@ async function approveTeamApplication(uid){
     var userRef=doc(db,'users',uid);var snap=await getDoc(userRef);if(!snap.exists())return;
     var u=snap.data();var app=u.teamApplication||{};
     var roles=Array.isArray(u.roles)?u.roles.slice():[];
-    if(roles.indexOf('team_member')<0)roles.push('team_member');
+    // Grant trial_member first — they must pass the test to get team_member
+    if(roles.indexOf('trial_member')<0)roles.push('trial_member');
     await updateDoc(userRef,{roles:roles,role:roles[0],teamApplication:Object.assign({},app,{status:'approved',approvedAt:Date.now()})});
     if(uCache[uid])uCache[uid]=Object.assign({},uCache[uid],{roles:roles,role:roles[0]});
-    toast('Team Member role granted!','success');loadTeamApplications();
+    toast('✓ Trial Member role granted! They must pass the NEXUS test to become a full Team Member.','success');loadTeamApplications();
   }catch(e){toast('Approve failed: '+e.message,'danger');}
 }
 async function rejectTeamApplication(uid){
@@ -13301,6 +13318,168 @@ async function rejectTeamApplication(uid){
     toast('Application rejected.','success');loadTeamApplications();
   }catch(e){toast('Reject failed: '+e.message,'danger');}
 }
+// ── NEXUS TRIAL TEST ─────────────────────────────────────────────────────
+var NEXUS_TEST_QUESTIONS = [
+  {q:'Where do you go to see daily challenges?',a:'Three dots menu → Daily Challenges',opts:['Profile settings','Three dots menu → Daily Challenges','The leaderboard','Notification bell']},
+  {q:'What happens when you accept a group invite?',a:'You are added to the group chat',opts:['You are added to the group chat','You get a notification only','The invite is deleted silently','You need to wait for the owner to approve']},
+  {q:'Where can you submit feedback to the developer?',a:'Three dots menu → Feedback',opts:['The help chat','Three dots menu → Feedback','Profile page','Settings panel']},
+  {q:'Someone submits a [HELP REQUEST] message. As a team member, what should you do?',a:'Check the owner DMs and respond via the reply button in the owner portal',opts:['Ignore it','Reply directly to their message','Check the owner DMs and respond via the reply button in the owner portal','Delete the message']},
+  {q:'Where is the Owner Portal accessed from?',a:'Three dots menu → Owner Portal (owner only)',opts:['Profile page → Settings','Three dots menu → Owner Portal (owner only)','Sidebar footer','Achievements modal']},
+  {q:'What does the streak leaderboard track?',a:'Daily login streaks — consecutive days logged in',opts:['Messages sent per day','Daily login streaks — consecutive days logged in','Reaction count','Total time online']},
+  {q:'How do you send a DM to someone?',a:'Click their profile/avatar and select the DM option',opts:['Type /dm in any chat','Click their profile/avatar and select the DM option','Go to the leaderboard and click their name','Use the search bar to find them']},
+  {q:'Where do you find the Games Hub?',a:'Three dots menu → Games',opts:['Profile → Games','Three dots menu → Games','Sidebar → Games tab','Settings → Entertainment']},
+  {q:'What role is above Trial Member in the team hierarchy?',a:'Team Member',opts:['Tester','Moderator','Team Member','Elite']},
+  {q:'How can you change your profile picture?',a:'Click your avatar in the sidebar footer to open your profile',opts:['Settings → Appearance','Click your avatar in the sidebar footer to open your profile','Three dots → Edit profile','You cannot change it']},
+  {q:'What collection stores help tickets in Firestore?',a:'Owner DMs (messages tagged [HELP REQUEST])',opts:['helpTickets','Owner DMs (messages tagged [HELP REQUEST])','feedback','support']},
+  {q:'What is the fastest way to find a specific past chat?',a:'Use the search bar at the top of the sidebar',opts:['Scroll through the chat feed','Use the search bar at the top of the sidebar','Check the leaderboard','Open your profile history']},
+];
+
+var _trialQuestions=[];
+var _trialAnswers={};
+var _trialSubmitted=false;
+
+function openTrialTest(){
+  if(!cu||!cud) return;
+  const roles=Array.isArray(cud.roles)?cud.roles:[];
+  if(!roles.includes('trial_member')||roles.includes('team_member')){
+    toast('This test is only for Trial Members.','danger');return;
+  }
+  // Cooldown: 10 minutes between attempts
+  const lastFail=cud.trialTestFailedAt||0;
+  const cooldownMs=10*60*1000;
+  if(Date.now()-lastFail<cooldownMs){
+    const rem=Math.ceil((cooldownMs-(Date.now()-lastFail))/60000);
+    toast('Please wait '+rem+' more minute'+(rem===1?'':'s')+' before retrying.','danger');return;
+  }
+  // Pick 5 random questions
+  var shuffled=NEXUS_TEST_QUESTIONS.slice().sort(function(){return Math.random()-0.5;});
+  _trialQuestions=shuffled.slice(0,5);
+  _trialAnswers={};
+  _trialSubmitted=false;
+  renderTrialTest();
+  openModal('trial-test-modal');
+}
+
+function renderTrialTest(){
+  const body=document.getElementById('trial-test-body');
+  if(!body) return;
+  body.innerHTML='';
+  _trialQuestions.forEach(function(q,qi){
+    var qWrap=document.createElement('div');
+    qWrap.style.cssText='margin-bottom:20px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;';
+    var qLabel=document.createElement('div');
+    qLabel.style.cssText='font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;line-height:1.5;';
+    qLabel.textContent=(qi+1)+'. '+q.q;
+    qWrap.appendChild(qLabel);
+    var shuffledOpts=q.opts.slice().sort(function(){return Math.random()-0.5;});
+    shuffledOpts.forEach(function(opt){
+      var btn=document.createElement('button');
+      btn.style.cssText='display:block;width:100%;text-align:left;background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:8px 12px;border-radius:6px;cursor:pointer;margin-bottom:6px;transition:all 0.15s;';
+      btn.textContent=opt;
+      btn.dataset.qi=qi;
+      btn.dataset.opt=opt;
+      btn.onmouseenter=function(){if(!_trialSubmitted&&_trialAnswers[qi]!==opt)btn.style.borderColor='var(--accent)';};
+      btn.onmouseleave=function(){if(_trialAnswers[qi]!==opt)btn.style.borderColor='var(--border)';};
+      btn.onclick=function(){
+        if(_trialSubmitted) return;
+        _trialAnswers[qi]=opt;
+        // Update button styles for this question
+        var btns=qWrap.querySelectorAll('button');
+        btns.forEach(function(b){
+          b.style.background='var(--bg2)';
+          b.style.borderColor='var(--border)';
+          b.style.color='var(--text-dim)';
+          b.style.fontWeight='400';
+        });
+        btn.style.background='rgba(0,212,255,0.12)';
+        btn.style.borderColor='rgba(0,212,255,0.6)';
+        btn.style.color='#00d4ff';
+        btn.style.fontWeight='700';
+      };
+      qWrap.appendChild(btn);
+    });
+    body.appendChild(qWrap);
+  });
+}
+
+async function submitTrialTest(){
+  if(_trialSubmitted) return;
+  if(Object.keys(_trialAnswers).length<_trialQuestions.length){
+    toast('Please answer all questions before submitting.','danger');return;
+  }
+  _trialSubmitted=true;
+  var score=0;
+  _trialQuestions.forEach(function(q,qi){
+    if(_trialAnswers[qi]===q.a) score++;
+  });
+  var passed=score>=4; // 4/5 to pass
+  // Show results
+  var body=document.getElementById('trial-test-body');
+  if(body){
+    var qWraps=body.querySelectorAll('div[style*="margin-bottom:20px"]');
+    _trialQuestions.forEach(function(q,qi){
+      var wrap=qWraps[qi];
+      if(!wrap) return;
+      var btns=wrap.querySelectorAll('button');
+      btns.forEach(function(b){
+        var opt=b.dataset.opt;
+        if(opt===q.a){
+          b.style.background='rgba(0,255,136,0.15)';
+          b.style.borderColor='#00ff88';
+          b.style.color='#00ff88';
+          b.style.fontWeight='700';
+        } else if(opt===_trialAnswers[qi]){
+          b.style.background='rgba(212,43,43,0.15)';
+          b.style.borderColor='var(--danger)';
+          b.style.color='var(--danger)';
+        }
+      });
+    });
+  }
+  var submitBtn=document.getElementById('trial-submit-btn');
+  if(submitBtn) submitBtn.style.display='none';
+  var resultEl=document.getElementById('trial-result');
+  if(resultEl){
+    resultEl.style.display='block';
+    if(passed){
+      resultEl.innerHTML='<div style="text-align:center;padding:18px 0 4px;">'
+        +'<div style="font-size:28px;margin-bottom:8px;">✨</div>'
+        +'<div style="font-family:Orbitron,monospace;font-size:14px;font-weight:900;color:#00d4ff;letter-spacing:3px;margin-bottom:6px;">TEST PASSED</div>'
+        +'<div style="font-size:12px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:4px;">Score: '+score+' / '+_trialQuestions.length+'</div>'
+        +'<div style="font-size:11px;color:#00ff88;font-family:var(--font-mono);">You are now a full Team Member!</div>'
+        +'</div>';
+    } else {
+      resultEl.innerHTML='<div style="text-align:center;padding:18px 0 4px;">'
+        +'<div style="font-size:28px;margin-bottom:8px;">❌</div>'
+        +'<div style="font-family:Orbitron,monospace;font-size:14px;font-weight:900;color:var(--danger);letter-spacing:3px;margin-bottom:6px;">NOT QUITE</div>'
+        +'<div style="font-size:12px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:4px;">Score: '+score+' / '+_trialQuestions.length+' (need 4 to pass)</div>'
+        +'<div style="font-size:11px;color:#f0b824;font-family:var(--font-mono);">Review the answers above, then retry in 10 minutes.</div>'
+        +'</div>';
+    }
+  }
+  if(passed){
+    try{
+      var roles=Array.isArray(cud.roles)?cud.roles.slice():[];
+      roles=roles.filter(function(r){return r!=='trial_member';});
+      if(roles.indexOf('team_member')<0) roles.push('team_member');
+      await updateDoc(doc(db,'users',cu.uid),{roles:roles,role:roles[0],trialTestPassedAt:Date.now()});
+      cud=Object.assign({},cud,{roles:roles,role:roles[0],trialTestPassedAt:Date.now()});
+      uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:roles,role:roles[0]});
+      // Hide the trial test button
+      var tw=document.getElementById('trial-test-btn-wrap');
+      if(tw) tw.style.display='none';
+      renderSidebar&&renderSidebar();
+      renderProfile&&renderProfile();
+      toast('🌟 You are now a full Team Member! Welcome to the team.','success');
+    }catch(e){toast('Role update failed: '+e.message,'danger');}
+  } else {
+    try{
+      await updateDoc(doc(db,'users',cu.uid),{trialTestFailedAt:Date.now()});
+      cud=Object.assign({},cud,{trialTestFailedAt:Date.now()});
+    }catch(_){}
+  }
+}
+
 async function loadCommunityGameStats(){
   // Load global like counts from Firestore into the local registry
   try{
@@ -14508,6 +14687,7 @@ window._N = {
   openCommunityGames, renderCommunityGames, openCommunityGame, toggleCommunityFav, toggleCommunityLike, openProfileByUsername,
   submitCommunityGame, loadGameSubmissions, approveGameSubmission, rejectGameSubmission,
   submitTeamApplication, loadTeamApplications, approveTeamApplication, rejectTeamApplication, downloadGameFile,
+  openTrialTest, submitTrialTest,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
   toggleNotifications, updateNotifSettingsUI,
@@ -14806,6 +14986,21 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
       </button>
 
     </div>
+  </div>
+</div>
+
+<!-- Trial Test Modal -->
+<div id="trial-test-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('trial-test-modal')">
+  <div class="modal" style="width:520px;max-height:88vh;display:flex;flex-direction:column;">
+    <div class="modal-title">&#9711; NEXUS TEAM TEST</div>
+    <button class="modal-close" onclick="N.closeModal('trial-test-modal')">&#10005;</button>
+    <div style="padding:4px 0 12px;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.7;">
+      Answer <strong style="color:#f0b824;">4 out of 5</strong> questions correctly to become a full Team Member.
+      Questions are randomised each attempt.
+    </div>
+    <div id="trial-test-body" style="overflow-y:auto;flex:1;padding-right:4px;"></div>
+    <div id="trial-result" style="display:none;"></div>
+    <button id="trial-submit-btn" onclick="N.submitTrialTest()" style="margin-top:14px;width:100%;background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(68,102,255,0.15));border:1px solid rgba(0,212,255,0.5);color:#00d4ff;font-family:'Orbitron',monospace;font-size:11px;font-weight:900;letter-spacing:3px;padding:12px;border-radius:8px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,212,255,0.3)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(0,212,255,0.2),rgba(68,102,255,0.15))'">SUBMIT ANSWERS</button>
   </div>
 </div>
 
