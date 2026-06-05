@@ -1044,7 +1044,9 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
               <div style="height:1px;background:rgba(240,184,36,0.3);margin:4px 0;"></div>
               <button onclick="N.openTrialTest();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08));border:none;color:#f0b824;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;" onmouseover="this.style.background='rgba(240,184,36,0.22)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08))'">&#9711; NEXUS Team Test</button>
             </div>
-            <button onclick="N.openModal('team-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;color:#00d4ff;" onmouseover="this.style.background='rgba(0,212,255,0.12)'" onmouseout="this.style.background='none'">◈ Team</button>
+            <div id="team-join-btn-wrap">
+              <button onclick="N.openModal('team-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;color:#00d4ff;" onmouseover="this.style.background='rgba(0,212,255,0.12)'" onmouseout="this.style.background='none'">◈ Team</button>
+            </div>
             <div style="border-top:1px solid var(--border);margin:4px 0;"></div>
             <button onclick="N.openGamesHub();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🎮 Games</button>
 
@@ -7014,6 +7016,8 @@ async function checkOwnerAndShowBtn(){
       const isTeamMember=_roles.includes('team_member')||isOwner;
       if(trialWrap) trialWrap.style.display=isTrial?'block':'none';
       if(teamPortalWrap) teamPortalWrap.style.display=isTeamMember?'block':'none';
+      const teamJoinWrap=document.getElementById('team-join-btn-wrap');
+      if(teamJoinWrap) teamJoinWrap.style.display=isTeamMember?'none':'block';
     }
   }catch{}
 }
@@ -13720,23 +13724,19 @@ async function loadTeamStats(){
     const stats=statsSnap.exists()?statsSnap.data():{};
     const userCount=users.length;
     const pageViews=stats.pageViews||0;
-    // Time stats from user docs
-    const now=Date.now();
-    const dayMs=24*60*60*1000;
-    const weekMs=7*dayMs;
-    let dailyMs=0,weeklyMs=0,allTimeMs=0;
+    // Time stats — summed from minutesOnSite (all-time), dailyMinutes, weeklyMinutes
+    let dailyMins=0,weeklyMins=0,allTimeMins=0;
+    const today=getDailyKey();
+    const weekKey=getWeekKey();
     users.forEach(function(u){
-      const t=u.totalTimeMs||0;
-      const todayT=u.todayTimeMs||0;
-      const weekT=u.weekTimeMs||0;
-      allTimeMs+=t;
-      dailyMs+=todayT;
-      weeklyMs+=weekT;
+      allTimeMins+=(u.minutesOnSite||0);
+      if(u.lastTimeDay===today) dailyMins+=(u.dailyMinutes||0);
+      if(u.lastTimeWeek===weekKey) weeklyMins+=(u.weeklyMinutes||0);
     });
-    const fmtTime=function(ms){
-      if(ms<60000)return Math.round(ms/1000)+'s';
-      if(ms<3600000)return Math.round(ms/60000)+'m';
-      return (ms/3600000).toFixed(1)+'h';
+    const fmtTime=function(mins){
+      if(mins<60)return mins+'m';
+      if(mins<1440)return (mins/60).toFixed(1)+'h';
+      return (mins/1440).toFixed(1)+'d';
     };
     panel.innerHTML='';
     const rows=[
