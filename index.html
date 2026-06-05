@@ -6991,7 +6991,7 @@ async function checkOwnerAndShowBtn(){
     if(trialWrap||teamPortalWrap){
       const _roles=Array.isArray(cud&&cud.roles)?cud.roles:[];
       const isTrial=_roles.includes('trial_member')&&!_roles.includes('team_member');
-      const isTeamMember=_roles.includes('team_member');
+      const isTeamMember=_roles.includes('team_member')||isOwner;
       if(trialWrap) trialWrap.style.display=isTrial?'block':'none';
       if(teamPortalWrap) teamPortalWrap.style.display=isTeamMember?'block':'none';
     }
@@ -13431,8 +13431,8 @@ let teamPortalCurrentTab='tickets';
 async function openTeamPortal(){
   if(!cu||!cud){toast('Not logged in.','danger');return;}
   const roles=Array.isArray(cud.roles)?cud.roles:[];
-  if(!roles.includes('team_member')){toast('Team Member access only.','danger');return;}
-  if(teamPortalVerified){_openTeamPortalModal();return;}
+  if(!roles.includes('team_member')&&!isOwner){toast('Team Member access only.','danger');return;}
+  if(teamPortalVerified||isOwner){_openTeamPortalModal();return;}
   const pw=prompt('◈ TEAM PORTAL\n\nEnter your account password to continue:');
   if(!pw) return;
   try{
