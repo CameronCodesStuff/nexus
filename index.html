@@ -4194,7 +4194,7 @@ function openModal(id){
     tgStop();tgInit();
   }
 }
-const closeModal=id=>{$(id).classList.remove('open');if(id==='lb-modal'&&window._lbRefreshInterval){clearInterval(window._lbRefreshInterval);window._lbRefreshInterval=null;}};
+const closeModal=id=>{$(id).classList.remove('open');if(id==='lb-modal'&&window._lbRefreshInterval){clearInterval(window._lbRefreshInterval);window._lbRefreshInterval=null;}if(id==='team-portal-modal'&&_teamChatUnsub){_teamChatUnsub();_teamChatUnsub=null;}};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
 
 let usersFilterQuery='';
