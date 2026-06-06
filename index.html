@@ -1044,7 +1044,9 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
               <div style="height:1px;background:rgba(240,184,36,0.3);margin:4px 0;"></div>
               <button onclick="N.openTrialTest();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08));border:none;color:#f0b824;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;" onmouseover="this.style.background='rgba(240,184,36,0.22)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08))'">&#9711; NEXUS Team Test</button>
             </div>
-            <button id="github-verify-menu-btn" onclick="N.openGithubVerify();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐙 Verify GitHub</button>
+            <div id="github-verify-wrap" style="display:none;">
+              <button onclick="N.openGithubVerify();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🐙 Verify GitHub</button>
+            </div>
             <div id="team-join-btn-wrap">
               <button onclick="N.openModal('team-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;color:#00d4ff;" onmouseover="this.style.background='rgba(0,212,255,0.12)'" onmouseout="this.style.background='none'">◈ Team</button>
             </div>
@@ -7067,14 +7069,14 @@ async function checkOwnerAndShowBtn(){
       if(teamPortalWrap) teamPortalWrap.style.display=isTeamMember?'block':'none';
       const teamJoinWrap=document.getElementById('team-join-btn-wrap');
       if(teamJoinWrap) teamJoinWrap.style.display=isTeamMember?'none':'block';
-      const ghBtn=document.getElementById('github-verify-menu-btn');
-      if(ghBtn) ghBtn.style.display=_roles.includes('github')?'none':'flex';
+      const ghBtn=document.getElementById('github-verify-wrap');
+      if(ghBtn) ghBtn.style.display=_roles.includes('github')?'none':'block';
     }
     // GitHub verify button — always update regardless of team status
-    const _ghBtn2=document.getElementById('github-verify-menu-btn');
+    const _ghBtn2=document.getElementById('github-verify-wrap');
     if(_ghBtn2){
       const _r2=Array.isArray(cud&&cud.roles)?cud.roles:[];
-      _ghBtn2.style.display=_r2.includes('github')?'none':'flex';
+      _ghBtn2.style.display=_r2.includes('github')?'none':'block';
     }
   }catch{}
 }
