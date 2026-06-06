@@ -2703,24 +2703,35 @@ onAuthStateChanged(auth, async user=>{
       // Race the Firestore read against a 5s timeout so a bad rules config never hangs the app
       const uSnap=await Promise.race([
         getDoc(uRef),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),10000))
       ]);
       if(uSnap.exists()){
         cud=uSnap.data();
       } else {
-        // Brand-new account — bootstrap from Auth profile, never overwrite an existing doc
-        cud={uid:user.uid,displayName:user.displayName||'User',username:(user.displayName||'user').toLowerCase(),msgCount:0,online:true,roles:[],createdAt:serverTimestamp()};
-        await setDoc(uRef,cud).catch(()=>{});
+        // getDoc returned no doc — but double-check with a retry before writing
+        // The original read may have timed out; retrying prevents overwriting real data
+        let retrySnap=null;
+        try{retrySnap=await getDoc(uRef);}catch{}
+        if(retrySnap&&retrySnap.exists()){
+          // Doc exists after retry — use it, don't write anything
+          cud=retrySnap.data();
+        } else {
+          // Truly new account — bootstrap, use merge:true as safety net
+          cud={uid:user.uid,displayName:user.displayName||'User',username:(user.displayName||'user').toLowerCase(),msgCount:0,online:true,roles:[],createdAt:serverTimestamp()};
+          await setDoc(uRef,cud,{merge:true}).catch(()=>{});
+        }
       }
       await updateDoc(uRef,{online:true}).catch(()=>{});
     }catch(e){
-      // Firestore read failed (permissions, network, timeout) — keep any previously loaded cud
-      // rather than overwriting with a bare minimal object that would wipe roles/msgCount.
-      // Only set a fallback if cud is completely absent (e.g. first load with no prior state).
+      // Read failed (timeout/network) — attempt one more fresh read before falling back
       if(!cud||!cud.uid){
-        // Derive display name from Firestore display name, NOT from the Firebase Auth email,
-        // since the Auth email is 'oldusername@nexus.local' and may be stale after a rename.
-        cud={uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true,roles:[]};
+        try{
+          const retrySnap2=await getDoc(uRef);
+          if(retrySnap2.exists()){cud=retrySnap2.data();}
+          else{cud={uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true,roles:[]};}
+        }catch{
+          cud={uid:user.uid,displayName:user.displayName||'User',msgCount:0,online:true,roles:[]};
+        }
       }
     }
     enterApp();
