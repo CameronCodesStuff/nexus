@@ -1044,6 +1044,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
               <div style="height:1px;background:rgba(240,184,36,0.3);margin:4px 0;"></div>
               <button onclick="N.openTrialTest();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08));border:none;color:#f0b824;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;" onmouseover="this.style.background='rgba(240,184,36,0.22)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(240,184,36,0.12),rgba(255,140,0,0.08))'">&#9711; NEXUS Team Test</button>
             </div>
+            <button id="github-verify-menu-btn" onclick="N.openGithubVerify();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">&#9015; Verify GitHub</button>
             <div id="team-join-btn-wrap">
               <button onclick="N.openModal('team-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;color:#00d4ff;" onmouseover="this.style.background='rgba(0,212,255,0.12)'" onmouseout="this.style.background='none'">◈ Team</button>
             </div>
@@ -7055,6 +7056,8 @@ async function checkOwnerAndShowBtn(){
       if(teamPortalWrap) teamPortalWrap.style.display=isTeamMember?'block':'none';
       const teamJoinWrap=document.getElementById('team-join-btn-wrap');
       if(teamJoinWrap) teamJoinWrap.style.display=isTeamMember?'none':'block';
+      const ghBtn=document.getElementById('github-verify-menu-btn');
+      if(ghBtn) ghBtn.style.display=_roles.includes('github')?'none':'flex';
     }
   }catch{}
 }
@@ -13760,10 +13763,82 @@ async function loadTeamChat(){
   });
 }
 
+// ── GITHUB ROLE VERIFICATION ──────────────────────────────────────────
+function openGithubVerify(){
+  const inp=document.getElementById('gh-username-inp');
+  const status=document.getElementById('gh-verify-status');
+  if(inp) inp.value='';
+  if(status) status.innerHTML='';
+  openModal('github-verify-modal');
+}
+
+async function verifyGithub(){
+  const inp=document.getElementById('gh-username-inp');
+  const status=document.getElementById('gh-verify-status');
+  const btn=document.getElementById('gh-verify-btn');
+  const ghUser=(inp&&inp.value||'').trim();
+  if(!ghUser){status.innerHTML='<span style="color:var(--danger);">Enter your GitHub username.</span>';return;}
+  if(!cu||!cud){status.innerHTML='<span style="color:var(--danger);">Not logged in.</span>';return;}
+  btn.disabled=true;btn.textContent='Checking…';
+  status.innerHTML='<span style="color:var(--text-dim);">Checking GitHub…</span>';
+  const OWNER='CameronCodesStuff';
+  const REPO='nexus';
+  const headers={Accept:'application/vnd.github.v3+json'};
+
+  // Paginate through stargazers to find the user (up to 10 pages = 300 entries)
+  async function checkList(urlBase){
+    for(let page=1;page<=10;page++){
+      try{
+        const r=await fetch(urlBase+'?per_page=100&page='+page,{headers});
+        if(!r.ok) return false;
+        const data=await r.json();
+        if(!data.length) return false;
+        const loginKey=data[0].login!==undefined?'login':'login';
+        if(data.some(function(u){return (u.login||'').toLowerCase()===ghUser.toLowerCase();})) return true;
+        if(data.length<100) return false; // last page
+      }catch{return false;}
+    }
+    return false;
+  }
+
+  try{
+    status.innerHTML='<span style="color:var(--text-dim);">Checking stargazers…</span>';
+    const hasStarred=await checkList('https://api.github.com/repos/'+OWNER+'/'+REPO+'/stargazers');
+    if(!hasStarred){
+      status.innerHTML='<span style="color:var(--danger);">&#10007; @'+esc(ghUser)+' has not starred the Nexus repo. Please star it first, then try again.</span>';
+      btn.disabled=false;btn.textContent='VERIFY';
+      return;
+    }
+    status.innerHTML='<span style="color:#00ff88;">&#10003; Starred!</span> <span style="color:var(--text-dim);">Checking followers…</span>';
+    const isFollowing=await checkList('https://api.github.com/users/'+OWNER+'/followers');
+    if(!isFollowing){
+      status.innerHTML='<span style="color:var(--danger);">&#10007; @'+esc(ghUser)+' is not following @'+OWNER+' on GitHub. Please follow first, then try again.</span>';
+      btn.disabled=false;btn.textContent='VERIFY';
+      return;
+    }
+    // Both verified — grant the role
+    status.innerHTML='<span style="color:#00ff88;">&#10003; Starred! &#10003; Following! Granting role…</span>';
+    const roles=Array.isArray(cud.roles)?cud.roles.slice():[];
+    if(!roles.includes('github')) roles.push('github');
+    await updateDoc(doc(db,'users',cu.uid),{roles:roles,role:roles[0],githubUsername:ghUser});
+    cud=Object.assign({},cud,{roles:roles,role:roles[0],githubUsername:ghUser});
+    uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:roles,role:roles[0],githubUsername:ghUser});
+    status.innerHTML='<span style="color:#00ff88;">&#9015; GitHub role granted! Welcome.</span>';
+    renderSidebar&&renderSidebar();
+    renderProfile&&renderProfile();
+    setTimeout(function(){closeModal('github-verify-modal');},1800);
+  }catch(e){
+    status.innerHTML='<span style="color:var(--danger);">Error: '+esc(e.message)+'</span>';
+  }finally{
+    btn.disabled=false;btn.textContent='VERIFY';
+  }
+}
+
 // ── TEAM ROLES MANAGEMENT ──
-const TEAM_ASSIGNABLE_ROLES=['feedback','github','codetype'];
+
+const TEAM_ASSIGNABLE_ROLES=['feedback','codetype']; // github is self-verified via GitHub API
 const TEAM_ROLE_LABELS={feedback:'Feedback',github:'GitHub',codetype:'Codetype'};
-const TEAM_ROLE_DESCS={feedback:'Given to users who regularly leave useful feedback.',github:'Given to users with a linked GitHub or who contribute code.',codetype:'Given to users who use Codetype frequently or competitively.'};
+const TEAM_ROLE_DESCS={feedback:'Given to users who regularly leave useful feedback.',github:'Earned by following @CameronCodesStuff and starring the Nexus repo on GitHub.',codetype:'Given to users who use Codetype frequently or competitively.'};
 
 async function loadTeamRoles(){
   const panel=document.getElementById('tp-panel-roles');
@@ -15873,6 +15948,7 @@ window._N = {
   submitCommunityGame, loadGameSubmissions, approveGameSubmission, rejectGameSubmission,
   submitTeamApplication, loadTeamApplications, approveTeamApplication, rejectTeamApplication, downloadGameFile,
   openTrialTest, submitTrialTest,
+  openGithubVerify, verifyGithub,
   openTeamPortal, teamPortalTab, loadOwnerTesting, agreeToTeamConditions,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
@@ -16254,6 +16330,35 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- GitHub Verify Modal -->
+<div id="github-verify-modal" class="modal-overlay" onclick="if(event.target===this)N.closeModal('github-verify-modal')">
+  <div class="modal" style="width:400px;">
+    <div class="modal-title">&#9015; GitHub Verification</div>
+    <button class="modal-close" onclick="N.closeModal('github-verify-modal')">&#10005;</button>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.8;margin-bottom:14px;">
+        To earn the <strong style="color:var(--accent);">&#9015; GitHub</strong> role you must:
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+        <a href="https://github.com/CameronCodesStuff" target="_blank" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-size:18px;">&#128101;</span>
+          <div><div style="font-size:12px;font-weight:700;">Follow @CameronCodesStuff</div><div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">github.com/CameronCodesStuff &#8599;</div></div>
+        </a>
+        <a href="https://github.com/CameronCodesStuff/nexus" target="_blank" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);text-decoration:none;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <span style="font-size:18px;">&#11088;</span>
+          <div><div style="font-size:12px;font-weight:700;">Star the Nexus repo</div><div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">github.com/CameronCodesStuff/nexus &#8599;</div></div>
+        </a>
+      </div>
+      <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px;">THEN ENTER YOUR GITHUB USERNAME</div>
+      <div style="display:flex;gap:8px;">
+        <input id="gh-username-inp" type="text" placeholder="your-github-username" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        <button id="gh-verify-btn" onclick="N.verifyGithub()" style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:8px 14px;border-radius:6px;cursor:pointer;white-space:nowrap;">VERIFY</button>
+      </div>
+      <div id="gh-verify-status" style="margin-top:10px;font-size:11px;font-family:var(--font-mono);min-height:18px;"></div>
+    </div>
   </div>
 </div>
 
