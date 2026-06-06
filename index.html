@@ -14349,6 +14349,82 @@ async function loadTeamFeedback(){
   }
 }
 
+// ── TEAM INFO / ARCHITECTURE MAP ──
+function loadTeamInfo(){
+  const panel=document.getElementById('tp-panel-info');
+  if(!panel) return;
+  panel.innerHTML='';
+  const sec=function(title,color,children){
+    const s=document.createElement('div');
+    s.style.cssText='border:1px solid '+color+'44;border-left:3px solid '+color+';border-radius:8px;padding:14px;margin-bottom:14px;background:var(--bg2);';
+    const h=document.createElement('div');h.style.cssText='font-size:9px;letter-spacing:3px;color:'+color+';font-family:var(--font-mono);margin-bottom:10px;font-weight:700;';h.textContent=title;s.appendChild(h);
+    children.forEach(function(c){s.appendChild(c);});return s;
+  };
+  const row=function(label,desc){
+    const d=document.createElement('div');d.style.cssText='display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;';
+    const l=document.createElement('div');l.style.cssText='flex-shrink:0;font-size:10px;font-weight:700;color:var(--text);font-family:var(--font-mono);min-width:120px;padding-top:1px;';l.textContent=label;
+    const r=document.createElement('div');r.style.cssText='font-size:11px;color:var(--text-dim);line-height:1.6;flex:1;';r.textContent=desc;
+    d.appendChild(l);d.appendChild(r);return d;
+  };
+  const txt=function(s){const d=document.createElement('div');d.style.cssText='font-size:11px;color:var(--text-dim);line-height:1.7;margin-bottom:8px;';d.textContent=s;return d;};
+  const cod=function(s){const d=document.createElement('div');d.style.cssText='font-size:10px;color:#00ff88;font-family:var(--font-mono);background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin:4px 0 10px;line-height:1.7;white-space:pre;overflow-x:auto;';d.textContent=s;return d;};
+
+  panel.appendChild(sec('NEXUS \u2014 OVERVIEW','#00d4ff',[
+    txt('NEXUS is a real-time chat and social platform built as a single HTML file. Everything \u2014 UI, logic, auth, and data \u2014 runs in the browser. There is no traditional server or backend framework.'),
+    txt('The file is deployed via GitHub Pages (static hosting) and talks directly to Firebase cloud services for everything live.'),
+  ]));
+
+  panel.appendChild(sec('FRONTEND (what you see)','#4466ff',[
+    txt('The entire frontend is vanilla HTML, CSS, and JavaScript \u2014 no frameworks, no build tools. Everything lives in one file: index.html.'),
+    row('HTML','All modals, the sidebar, chat area, and overlays. Defined once, shown/hidden by toggling CSS classes.'),
+    row('CSS','Custom variables (--accent, --bg2 etc.) power the theme system. Role badge animations and background effects are pure CSS keyframes.'),
+    row('JavaScript','All app logic runs in one <script type="module"> block. Auth, chat, roles, games, leaderboard \u2014 all in the same file.'),
+    row('Rendering','No virtual DOM. JS directly updates innerHTML or appends DOM elements. Functions like renderSidebar() and renderProfile() re-draw sections.'),
+    row('Global State','cu = Firebase auth user | cud = your Firestore profile | uCache = all loaded users | aChats = loaded chats | acid = active chat ID'),
+  ]));
+
+  panel.appendChild(sec('BACKEND (Firebase cloud)','#00ff88',[
+    txt('Firebase provides three services acting as the backend. No custom server code exists \u2014 security is enforced by Firestore rules in the Firebase console.'),
+    row('Firestore','The main NoSQL database. All users, chats, messages, roles, tickets, games live here. Real-time updates via onSnapshot() listeners.'),
+    row('Firebase Auth','Handles sign-in/sign-out. Nexus stores usernames as username@nexus.local emails internally. Google and GitHub OAuth are also supported.'),
+    row('GitHub Pages','Hosts the static index.html. Every push to the main branch auto-deploys via GitHub Actions.'),
+    cod('Key Firestore collections:\n  users/              \u2014 profiles, roles, stats, preferences\n  chats/              \u2014 DM and group chat metadata\n  chats/{id}/messages \u2014 individual messages\n  invites/            \u2014 pending invitations\n  helpTickets/        \u2014 mirrored [HELP REQUEST] messages\n  teamFeed/           \u2014 owner posts for the team\n  teamChat/           \u2014 team-only live chat\n  teamTestItems/      \u2014 files and links to test\n  teamSuggestions/    \u2014 team improvement ideas\n  communityGames/     \u2014 community game reviews\n  feedback/           \u2014 user feedback and ratings\n  config/stats        \u2014 page view counter'),
+  ]));
+
+  panel.appendChild(sec('DATA FLOW \u2014 HOW IT WORKS','#f0b824',[
+    txt('Sending a message:'),
+    cod('User types \u2192 addDoc() writes to chats/{id}/messages/\n\u2192 Firestore broadcasts to all connected clients\n\u2192 each client\'s onSnapshot() fires\n\u2192 renderMessages() updates the UI\n(no server involved \u2014 Firestore handles the broadcast)'),
+    txt('Updating a role:'),
+    cod('Owner/team calls updateDoc() on users/{uid} with new roles array\n\u2192 Firestore writes the change\n\u2192 the affected user\'s onSnapshot() fires (they listen to their own doc)\n\u2192 cud is merged \u2192 renderSidebar() refreshes their badges'),
+    txt('Security: Firestore rules in the Firebase console decide who can read or write each collection. They are NOT in the code.'),
+  ]));
+
+  panel.appendChild(sec('YOUR ROLE AS TEAM MEMBER','#9b00ff',[
+    row('Help Tickets','Users send [HELP REQUEST] in chat \u2192 mirrored to helpTickets/. You read from there \u2014 you never touch private DMs.'),
+    row('Testing','Owner uploads to teamTestItems/. You open items, try them, post reviews to teamTestItems/{id}/reviews/{yourUID}.'),
+    row('Suggestions','Your ideas go to teamSuggestions/. Owner controls deletion.'),
+    row('Roles','You toggle feedback and codetype via updateDoc() on users/. GitHub is self-verified via GitHub public API.'),
+    row('Codetype Proof','Stored as a base64 image on the user doc. You review submissions and approve/reject in the PROOF tab.'),
+  ]));
+
+  const linksec=sec('USEFUL LINKS','#00d4ff',[]);
+  [
+    ['GitHub Repo','https://github.com/CameronCodesStuff/nexus','Source code and deployment history'],
+    ['Firebase Console','https://console.firebase.google.com','Firestore, Auth, and usage stats'],
+    ['Firestore Rules','https://console.firebase.google.com/project/bigchat-48763/firestore/rules','Edit security rules'],
+    ['Live Site','https://cameroncodesstuff.github.io/nexus','The deployed app'],
+  ].forEach(function(l){
+    const a=document.createElement('a');
+    a.href=l[1];a.target='_blank';
+    a.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;text-decoration:none;color:var(--text);margin-bottom:6px;transition:border-color 0.15s;';
+    a.onmouseenter=function(){a.style.borderColor='#00d4ff';};
+    a.onmouseleave=function(){a.style.borderColor='var(--border)';};
+    a.innerHTML='<span style="font-size:16px;">\U0001f517</span><div><div style="font-size:12px;font-weight:700;">'+l[0]+'</div><div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">'+l[2]+'</div></div>';
+    linksec.appendChild(a);
+  });
+  panel.appendChild(linksec);
+}
+
 // ── TEAM GAMES REVIEW ──
 
 async function loadTeamGames(){
@@ -16656,6 +16732,8 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
         <div id="tp-panel-games" style="display:none;"></div>
         <div id="tp-panel-roles" style="display:none;"></div>
         <div id="tp-panel-feedback" style="display:none;"></div>
+        <div id="tp-panel-proof" style="display:none;"></div>
+        <div id="tp-panel-info" style="display:none;"></div>
       </div>
     </div>
 
