@@ -13561,7 +13561,7 @@ function _populateTPBanner(){
 
 function teamPortalTab(tab){
   teamPortalCurrentTab=tab;
-  ['feed','tickets','testing','suggestions','team','chat','stats','games'].forEach(function(t){
+  ['feed','tickets','testing','suggestions','team','chat','stats','games','roles','feedback'].forEach(function(t){
     const btn=document.getElementById('tp-tab-'+t);
     const panel=document.getElementById('tp-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -13575,6 +13575,8 @@ function teamPortalTab(tab){
   if(tab==='chat') loadTeamChat();
   if(tab==='stats') loadTeamStats();
   if(tab==='games') loadTeamGames();
+  if(tab==='roles') loadTeamRoles();
+  if(tab==='feedback') loadTeamFeedback();
 }
 
 // ── TEAM FEED ──
@@ -13758,7 +13760,196 @@ async function loadTeamChat(){
   });
 }
 
+// ── TEAM ROLES MANAGEMENT ──
+const TEAM_ASSIGNABLE_ROLES=['feedback','github','codetype'];
+const TEAM_ROLE_LABELS={feedback:'Feedback',github:'GitHub',codetype:'Codetype'};
+const TEAM_ROLE_DESCS={feedback:'Given to users who regularly leave useful feedback.',github:'Given to users with a linked GitHub or who contribute code.',codetype:'Given to users who use Codetype frequently or competitively.'};
+
+async function loadTeamRoles(){
+  const panel=document.getElementById('tp-panel-roles');
+  if(!panel) return;
+  panel.innerHTML='';
+  // Info header
+  const info=document.createElement('div');
+  info.style.cssText='background:var(--bg2);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:12px;margin-bottom:14px;';
+  info.innerHTML='<div style="font-size:9px;letter-spacing:3px;color:#00d4ff;font-family:var(--font-mono);margin-bottom:8px;">ASSIGNABLE ROLES</div>';
+  // Build badge rows inline
+  const badgeWrap=document.createElement('div');
+  badgeWrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;';
+  TEAM_ASSIGNABLE_ROLES.forEach(function(r){
+    const bd=document.createElement('div');
+    bd.style.cssText='padding:4px 10px;border-radius:4px;background:var(--bg3);border:1px solid var(--border);';
+    bd.innerHTML=getRoleBadge([r])+'<div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);max-width:160px;margin-top:3px;">'+esc(TEAM_ROLE_DESCS[r]||r)+'</div>';
+    badgeWrap.appendChild(bd);
+  });
+  info.appendChild(badgeWrap);
+  panel.appendChild(info);
+  // Search form
+  const searchWrap=document.createElement('div');
+  searchWrap.style.cssText='display:flex;gap:8px;margin-bottom:14px;';
+  const searchInp=document.createElement('input');
+  searchInp.type='text';searchInp.placeholder='Search by username…';
+  searchInp.style.cssText='flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;outline:none;';
+  const searchBtn=document.createElement('button');
+  searchBtn.textContent='SEARCH';
+  searchBtn.style.cssText='background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:10px;font-weight:700;padding:8px 14px;border-radius:6px;cursor:pointer;';
+  const resultArea=document.createElement('div');
+  resultArea.id='tr-result';
+  const doSearch=async function(){
+    const q=(searchInp.value||'').trim().toLowerCase().replace(/^@/,'');
+    if(!q){toast('Enter a username.','danger');return;}
+    searchBtn.disabled=true;searchBtn.textContent='Searching…';
+    resultArea.innerHTML='';
+    try{
+      const snap=await getDocs(query(collection(db,'users'),where('username','==',q)));
+      if(snap.empty){resultArea.innerHTML='<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:8px;">User @'+esc(q)+' not found.</div>';return;}
+      const uDoc=snap.docs[0];
+      const u=uDoc.data();const uid=uDoc.id;
+      uCache[uid]=u;
+      resultArea.appendChild(buildRoleCard(uid,u));
+    }catch(e){resultArea.innerHTML='<div style="color:var(--danger);font-family:var(--font-mono);font-size:11px;padding:8px;">Error: '+esc(e.message)+'</div>';}
+    finally{searchBtn.disabled=false;searchBtn.textContent='SEARCH';}
+  };
+  searchBtn.onclick=doSearch;
+  searchInp.addEventListener('keydown',function(e){if(e.key==='Enter')doSearch();});
+  searchWrap.appendChild(searchInp);searchWrap.appendChild(searchBtn);
+  panel.appendChild(searchWrap);
+  panel.appendChild(resultArea);
+}
+
+function buildRoleCard(uid,u){
+  const rank=getRank(u.msgCount||0);
+  const card=document.createElement('div');
+  card.style.cssText='border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:14px;background:var(--bg2);';
+  // User header
+  const hdr=document.createElement('div');
+  hdr.style.cssText='display:flex;align-items:center;gap:10px;margin-bottom:12px;';
+  const av=document.createElement('div');
+  av.style.cssText='width:38px;height:38px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden;cursor:pointer;';
+  const avH=avatarHtml(uid,'38px');
+  if(avH&&avH.startsWith('<'))av.innerHTML=avH;else av.textContent=avH||'👤';
+  av.onclick=function(){openProfileModal(uid);};
+  const uInfo=document.createElement('div');
+  uInfo.style.cssText='flex:1;min-width:0;';
+  const uName=document.createElement('div');
+  uName.className=rank.c;
+  uName.style.cssText='font-size:13px;font-weight:700;cursor:pointer;';
+  uName.textContent=u.displayName||u.username||uid;
+  uName.onclick=function(){openProfileModal(uid);};
+  const uMeta=document.createElement('div');
+  uMeta.style.cssText='font-size:10px;color:var(--text-dim);font-family:var(--font-mono);';
+  uMeta.textContent='@'+(u.username||uid)+' · '+(u.msgCount||0)+' msgs';
+  const uBadges=document.createElement('div');
+  uBadges.style.cssText='display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;';
+  uBadges.innerHTML=getRoleBadge(uid)||'';
+  uInfo.appendChild(uName);uInfo.appendChild(uMeta);uInfo.appendChild(uBadges);
+  hdr.appendChild(av);hdr.appendChild(uInfo);
+  card.appendChild(hdr);
+  // Role toggle section
+  const rolesHdr=document.createElement('div');
+  rolesHdr.style.cssText='font-size:9px;letter-spacing:3px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:8px;border-top:1px solid var(--border);padding-top:8px;';
+  rolesHdr.textContent='TOGGLE ROLES';
+  card.appendChild(rolesHdr);
+  const toggleRow=document.createElement('div');
+  toggleRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px;';
+  const currentRoles=Array.isArray(u.roles)?u.roles.slice():[];
+  TEAM_ASSIGNABLE_ROLES.forEach(function(r){
+    const has=currentRoles.includes(r);
+    const btn=document.createElement('button');
+    btn.style.cssText='display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;font-weight:700;transition:all 0.15s;'
+      +(has?'background:rgba(0,255,136,0.12);border:1px solid rgba(0,255,136,0.5);color:#00ff88;':'background:var(--bg3);border:1px solid var(--border);color:var(--text-dim);');
+    btn.innerHTML=(has?'✓ ':'• ')+esc(TEAM_ROLE_LABELS[r]||r);
+    btn.onclick=(function(roleId,b,rolesArr,cardEl,_uid,_u){
+      return async function(){
+        const idx=rolesArr.indexOf(roleId);
+        if(idx>-1) rolesArr.splice(idx,1); else rolesArr.push(roleId);
+        const nowHas=rolesArr.includes(roleId);
+        b.style.background=nowHas?'rgba(0,255,136,0.12)':'var(--bg3)';
+        b.style.borderColor=nowHas?'rgba(0,255,136,0.5)':'var(--border)';
+        b.style.color=nowHas?'#00ff88':'var(--text-dim)';
+        b.innerHTML=(nowHas?'✓ ':'• ')+esc(TEAM_ROLE_LABELS[roleId]||roleId);
+        try{
+          await updateDoc(doc(db,'users',_uid),{roles:rolesArr,role:rolesArr[0]||null});
+          if(uCache[_uid]) uCache[_uid]=Object.assign({},uCache[_uid],{roles:rolesArr.slice(),role:rolesArr[0]||null});
+          uBadges.innerHTML=getRoleBadge(_uid)||'';
+          toast((nowHas?'✓ Gave ':'Removed ')+(TEAM_ROLE_LABELS[roleId]||roleId)+' role '+(nowHas?'to':'from')+' @'+esc(_u.username||_uid),'success');
+        }catch(e){toast('Failed: '+e.message,'danger');rolesArr.splice(rolesArr.indexOf(roleId),1);}
+      };
+    })(r,btn,currentRoles,card,uid,u);
+    toggleRow.appendChild(btn);
+  });
+  card.appendChild(toggleRow);
+  return card;
+}
+
+// ── TEAM FEEDBACK VIEWER ──
+async function loadTeamFeedback(){
+  const panel=document.getElementById('tp-panel-feedback');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading…</div>';
+  try{
+    const snap=await getDocs(collection(db,'feedback'));
+    if(snap.empty){
+      panel.innerHTML='<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:10px;text-align:center;">No feedback submitted yet.</div>';
+      return;
+    }
+    // Compute summary stats
+    const docs=snap.docs.map(function(d){return Object.assign({_uid:d.id},d.data());});
+    const total=docs.reduce(function(s,d){return s+(d.rating||0);},0);
+    const avg=total/docs.length;
+    const dist=[0,0,0,0,0];
+    docs.forEach(function(d){if(d.rating>=1&&d.rating<=5)dist[d.rating-1]++;});
+    panel.innerHTML='';
+    // Summary card
+    const summary=document.createElement('div');
+    summary.style.cssText='background:var(--bg2);border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:14px;margin-bottom:14px;';
+    summary.innerHTML='<div style="font-size:9px;letter-spacing:3px;color:#00d4ff;font-family:var(--font-mono);margin-bottom:10px;">FEEDBACK SUMMARY</div>'
+      +'<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">'
+      +'<div style="text-align:center;"><div style="font-size:28px;font-weight:900;color:#f0b824;font-family:Orbitron,monospace;">'+avg.toFixed(1)+'</div><div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">AVG RATING</div></div>'
+      +'<div style="text-align:center;"><div style="font-size:28px;font-weight:900;color:#00d4ff;font-family:Orbitron,monospace;">'+docs.length+'</div><div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">TOTAL</div></div>'
+      +'<div style="flex:1;min-width:120px;">'+(function(){
+        return [5,4,3,2,1].map(function(n){
+          const count=dist[n-1];
+          const pct=docs.length?Math.round(count/docs.length*100):0;
+          return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">'
+            +'<span style="font-size:9px;color:#f0b824;width:14px;text-align:right;">'+'★'.repeat(n)+'</span>'
+            +'<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;">'
+            +'<div style="height:100%;width:'+pct+'%;background:#f0b824;border-radius:3px;"></div></div>'
+            +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);width:24px;">'+count+'</span>'
+            +'</div>';
+        }).join('');
+      }())
+      +'</div></div>';
+    panel.appendChild(summary);
+    // Sort: highest rating first, then by username
+    docs.sort(function(a,b){return (b.rating||0)-(a.rating||0)||(a.username||'').localeCompare(b.username||'');});
+    const listHdr=document.createElement('div');
+    listHdr.style.cssText='font-size:9px;letter-spacing:3px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:10px;';
+    listHdr.textContent='ALL FEEDBACK ('+docs.length+')';
+    panel.appendChild(listHdr);
+    docs.forEach(function(fb){
+      const u=uCache[fb._uid]||{};
+      const rank=getRank(u.msgCount||0);
+      const stars='★'.repeat(fb.rating||0)+'☆'.repeat(5-(fb.rating||0));
+      const card=document.createElement('div');
+      card.style.cssText='border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:7px;background:var(--bg2);cursor:pointer;';
+      card.onclick=function(){if(fb._uid)openProfileModal(fb._uid);};
+      card.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">'
+        +'<span class="'+rank.c+'" style="font-size:12px;font-weight:700;">'+esc(fb.displayName||u.displayName||fb.username||'?')+'</span>'
+        +'<span style="font-size:12px;color:#f0b824;letter-spacing:1px;">'+stars+'</span>'
+        +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">@'+esc(fb.username||u.username||'')+'</span>'
+        +(fb.ts?'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-left:auto;">'+new Date(fb.ts.toMillis?fb.ts.toMillis():fb.ts).toLocaleDateString()+'</span>':'')
+        +'</div>'
+        +(fb.text?'<div style="font-size:11px;color:var(--text-dim);line-height:1.5;">'+esc(fb.text)+'</div>':'');
+      panel.appendChild(card);
+    });
+  }catch(e){
+    panel.innerHTML='<div style="color:var(--danger);font-size:11px;font-family:var(--font-mono);padding:10px;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
 // ── TEAM GAMES REVIEW ──
+
 async function loadTeamGames(){
   const panel=document.getElementById('tp-panel-games');
   if(!panel) return;
@@ -16045,6 +16236,8 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
           <div class="auth-tab" id="tp-tab-chat" onclick="N.teamPortalTab('chat')" style="font-size:9px;">CHAT</div>
           <div class="auth-tab" id="tp-tab-stats" onclick="N.teamPortalTab('stats')" style="font-size:9px;">STATS</div>
           <div class="auth-tab" id="tp-tab-games" onclick="N.teamPortalTab('games')" style="font-size:9px;">GAMES</div>
+          <div class="auth-tab" id="tp-tab-roles" onclick="N.teamPortalTab('roles')" style="font-size:9px;">ROLES</div>
+          <div class="auth-tab" id="tp-tab-feedback" onclick="N.teamPortalTab('feedback')" style="font-size:9px;">FEEDBACK</div>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:14px 18px;">
@@ -16056,6 +16249,8 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
         <div id="tp-panel-chat" style="display:none;"></div>
         <div id="tp-panel-stats" style="display:none;"></div>
         <div id="tp-panel-games" style="display:none;"></div>
+        <div id="tp-panel-roles" style="display:none;"></div>
+        <div id="tp-panel-feedback" style="display:none;"></div>
       </div>
     </div>
 
