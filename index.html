@@ -59,18 +59,18 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .screen{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;}
   .screen.active{display:flex;}
   #auth-screen{background:radial-gradient(ellipse at 50% 40%,rgba(68,102,255,0.08) 0%,transparent 70%);}
-  .auth-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:48px;width:420px;max-width:95vw;backdrop-filter:blur(20px);box-shadow:0 0 60px var(--glow),0 0 120px rgba(0,0,0,0.8);position:relative;overflow:hidden;}
+  .auth-box{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:32px 36px 28px;width:400px;max-width:92vw;max-height:90vh;overflow-y:auto;overflow-x:hidden;backdrop-filter:blur(24px);box-shadow:0 0 80px var(--glow),0 32px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.04);position:relative;}
   .auth-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
-  .auth-logo{font-family:var(--font-display);font-size:32px;font-weight:900;text-align:center;letter-spacing:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px;}
-  .auth-tagline{text-align:center;color:var(--text-dim);font-size:11px;letter-spacing:3px;margin-bottom:36px;font-family:var(--font-mono);}
-  .auth-tabs{display:flex;margin-bottom:28px;border-bottom:1px solid var(--border);}
+  .auth-logo{font-family:var(--font-display);font-size:28px;font-weight:900;text-align:center;letter-spacing:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px;}
+  .auth-tagline{text-align:center;color:var(--text-dim);font-size:10px;letter-spacing:3px;margin-bottom:18px;font-family:var(--font-mono);}
+  .auth-tabs{display:flex;margin-bottom:16px;border-bottom:1px solid var(--border);}
   .auth-tab{flex:1;padding:10px;text-align:center;cursor:pointer;font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:var(--text-dim);transition:all 0.3s;border-bottom:2px solid transparent;margin-bottom:-1px;}
   .auth-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-  .auth-form{display:flex;flex-direction:column;gap:14px;}
-  .auth-form input{background:#1a1a2e !important;border:1px solid rgba(68,102,255,0.2) !important;color:var(--text);padding:12px 16px;border-radius:8px;font-family:var(--font-mono);font-size:13px;outline:none;transition:border-color 0.3s,box-shadow 0.3s;}
+  .auth-form{display:flex;flex-direction:column;gap:10px;}
+  .auth-form input{background:#1a1a2e !important;border:1px solid rgba(68,102,255,0.2) !important;color:var(--text);padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color 0.3s,box-shadow 0.3s;}
   .auth-form input:focus{border-color:var(--accent);box-shadow:0 0 16px var(--glow);}
   .auth-form input::placeholder{color:var(--text-dim);}
-  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:13px;border-radius:8px;font-family:var(--font-display);font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.3s;margin-top:8px;}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:11px;border-radius:8px;font-family:var(--font-display);font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.3s;margin-top:4px;}
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px var(--glow);}
   .auth-error{color:var(--danger);font-size:12px;text-align:center;font-family:var(--font-mono);min-height:16px;}
   .auth-info{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);text-align:center;line-height:1.6;margin-top:4px;}
@@ -2934,79 +2934,50 @@ async function signInWithGithub(){
 function showForgotPassword(){
   const form=$('login-form');
   if(!form) return;
-  // Don't double-inject
   if(document.getElementById('forgot-pw-panel')) return;
   const panel=document.createElement('div');
   panel.id='forgot-pw-panel';
   panel.style.cssText='margin-top:10px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;';
   panel.innerHTML=`
-    <div style="font-size:9px;color:rgba(255,255,255,0.4);font-family:var(--font-mono);letter-spacing:1px;margin-bottom:8px;">enter your email to reset password</div>
+    <div style="font-size:9px;color:rgba(255,255,255,0.4);font-family:var(--font-mono);letter-spacing:1px;margin-bottom:8px;">a password reset ticket will be sent to the owner</div>
     <div style="display:flex;gap:6px;">
-      <input type="text" id="forgot-email-inp" placeholder="username or recovery email" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;font-family:var(--font-mono);font-size:11px;padding:6px 10px;border-radius:6px;outline:none;">
+      <input type="text" id="forgot-user-inp" placeholder="your username" style="flex:1;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff;font-family:var(--font-mono);font-size:11px;padding:6px 10px;border-radius:6px;outline:none;">
       <button onclick="N.doForgotPassword()" style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:9px;letter-spacing:1px;padding:6px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">SEND</button>
     </div>
     <div id="forgot-status" style="font-size:9px;font-family:var(--font-mono);margin-top:6px;display:none;"></div>
   `;
   form.appendChild(panel);
-  setTimeout(()=>document.getElementById('forgot-email-inp')?.focus(),50);
+  setTimeout(()=>document.getElementById('forgot-user-inp')?.focus(),50);
 }
 
 async function doForgotPassword(){
-  const inp=document.getElementById('forgot-email-inp');
+  const inp=document.getElementById('forgot-user-inp');
   const status=document.getElementById('forgot-status');
   const setStatus=(msg,ok)=>{if(status){status.style.display='block';status.style.color=ok?'rgba(0,255,136,0.8)':'rgba(255,80,80,0.9)';status.textContent=msg;}};
-  const val=(inp?.value||'').trim().toLowerCase();
-  if(!val){setStatus('enter your username or email');return;}
-  setStatus('✓ looking up account…',true);
+  const val=(inp?.value||'').trim().toLowerCase().replace(/^@/,'');
+  if(!val){setStatus('enter your username');return;}
+  setStatus('sending request…',true);
   try{
-    // Build a list of candidate emails to try, in priority order
-    const candidates=[];
-    if(val.includes('@')&&!val.endsWith('@nexus.local')){
-      // User typed an email directly
-      candidates.push(val);
-    } else {
-      // Username entered — look up uid from usernames (public read, no auth needed)
-      const username=val.replace(/^@/,'').replace('@nexus.local','');
-      const unSnap=await getDoc(doc(db,'usernames',username)).catch(()=>null);
-      const uid=unSnap?.exists?.()?unSnap.data().uid:null;
-      if(!uid){setStatus('no account found for @'+username);return;}
-      // Fetch user doc — may fail if rules block unauthenticated reads,
-      // in which case we fall back to asking Firebase Auth directly
-      const uSnap=await getDoc(doc(db,'users',uid)).catch(()=>null);
-      const uData=uSnap?.exists?.()?uSnap.data():{};
-      // Priority: googleEmail (already the Firebase Auth email if Google-linked)
-      // then recoveryEmail (set via saveLinkedEmail which calls updateEmail)
-      if(uData.googleEmail) candidates.push(uData.googleEmail);
-      if(uData.recoveryEmail&&uData.recoveryEmail!==uData.googleEmail) candidates.push(uData.recoveryEmail);
-    }
-    if(!candidates.length){
-      setStatus('no recovery email on file — log in and add one in Settings → Account & Security');
-      return;
-    }
-    // Try each candidate: check it exists in Firebase Auth, then send reset
-    let sent=false;
-    for(const email of candidates){
-      let methods=[];
-      try{methods=await fetchSignInMethodsForEmail(auth,email);}catch{}
-      if(methods&&methods.length){
-        // This email is registered in Firebase Auth — send the reset
-        await sendPasswordResetEmail(auth,email);
-        setStatus('✓ reset link sent to '+email.replace(/(.{2}).+(@.+)/,'$1…$2'),true);
-        if(inp) inp.value='';
-        sent=true;
-        break;
-      }
-    }
-    if(!sent){
-      setStatus('no Firebase account linked to your recovery email — log in and re-save your email in Settings → Account & Security');
-    }
+    // Look up uid from usernames (public read)
+    const unSnap=await getDoc(doc(db,'usernames',val)).catch(()=>null);
+    const uid=unSnap?.exists?.()?unSnap.data().uid:null;
+    if(!uid){setStatus('no account found for @'+val);return;}
+    // Write to passwordResetRequests — public create, owner/team reads
+    await addDoc(collection(db,'passwordResetRequests'),{
+      username:val,
+      uid:uid,
+      ts:serverTimestamp(),
+      status:'pending',
+      note:'User submitted forgot-password request from login screen.'
+    });
+    setStatus('✓ request sent — the owner will reset your password shortly',true);
+    if(inp) inp.value='';
   }catch(e){
-    const msg=e.code==='auth/invalid-email'?'invalid email address'
-      :e.code==='auth/user-not-found'?'no account found with that email'
-      :'error — '+e.message;
-    setStatus(msg);
+    setStatus('failed — '+e.message);
   }
 }
+
+
 async function doLogin(){
   const un=$('login-user').value.trim(),pw=$('login-pass').value;
   const err=$('login-error');
@@ -14852,6 +14823,45 @@ async function loadTeamTickets(){
   }catch(e){
     panel.innerHTML='<div style="color:var(--danger);font-size:11px;font-family:var(--font-mono);padding:10px;">Error: '+esc(e.message)+'</div>';
   }
+  // ── PASSWORD RESET REQUESTS ──
+  try{
+    const prSnap=await getDocs(query(collection(db,'passwordResetRequests'),limit(50)));
+    if(!prSnap.empty){
+      const prDocs=prSnap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.status!=='resolved');
+      if(prDocs.length){
+        const hdr=document.createElement('div');
+        hdr.style.cssText='font-size:10px;font-family:var(--font-display);letter-spacing:2px;color:#f0b824;margin:12px 0 6px;display:flex;align-items:center;gap:6px;';
+        hdr.innerHTML='🔑 PASSWORD RESET REQUESTS <span style="background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.4);color:#f0b824;font-size:9px;padding:1px 7px;border-radius:10px;">'+prDocs.length+'</span>';
+        panel.appendChild(hdr);
+        prDocs.sort((a,b)=>(b.ts?.toMillis?.()||0)-(a.ts?.toMillis?.()||0));
+        prDocs.forEach(function(r){
+          const card=document.createElement('div');
+          card.style.cssText='border:1px solid rgba(240,184,36,0.35);border-radius:8px;padding:12px;margin-bottom:8px;background:rgba(240,184,36,0.05);';
+          const ts=r.ts?.toMillis?.()||0;
+          card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'
+            +'<span style="font-size:12px;font-weight:700;color:var(--text);font-family:var(--font-mono);">@'+esc(r.username||'?')+'</span>'
+            +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">'+new Date(ts).toLocaleString()+'</span>'
+            +'</div>'
+            +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:8px;">'+esc(r.note||'Password reset requested')+'</div>';
+          const btnRow=document.createElement('div');
+          btnRow.style.cssText='display:flex;gap:6px;';
+          const doneBtn=document.createElement('button');
+          doneBtn.style.cssText='background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.4);color:#00ff88;font-family:var(--font-mono);font-size:9px;font-weight:700;padding:4px 12px;border-radius:5px;cursor:pointer;';
+          doneBtn.textContent='✓ MARK RESOLVED';
+          doneBtn.onclick=(function(id,c2){return async function(){
+            try{
+              await updateDoc(doc(db,'passwordResetRequests',id),{status:'resolved',resolvedAt:serverTimestamp(),resolvedBy:cud?.username||cu.uid});
+              c2.style.opacity='0.5';doneBtn.disabled=true;doneBtn.textContent='✓ RESOLVED';
+              toast('Reset request marked resolved.','success');
+            }catch(e){toast('Failed: '+e.message,'danger');}
+          };})(r.id,card);
+          btnRow.appendChild(doneBtn);
+          card.appendChild(btnRow);
+          panel.appendChild(card);
+        });
+      }
+    }
+  }catch{}
 }
 
 // ── TEAM PORTAL: TESTING ──
