@@ -9626,6 +9626,7 @@ async function saveLinkedEmail(){
 }
 
 async function linkGitHub(){
+  if(!auth.currentUser){toast('Not logged in.','danger');return;}
   const status=document.getElementById('link-account-status');
   if(status){status.style.color='var(--text-dim)';status.textContent='Opening GitHub sign-in…';}
   try{
@@ -9639,10 +9640,12 @@ async function linkGitHub(){
     toast('✓ GitHub account linked! Checking role eligibility…','success');
     renderLinkedAccountsSection();
   }catch(e){
-    const msg=e.code==='auth/credential-already-in-use'?'That GitHub account is already linked to another account.'
-      :e.code==='auth/popup-closed-by-user'?'Popup closed — try again.'
+    const msg=e.code==='auth/credential-already-in-use'?'That GitHub account is already linked to another Nexus account.'
+      :e.code==='auth/popup-closed-by-user'?''
+      :e.code==='auth/invalid-action'||e.message?.includes('invalid')||e.message?.includes('domain')?'Domain not authorised. Add cameroncodesstuff.github.io to Firebase Auth → Authorized Domains, and enable GitHub in Firebase Auth → Sign-in providers.'
       :'Failed: '+e.message;
-    if(status){status.style.color='var(--danger)';status.textContent=msg;}
+    if(status&&msg){status.style.color='var(--danger)';status.textContent=msg;}
+    else if(status) status.textContent='';
   }
 }
 async function unlinkGitHub(){
@@ -9683,25 +9686,42 @@ async function removeLinkedEmail(){
 }
 
 async function linkGoogle(){
+  if(!auth.currentUser){toast('Not logged in.','danger');return;}
+  const status=document.getElementById('link-account-status');
+  if(status){status.style.color='var(--text-dim)';status.textContent='Opening Google sign-in…';}
   try{
     const provider=new GoogleAuthProvider();
-    await linkWithPopup(auth.currentUser,provider);
-    toast('Google account linked!','success');
-    renderSettings();
+    const result=await linkWithPopup(auth.currentUser,provider);
+    const gEmail=result.user.providerData.find(p=>p.providerId==='google.com')?.email||'';
+    await updateDoc(doc(db,'users',cu.uid),{googleLinked:true,googleEmail:gEmail,recoveryEmail:gEmail}).catch(()=>{});
+    cud=Object.assign({},cud,{googleLinked:true,googleEmail:gEmail,recoveryEmail:gEmail});
+    toast('✓ Google account linked!','success');
+    if(status) status.textContent='';
+    renderLinkedAccountsSection();
   }catch(e){
-    if(e.code==='auth/credential-already-in-use') toast('That Google account is linked to another user.','danger');
-    else if(e.code==='auth/popup-closed-by-user') return;
-    else toast('Link failed: '+e.message,'danger');
+    const msg=e.code==='auth/credential-already-in-use'?'That Google account is already linked to another Nexus account.'
+      :e.code==='auth/popup-closed-by-user'?''
+      :e.code==='auth/invalid-action'||e.message?.includes('invalid')?'Make sure cameroncodesstuff.github.io is listed in Firebase Auth → Authorized Domains.'
+      :'Link failed: '+e.message;
+    if(msg) toast(msg,'danger');
+    if(status) status.textContent='';
   }
 }
 
 async function unlinkGoogle(){
-  if(!confirm('Unlink your Google account? Make sure you have a password set first.')) return;
+  if(!auth.currentUser){toast('Not logged in.','danger');return;}
+  if(!confirm('Unlink your Google account?')) return;
   try{
     await unlink(auth.currentUser,'google.com');
+    await updateDoc(doc(db,'users',cu.uid),{googleLinked:false,googleEmail:''}).catch(()=>{});
+    cud=Object.assign({},cud,{googleLinked:false,googleEmail:''});
     toast('Google account unlinked.','success');
-    renderSettings();
-  }catch(e){toast('Unlink failed: '+e.message,'danger');}
+    renderLinkedAccountsSection();
+  }catch(e){
+    const msg=e.code==='auth/no-such-provider'?'Google is not linked to this account.'
+      :'Unlink failed: '+e.message;
+    toast(msg,'danger');
+  }
 }
 
 async function sendPasswordReset(){
