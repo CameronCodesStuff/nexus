@@ -393,7 +393,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   /* Profile modal */
   .profile-banner{height:70px;border-radius:10px 10px 0 0;background:linear-gradient(135deg,var(--accent),var(--accent2));position:relative;flex-shrink:0;}
   .profile-header-row{display:flex;align-items:flex-end;gap:14px;padding:0 20px;margin-top:-26px;margin-bottom:14px;position:relative;z-index:1;}
-  .profile-avatar-big{width:56px;height:56px;border-radius:14px;background:var(--bg3);border:3px solid var(--panel);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,0.5);}
+  .profile-avatar-big{width:56px;height:56px;border-radius:14px;background:var(--bg3);border:3px solid var(--panel);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,0.5);position:relative;}
   .profile-bio{font-size:13px;color:var(--text-dim);font-family:var(--font-mono);line-height:1.7;padding:8px 0;word-break:break-word;white-space:pre-wrap;}
   .profile-bio-empty{font-size:12px;color:var(--text-dim);font-family:var(--font-mono);font-style:italic;opacity:0.5;}
   /* Bio edit in settings */
@@ -2626,7 +2626,7 @@ function avatarHtml(uid, sizePx){
     +'align-items:center;justify-content:center;flex-shrink:0;border-radius:inherit;';
   if(u.profilePic){
     const se=emoji.replace(/'/g,"\'");
-    const img='<img src="'+esc(u.profilePic)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" alt="" '
+    const img='<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" alt="" '
       +'onerror="this.style.display=\'none\';this.parentElement.style.fontSize=\'calc('+sizePx+' * 0.55)\';this.parentElement.textContent=\''+se+'\'">';
     return '<div style="'+wrapStyle+'">'+img+_fo+'</div>';
   }
@@ -6452,7 +6452,7 @@ function openProfileModal(uid){
     ?'<div style="position:absolute;inset:0;border-radius:12px;z-index:2;pointer-events:none;box-shadow:inset 0 0 0 3px '+_profFr.b+',0 0 16px '+_profFr.g+';"></div>'
     :'';
   const avatarContent=u.profilePic
-    ?'<img src="'+esc(u.profilePic)+'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:12px;display:block;" alt="" onerror="this.style.display=\'none\';this.parentElement.textContent=\''+emoji.replace(/'/g,"\'")+'\'">'+_profFo
+    ?'<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px;display:block;" alt="" onerror="this.style.display=\'none\';this.parentElement.textContent=\''+emoji.replace(/'/g,"\'")+'\'">'+_profFo
     :emoji+_profFo;
 
   // Activity / now playing
