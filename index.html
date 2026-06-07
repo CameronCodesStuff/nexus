@@ -2611,20 +2611,23 @@ function userEmoji(uid){
 }
 
 // Returns HTML for an avatar — profile pic if set, else emoji
-const AVATAR_FRAMES={none:'',gold:'border:2px solid #f0b824;box-shadow:0 0 8px rgba(240,184,36,0.6);border-radius:inherit;',neon:'border:2px solid #00ff87;box-shadow:0 0 10px rgba(0,255,135,0.7);border-radius:inherit;',galaxy:'border:2px solid #7c3aed;box-shadow:0 0 10px rgba(124,58,237,0.7);border-radius:inherit;',fire:'border:2px solid #ff4500;box-shadow:0 0 10px rgba(255,69,0,0.8);border-radius:inherit;',ice:'border:2px solid #a8edea;box-shadow:0 0 8px rgba(168,237,234,0.6);border-radius:inherit;',rainbow:'border:2px solid #ff0080;box-shadow:0 0 12px rgba(255,0,128,0.5);border-radius:inherit;',owner:'border:2px solid var(--accent);box-shadow:0 0 12px var(--glow);border-radius:inherit;',};
+const AVATAR_FRAMES={none:'',gold:'box-shadow:inset 0 0 0 2px #f0b824,0 0 8px rgba(240,184,36,0.5);',neon:'box-shadow:inset 0 0 0 2px #00ff87,0 0 10px rgba(0,255,135,0.6);',galaxy:'box-shadow:inset 0 0 0 2px #7c3aed,0 0 10px rgba(124,58,237,0.6);',fire:'box-shadow:inset 0 0 0 2px #ff4500,0 0 10px rgba(255,69,0,0.7);',ice:'box-shadow:inset 0 0 0 2px #a8edea,0 0 8px rgba(168,237,234,0.5);',rainbow:'box-shadow:inset 0 0 0 2px #ff0080,0 0 12px rgba(255,0,128,0.4);',owner:'box-shadow:inset 0 0 0 2px var(--accent),0 0 12px var(--glow);',};
 function avatarHtml(uid, sizePx){
   const u=(uid===cu?.uid&&cud)?cud:(uCache[uid]||{});
   const emoji=userEmoji(uid);
   const _fr=AVATAR_FRAMES[u.avatarFrame||'none']||'';
-  const _fo=_fr?('<div style="position:absolute;inset:-3px;'+_fr+'pointer-events:none;border-radius:inherit;"></div>'):'';
   if(u.profilePic){
     const safeEmoji=emoji.replace(/'/g,"\'");
-    const _img='<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\')">';
-    if(_fr) return '<div style="position:relative;display:inline-flex;width:'+sizePx+';height:'+sizePx+';flex-shrink:0;overflow:visible;">'+_img+_fo+'</div>';
-    return _img;
+    // Apply frame as inset box-shadow on a wrapper div (stays inside overflow:hidden containers)
+    const wrapStyle='width:'+sizePx+';height:'+sizePx+';position:relative;display:inline-flex;flex-shrink:0;border-radius:inherit;'+(_fr?_fr:'');
+    const imgStyle='width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;';
+    return '<div style="'+wrapStyle+'">'
+      +'<img src="'+esc(u.profilePic)+'" style="'+imgStyle+'" alt="" onerror="this.style.display=\'none\';this.insertAdjacentText(\'afterend\',\''+safeEmoji+'\')">'
+      +'</div>';
   }
-  if(_fr) return '<div style="position:relative;display:inline-flex;width:'+sizePx+';height:'+sizePx+';align-items:center;justify-content:center;flex-shrink:0;overflow:visible;">'+emoji+_fo+'</div>';
-  return emoji;
+  // Emoji avatar
+  const wrapStyle='width:'+sizePx+';height:'+sizePx+';display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:inherit;'+(_fr?_fr:'');
+  return '<div style="'+wrapStyle+'">'+emoji+'</div>';
 }
 
 
@@ -6441,9 +6444,10 @@ function openProfileModal(uid){
   const container=$('profile-modal-content');
   const isBlocked=(cud?.blocked||[]).includes(uid);
   const deviceEmoji=u.device==='mobile'?'📱':'💻';
+  const _profFr=AVATAR_FRAMES[u.avatarFrame||'none']||'';
   const avatarContent=u.profilePic
-    ?`<img src="${esc(u.profilePic)}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;display:block;" alt="" onerror="this.style.display='none';this.parentElement.textContent='${emoji}'">`
-    :emoji;
+    ?'<img src="'+esc(u.profilePic)+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px;display:block;'+(_profFr?_profFr:'')+'" alt="" onerror="this.style.display=\'none\';this.parentElement.textContent=\''+emoji.replace(/'/g,"\'")+'\'">'+''
+    :'<span style="'+(_profFr?_profFr:'')+';border-radius:12px;display:inline-flex;align-items:center;justify-content:center;width:100%;height:100%;">'+emoji+'</span>';
 
   // Activity / now playing
   const actLabel=getActivityLabel(u);
