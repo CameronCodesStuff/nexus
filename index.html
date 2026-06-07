@@ -59,18 +59,18 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .screen{position:fixed;inset:0;z-index:10;display:none;align-items:center;justify-content:center;}
   .screen.active{display:flex;}
   #auth-screen{background:radial-gradient(ellipse at 50% 40%,rgba(68,102,255,0.08) 0%,transparent 70%);}
-  .auth-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:36px 44px;width:480px;max-width:96vw;backdrop-filter:blur(20px);box-shadow:0 0 60px var(--glow),0 0 120px rgba(0,0,0,0.8);position:relative;overflow:hidden;}
+  .auth-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:48px;width:420px;max-width:95vw;backdrop-filter:blur(20px);box-shadow:0 0 60px var(--glow),0 0 120px rgba(0,0,0,0.8);position:relative;overflow:hidden;}
   .auth-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
   .auth-logo{font-family:var(--font-display);font-size:32px;font-weight:900;text-align:center;letter-spacing:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px;}
-  .auth-tagline{text-align:center;color:var(--text-dim);font-size:11px;letter-spacing:3px;margin-bottom:22px;font-family:var(--font-mono);}
-  .auth-tabs{display:flex;margin-bottom:18px;border-bottom:1px solid var(--border);}
+  .auth-tagline{text-align:center;color:var(--text-dim);font-size:11px;letter-spacing:3px;margin-bottom:36px;font-family:var(--font-mono);}
+  .auth-tabs{display:flex;margin-bottom:28px;border-bottom:1px solid var(--border);}
   .auth-tab{flex:1;padding:10px;text-align:center;cursor:pointer;font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:var(--text-dim);transition:all 0.3s;border-bottom:2px solid transparent;margin-bottom:-1px;}
   .auth-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
-  .auth-form{display:flex;flex-direction:column;gap:10px;}
-  .auth-form input{background:#1a1a2e !important;border:1px solid rgba(68,102,255,0.2) !important;color:var(--text);padding:10px 14px;border-radius:8px;font-family:var(--font-mono);font-size:12px;outline:none;transition:border-color 0.3s,box-shadow 0.3s;}
+  .auth-form{display:flex;flex-direction:column;gap:14px;}
+  .auth-form input{background:#1a1a2e !important;border:1px solid rgba(68,102,255,0.2) !important;color:var(--text);padding:12px 16px;border-radius:8px;font-family:var(--font-mono);font-size:13px;outline:none;transition:border-color 0.3s,box-shadow 0.3s;}
   .auth-form input:focus{border-color:var(--accent);box-shadow:0 0 16px var(--glow);}
   .auth-form input::placeholder{color:var(--text-dim);}
-  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:11px;border-radius:8px;font-family:var(--font-display);font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.3s;margin-top:4px;}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;padding:13px;border-radius:8px;font-family:var(--font-display);font-size:11px;letter-spacing:3px;cursor:pointer;transition:all 0.3s;margin-top:8px;}
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px var(--glow);}
   .auth-error{color:var(--danger);font-size:12px;text-align:center;font-family:var(--font-mono);min-height:16px;}
   .auth-info{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);text-align:center;line-height:1.6;margin-top:4px;}
@@ -2954,51 +2954,57 @@ function showForgotPassword(){
 async function doForgotPassword(){
   const inp=document.getElementById('forgot-email-inp');
   const status=document.getElementById('forgot-status');
+  const setStatus=(msg,ok)=>{if(status){status.style.display='block';status.style.color=ok?'rgba(0,255,136,0.8)':'rgba(255,80,80,0.9)';status.textContent=msg;}};
   const val=(inp?.value||'').trim().toLowerCase();
-  if(!val){
-    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='enter your username or recovery email';}
-    return;
-  }
-  if(status){status.style.display='block';status.style.color='rgba(255,255,255,0.4)';status.textContent='looking up account…';}
+  if(!val){setStatus('enter your username or email');return;}
+  setStatus('✓ looking up account…',true);
   try{
-    let emailToReset='';
-    let userData=null;
+    // Build a list of candidate emails to try, in priority order
+    const candidates=[];
     if(val.includes('@')&&!val.endsWith('@nexus.local')){
-      // Direct real email entered
-      emailToReset=val;
+      // User typed an email directly
+      candidates.push(val);
     } else {
-      // Username entered — look up their Firestore doc for recoveryEmail or _authEmail
-      const username=val.replace('@nexus.local','');
-      const usernameDoc=await getDoc(doc(db,'usernames',username)).catch(()=>null);
-      const uid=usernameDoc?.exists?.()?usernameDoc.data().uid:null;
-      if(uid){
-        const userDoc=await getDoc(doc(db,'users',uid)).catch(()=>null);
-        userData=userDoc?.data()||{};
-        emailToReset=userData.recoveryEmail||'';
-      }
+      // Username entered — look up uid from usernames (public read, no auth needed)
+      const username=val.replace(/^@/,'').replace('@nexus.local','');
+      const unSnap=await getDoc(doc(db,'usernames',username)).catch(()=>null);
+      const uid=unSnap?.exists?.()?unSnap.data().uid:null;
+      if(!uid){setStatus('no account found for @'+username);return;}
+      // Fetch user doc — may fail if rules block unauthenticated reads,
+      // in which case we fall back to asking Firebase Auth directly
+      const uSnap=await getDoc(doc(db,'users',uid)).catch(()=>null);
+      const uData=uSnap?.exists?.()?uSnap.data():{};
+      // Priority: googleEmail (already the Firebase Auth email if Google-linked)
+      // then recoveryEmail (set via saveLinkedEmail which calls updateEmail)
+      if(uData.googleEmail) candidates.push(uData.googleEmail);
+      if(uData.recoveryEmail&&uData.recoveryEmail!==uData.googleEmail) candidates.push(uData.recoveryEmail);
     }
-    if(!emailToReset){
-      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email on file — log in and add one in Settings → Account & Security';}
+    if(!candidates.length){
+      setStatus('no recovery email on file — log in and add one in Settings → Account & Security');
       return;
     }
-    // sendPasswordResetEmail only works if emailToReset is the actual Firebase Auth email.
-    // If saveLinkedEmail succeeded, the Firebase Auth email was updated to recoveryEmail.
-    // Try sending; if Firebase says user-not-found, their Auth email was never updated.
-    try{
-      await sendPasswordResetEmail(auth,emailToReset);
-      if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset link sent to '+emailToReset.replace(/(.{2}).+(@.+)/,'$1…$2');}
-      if(inp) inp.value='';
-    }catch(inner){
-      if(inner.code==='auth/user-not-found'||inner.code==='auth/invalid-credential'){
-        if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='recovery email not linked to Firebase — log in normally and re-save your email in Settings → Account & Security';}
-      } else if(inner.code==='auth/invalid-email'){
-        if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='invalid email address';}
-      } else {
-        if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='failed — '+inner.message;}
+    // Try each candidate: check it exists in Firebase Auth, then send reset
+    let sent=false;
+    for(const email of candidates){
+      let methods=[];
+      try{methods=await fetchSignInMethodsForEmail(auth,email);}catch{}
+      if(methods&&methods.length){
+        // This email is registered in Firebase Auth — send the reset
+        await sendPasswordResetEmail(auth,email);
+        setStatus('✓ reset link sent to '+email.replace(/(.{2}).+(@.+)/,'$1…$2'),true);
+        if(inp) inp.value='';
+        sent=true;
+        break;
       }
     }
+    if(!sent){
+      setStatus('no Firebase account linked to your recovery email — log in and re-save your email in Settings → Account & Security');
+    }
   }catch(e){
-    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='error — '+e.message;}
+    const msg=e.code==='auth/invalid-email'?'invalid email address'
+      :e.code==='auth/user-not-found'?'no account found with that email'
+      :'error — '+e.message;
+    setStatus(msg);
   }
 }
 async function doLogin(){
@@ -13936,7 +13942,7 @@ async function renderRolesModal(){
   const sections=[];
 
   // ── GENDER ROLES ──
-  const genders=[{id:'male',label:'♂ Male',icon:'🔵'},{id:'female',label:'♀ Female',icon:'🔴'},{id:'nonbinary',label:'⚧ Non-Binary',icon:'🟣'}];
+  const genders=[{id:'male',label:'♂ Male',icon:'🔵'},{id:'female',label:'♀ Female',icon:'🔴'}];
   const hasGender=genders.some(g=>roles.includes(g.id));
   sections.push({
     title:'IDENTITY',
@@ -13954,13 +13960,20 @@ async function renderRolesModal(){
           // Remove other gender roles first
           let newRoles=roles.filter(r=>!genders.map(x=>x.id).includes(r));
           if(!has) newRoles.push(g.id);
+          // Optimistic update so UI reflects change immediately
+          cud=Object.assign({},cud,{roles:newRoles,role:newRoles[0]||null});
+          uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:newRoles,role:newRoles[0]||null});
+          renderRolesModal();
           try{
             await updateDoc(doc(db,'users',cu.uid),{roles:newRoles,role:newRoles[0]||null});
-            cud=Object.assign({},cud,{roles:newRoles,role:newRoles[0]||null});
-            uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:newRoles,role:newRoles[0]||null});
-            toast((has?'Removed ':'Claimed ')+g.label+' role.','success');
+            toast((has?'Removed ':'Set ')+g.label+' role.','success');
+          }catch(e){
+            // Revert on failure
+            cud=Object.assign({},cud,{roles:roles.slice(),role:roles[0]||null});
+            uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:roles.slice(),role:roles[0]||null});
             renderRolesModal();
-          }catch(e){toast('Failed: '+e.message,'danger');}
+            toast('Failed to save role — '+(e.code==='permission-denied'?'permission denied. Ask the owner to update Firestore rules to allow self-assignment.':e.message),'danger');
+          }
         };
         wrap.appendChild(btn);
       });
