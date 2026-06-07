@@ -74,13 +74,13 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 24px var(--glow);}
   .auth-error{color:var(--danger);font-size:12px;text-align:center;font-family:var(--font-mono);min-height:16px;}
   .auth-info{font-size:11px;font-family:var(--font-mono);color:var(--text-dim);text-align:center;line-height:1.6;margin-top:4px;}
-  .auth-divider{display:flex;align-items:center;gap:10px;margin:4px 0;color:var(--text-dim);font-family:var(--font-mono);font-size:10px;letter-spacing:2px;}
-  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
-  .auth-social{display:flex;gap:8px;margin-top:0;}
-  .btn-social{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.04);color:var(--text);font-family:var(--font-mono);font-size:11px;letter-spacing:1px;cursor:pointer;transition:all 0.2s;}
-  .btn-social:hover{background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.3);}
-  .btn-social.google:hover{border-color:#4285f4;background:rgba(66,133,244,0.1);}
-  .btn-social.github:hover{border-color:#f0f6fc;background:rgba(240,246,252,0.08);}
+  .auth-divider{display:flex;align-items:center;gap:8px;margin:6px 0 4px;color:rgba(255,255,255,0.2);font-family:var(--font-mono);font-size:9px;letter-spacing:1px;}
+  .auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.07);}
+  .auth-social{display:flex;gap:6px;margin-top:0;}
+  .btn-social{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.35);font-family:var(--font-mono);font-size:9px;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;}
+  .btn-social svg{opacity:0.6;}
+  .btn-social:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);}
+  .btn-social:hover svg{opacity:0.9;}
   #app-screen{display:none;}#app-screen.active{display:flex;flex-direction:column;height:100vh;height:100dvh;width:100vw;overflow:hidden;}
   .app-layout{flex:1;min-height:0;display:flex;position:relative;z-index:10;overflow:hidden;width:100%;}
   .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow:hidden;}
@@ -2956,38 +2956,49 @@ async function doForgotPassword(){
   const status=document.getElementById('forgot-status');
   const val=(inp?.value||'').trim().toLowerCase();
   if(!val){
-    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='enter your username or email';}
+    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='enter your username or recovery email';}
     return;
   }
   if(status){status.style.display='block';status.style.color='rgba(255,255,255,0.4)';status.textContent='looking up account…';}
   try{
     let emailToReset='';
+    let userData=null;
     if(val.includes('@')&&!val.endsWith('@nexus.local')){
       // Direct real email entered
       emailToReset=val;
     } else {
-      // Username entered — look up their Firebase Auth email (now a real email) or recoveryEmail
+      // Username entered — look up their Firestore doc for recoveryEmail or _authEmail
       const username=val.replace('@nexus.local','');
       const usernameDoc=await getDoc(doc(db,'usernames',username)).catch(()=>null);
       const uid=usernameDoc?.exists?.()?usernameDoc.data().uid:null;
       if(uid){
         const userDoc=await getDoc(doc(db,'users',uid)).catch(()=>null);
-        const userData=userDoc?.data()||{};
+        userData=userDoc?.data()||{};
         emailToReset=userData.recoveryEmail||'';
       }
     }
     if(!emailToReset){
-      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email on file — add one in Settings → Account & Security';}
+      if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='no recovery email on file — log in and add one in Settings → Account & Security';}
       return;
     }
-    await sendPasswordResetEmail(auth,emailToReset);
-    if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset link sent to '+emailToReset.replace(/(.{2}).+(@.+)/,'$1…$2');}
-    if(inp) inp.value='';
+    // sendPasswordResetEmail only works if emailToReset is the actual Firebase Auth email.
+    // If saveLinkedEmail succeeded, the Firebase Auth email was updated to recoveryEmail.
+    // Try sending; if Firebase says user-not-found, their Auth email was never updated.
+    try{
+      await sendPasswordResetEmail(auth,emailToReset);
+      if(status){status.style.display='block';status.style.color='rgba(0,255,136,0.8)';status.textContent='✓ reset link sent to '+emailToReset.replace(/(.{2}).+(@.+)/,'$1…$2');}
+      if(inp) inp.value='';
+    }catch(inner){
+      if(inner.code==='auth/user-not-found'||inner.code==='auth/invalid-credential'){
+        if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='recovery email not linked to Firebase — log in normally and re-save your email in Settings → Account & Security';}
+      } else if(inner.code==='auth/invalid-email'){
+        if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='invalid email address';}
+      } else {
+        if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='failed — '+inner.message;}
+      }
+    }
   }catch(e){
-    const msg=e.code==='auth/user-not-found'?'no account found with that email'
-      :e.code==='auth/invalid-email'?'invalid email address'
-      :'failed — '+e.message;
-    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent=msg;}
+    if(status){status.style.display='block';status.style.color='rgba(255,80,80,0.9)';status.textContent='error — '+e.message;}
   }
 }
 async function doLogin(){
@@ -13711,7 +13722,7 @@ function _populateTPBanner(){
 
 function teamPortalTab(tab){
   teamPortalCurrentTab=tab;
-  ['feed','tickets','testing','suggestions','team','chat','stats','games','roles','feedback','proof'].forEach(function(t){
+  ['feed','tickets','testing','suggestions','team','chat','stats','games','roles','feedback','proof','info'].forEach(function(t){
     const btn=document.getElementById('tp-tab-'+t);
     const panel=document.getElementById('tp-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -13728,6 +13739,7 @@ function teamPortalTab(tab){
   if(tab==='roles') loadTeamRoles();
   if(tab==='feedback') loadTeamFeedback();
   if(tab==='proof') loadCodetypeProofs();
+  if(tab==='info') loadTeamInfo();
 }
 
 // ── TEAM FEED ──
@@ -16792,6 +16804,7 @@ window.closeLightbox=closeLightbox;window.dlLightbox=dlLightbox;window.eggClose=
           <div class="auth-tab" id="tp-tab-roles" onclick="N.teamPortalTab('roles')" style="font-size:9px;">ROLES</div>
           <div class="auth-tab" id="tp-tab-feedback" onclick="N.teamPortalTab('feedback')" style="font-size:9px;">FEEDBACK</div>
           <div class="auth-tab" id="tp-tab-proof" onclick="N.teamPortalTab('proof')" style="font-size:9px;">PROOF</div>
+          <div class="auth-tab" id="tp-tab-info" onclick="N.teamPortalTab('info')" style="font-size:9px;">INFO</div>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:14px 18px;">
