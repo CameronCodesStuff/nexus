@@ -6580,6 +6580,10 @@ function openProfileModal(uid){
             +  '<span style="'+_labelStyle+'">🕐 LAST ACTIVE</span>'
             +  '<span style="'+_valStyle+'">'+_lastStr+'</span>'
             +'</div>'
+            +((u.githubLinked||u.githubUsername)?'<div style="'+_rowStyle+'">'
+            +  '<span style="'+_labelStyle+'">🐙 GITHUB</span>'
+            +  '<a href="https://github.com/'+(u.githubLogin||u.githubUsername||'')+'\" target=\"_blank\" rel=\"noopener\" style=\"'+_valStyle+';color:#60a5fa;text-decoration:none;\">@'+(u.githubLogin||u.githubUsername||'')+'</a>'
+            +'</div>':'')
             +'</div>';
         })()}
       </div>
@@ -10268,7 +10272,11 @@ function getRoleBadge(uid){
     elite:        '<span class="role-elite">★ ELITE</span>',
     wpm130:       '<span class="role-wpm130">⌨ 130WPM+</span>',
   };
-  return roles.map(r=>map[r]||'').join('');
+  let out=roles.map(r=>map[r]||'').join('');
+  const gr=u.genderRole||'';
+  if(gr==='male') out+='<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);color:#60a5fa;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">♂ MALE</span>';
+  else if(gr==='female') out+='<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.4);color:#f472b6;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">♀ FEMALE</span>';
+  return out;
 }
 
 // ── CLEAR CHAT ────────────────────────────────────
@@ -11296,19 +11304,22 @@ function startTimeTracking(){
     try{
       const today=getDailyKey();
       const weekKey=getWeekKey();
-      const newMins=(cud?.minutesOnSite||0)+1;
-      const newDayMins=(cud?.lastTimeDay===today?(cud?.dailyMinutes||0):0)+1;
-      const newWeekMins=(cud?.lastTimeWeek===weekKey?(cud?.weeklyMinutes||0):0)+1;
+      // Use atomic increment so concurrent tabs / onSnapshot overwrites can't reset the counter
       const fields={
-        minutesOnSite:newMins,
-        dailyMinutes:newDayMins,
-        weeklyMinutes:newWeekMins,
+        minutesOnSite:increment(1),
+        dailyMinutes:cud?.lastTimeDay===today?increment(1):1,
+        weeklyMinutes:cud?.lastTimeWeek===weekKey?increment(1):1,
         lastTimeDay:today,
         lastTimeWeek:weekKey
       };
       await updateDoc(doc(db,'users',cu.uid),fields);
-      cud={...cud,...fields};
-      uCache[cu.uid]={...uCache[cu.uid],...fields};
+      cud={...cud,
+        minutesOnSite:(cud?.minutesOnSite||0)+1,
+        dailyMinutes:cud?.lastTimeDay===today?(cud?.dailyMinutes||0)+1:1,
+        weeklyMinutes:cud?.lastTimeWeek===weekKey?(cud?.weeklyMinutes||0)+1:1,
+        lastTimeDay:today,lastTimeWeek:weekKey
+      };
+      uCache[cu.uid]={...uCache[cu.uid],minutesOnSite:cud.minutesOnSite,lastTimeDay:today,lastTimeWeek:weekKey};
     }catch{}
   },60000);
 }
@@ -13943,7 +13954,8 @@ async function renderRolesModal(){
 
   // ── GENDER ROLES ──
   const genders=[{id:'male',label:'♂ Male',icon:'🔵'},{id:'female',label:'♀ Female',icon:'🔴'}];
-  const hasGender=genders.some(g=>roles.includes(g.id));
+  const currentGender=cud?.genderRole||'';
+  const hasGender=!!currentGender;
   sections.push({
     title:'IDENTITY',
     desc:'Select your gender (optional). You can change this at any time.',
@@ -13951,28 +13963,25 @@ async function renderRolesModal(){
       const wrap=document.createElement('div');
       wrap.style.cssText='display:flex;gap:8px;flex-wrap:wrap;';
       genders.forEach(function(g){
-        const has=roles.includes(g.id);
+        const has=currentGender===g.id;
         const btn=document.createElement('button');
         btn.style.cssText='display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:7px;cursor:pointer;font-family:var(--font-mono);font-size:11px;font-weight:700;transition:all 0.15s;'
           +(has?'background:rgba(68,102,255,0.2);border:1px solid var(--accent);color:var(--accent);':'background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);');
         btn.innerHTML=g.icon+' '+g.label+(has?' ✓':'');
         btn.onclick=async function(){
-          // Remove other gender roles first
-          let newRoles=roles.filter(r=>!genders.map(x=>x.id).includes(r));
-          if(!has) newRoles.push(g.id);
-          // Optimistic update so UI reflects change immediately
-          cud=Object.assign({},cud,{roles:newRoles,role:newRoles[0]||null});
-          uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:newRoles,role:newRoles[0]||null});
+          const newGender=has?'':g.id;
+          const prevGender=cud?.genderRole||'';
+          cud=Object.assign({},cud,{genderRole:newGender});
+          uCache[cu.uid]=Object.assign({},uCache[cu.uid],{genderRole:newGender});
           renderRolesModal();
           try{
-            await updateDoc(doc(db,'users',cu.uid),{roles:newRoles,role:newRoles[0]||null});
+            await updateDoc(doc(db,'users',cu.uid),{genderRole:newGender});
             toast((has?'Removed ':'Set ')+g.label+' role.','success');
           }catch(e){
-            // Revert on failure
-            cud=Object.assign({},cud,{roles:roles.slice(),role:roles[0]||null});
-            uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles:roles.slice(),role:roles[0]||null});
+            cud=Object.assign({},cud,{genderRole:prevGender});
+            uCache[cu.uid]=Object.assign({},uCache[cu.uid],{genderRole:prevGender});
             renderRolesModal();
-            toast('Failed to save role — '+(e.code==='permission-denied'?'permission denied. Ask the owner to update Firestore rules to allow self-assignment.':e.message),'danger');
+            toast('Failed: '+e.message,'danger');
           }
         };
         wrap.appendChild(btn);
@@ -13984,22 +13993,23 @@ async function renderRolesModal(){
   // ── GITHUB ROLE ──
   const hasGH=roles.includes('github');
   const ghLinked=!!cud?.githubLinked||!!cud?.githubUsername;
+  const ghUser=cud?.githubLogin||cud?.githubUsername||'';
   sections.push({
     title:'GITHUB',
-    desc:hasGH?'✓ You have the GitHub role! You follow @CameronCodesStuff and starred Nexus.'
-      :ghLinked?'Your GitHub is linked as @'+(cud.githubLogin||cud.githubUsername||'')+'. Verify you\'ve starred the repo and are following @CameronCodesStuff.'
+    desc:hasGH?'✓ GitHub role active! Follow @CameronCodesStuff and star Nexus to keep it.'
+      :ghLinked?'GitHub linked as @'+ghUser+'. Verify you\'ve starred the repo and are following @CameronCodesStuff.'
       :'Link your GitHub account in Settings → Account & Security, then verify here.',
     content:(function(){
       const wrap=document.createElement('div');
-      if(hasGH){
-        const ok=document.createElement('div');
-        ok.style.cssText='color:#00ff88;font-family:var(--font-mono);font-size:11px;';
-        ok.textContent='🐙 GitHub role active — @'+(cud.githubLogin||cud.githubUsername||'');
-        wrap.appendChild(ok);
-      } else if(ghLinked){
+      wrap.style.cssText='display:flex;flex-direction:column;gap:8px;';
+      if(ghLinked){
+        const linked=document.createElement('div');
+        linked.style.cssText='display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:11px;color:'+(hasGH?'#00ff88':'#60a5fa')+';';
+        linked.innerHTML=(hasGH?'✓ ':'')+'Linked as <a href="https://github.com/'+ghUser+'" target="_blank" rel="noopener" style="color:#60a5fa;text-decoration:none;">@'+ghUser+'</a>';
+        wrap.appendChild(linked);
         const btn=document.createElement('button');
-        btn.style.cssText='background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:8px 18px;border-radius:7px;cursor:pointer;';
-        btn.textContent='🐙 Verify Star + Follow';
+        btn.style.cssText='background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:8px 18px;border-radius:7px;cursor:pointer;align-self:flex-start;';
+        btn.textContent=hasGH?'🐙 Re-verify Star + Follow':'🐙 Verify Star + Follow';
         btn.onclick=function(){closeModal('roles-modal');openGithubVerify();};
         wrap.appendChild(btn);
       } else {
@@ -14012,7 +14022,6 @@ async function renderRolesModal(){
       return wrap;
     })()
   });
-
   // ── CODETYPE PROOF ──
   const hasCodetype=roles.includes('codetype');
   const pendingProof=cud?.codetypeProofStatus==='pending';
