@@ -81,13 +81,59 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .btn-social svg{opacity:0.6;}
   .btn-social:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);}
   .btn-social:hover svg{opacity:0.9;}
-  @keyframes frame-rainbow{0%{box-shadow:inset 0 0 0 2px #ff0080,0 0 12px #ff0080;}25%{box-shadow:inset 0 0 0 2px #ffff00,0 0 12px #ffff00;}50%{box-shadow:inset 0 0 0 2px #00ff87,0 0 12px #00ff87;}75%{box-shadow:inset 0 0 0 2px #00d4ff,0 0 12px #00d4ff;}100%{box-shadow:inset 0 0 0 2px #ff0080,0 0 12px #ff0080;}}
-  @keyframes frame-plasma{0%{box-shadow:inset 0 0 0 2px #7c3aed,0 0 14px #7c3aed,0 0 28px rgba(124,58,237,0.4);}50%{box-shadow:inset 0 0 0 2px #f0b824,0 0 14px #f0b824,0 0 28px rgba(240,184,36,0.4);}100%{box-shadow:inset 0 0 0 2px #7c3aed,0 0 14px #7c3aed,0 0 28px rgba(124,58,237,0.4);}}
-  @keyframes frame-aurora{0%{box-shadow:inset 0 0 0 2px #00c9ff,0 0 16px #00c9ff;}33%{box-shadow:inset 0 0 0 2px #92fe9d,0 0 16px #92fe9d;}66%{box-shadow:inset 0 0 0 2px #a78bfa,0 0 16px #a78bfa;}100%{box-shadow:inset 0 0 0 2px #00c9ff,0 0 16px #00c9ff;}}
-  @keyframes frame-inferno{0%{box-shadow:inset 0 0 0 3px #ff4500,0 0 20px #ff4500,0 0 40px rgba(255,69,0,0.5);}25%{box-shadow:inset 0 0 0 3px #ff8c00,0 0 24px #ff8c00,0 0 48px rgba(255,140,0,0.5);}50%{box-shadow:inset 0 0 0 3px #ffd700,0 0 28px #ffd700,0 0 56px rgba(255,215,0,0.4);}75%{box-shadow:inset 0 0 0 3px #ff0000,0 0 22px #ff0000,0 0 44px rgba(255,0,0,0.5);}100%{box-shadow:inset 0 0 0 3px #ff4500,0 0 20px #ff4500,0 0 40px rgba(255,69,0,0.5);}}
-  @keyframes frame-void{0%{box-shadow:inset 0 0 0 3px #0a0a1a,0 0 0 1px #7c3aed,0 0 30px rgba(124,58,237,0.8),inset 0 0 20px rgba(124,58,237,0.3);}50%{box-shadow:inset 0 0 0 3px #000005,0 0 0 1px #f0b824,0 0 40px rgba(240,184,36,0.6),inset 0 0 30px rgba(240,184,36,0.2);}100%{box-shadow:inset 0 0 0 3px #0a0a1a,0 0 0 1px #7c3aed,0 0 30px rgba(124,58,237,0.8),inset 0 0 20px rgba(124,58,237,0.3);}}
-  @keyframes frame-glitch{0%,95%{box-shadow:inset 0 0 0 2px #00ff87,0 0 12px #00ff87;}96%{box-shadow:inset 0 0 0 3px #ff0080,4px 0 0 rgba(255,0,128,0.7),-4px 0 0 rgba(0,255,135,0.7),0 0 20px #ff0080;}97%{box-shadow:inset 0 0 0 2px #00d4ff,-2px 0 0 rgba(255,0,128,0.5),2px 0 0 rgba(0,212,255,0.5);}98%{box-shadow:inset 0 0 0 3px #ff4500,0 0 16px #ff4500;}99%{box-shadow:inset 0 0 0 2px #7c3aed,0 0 8px #7c3aed;}}
-  @keyframes frame-holo{0%{box-shadow:inset 0 0 0 2px #ff0080,0 0 16px #ff0080,0 0 32px rgba(255,0,128,0.3);}16%{box-shadow:inset 0 0 0 2px #ff8c00,0 0 16px #ff8c00,0 0 32px rgba(255,140,0,0.3);}33%{box-shadow:inset 0 0 0 2px #ffd700,0 0 16px #ffd700,0 0 32px rgba(255,215,0,0.3);}50%{box-shadow:inset 0 0 0 2px #00ff87,0 0 16px #00ff87,0 0 32px rgba(0,255,135,0.3);}66%{box-shadow:inset 0 0 0 2px #00d4ff,0 0 16px #00d4ff,0 0 32px rgba(0,212,255,0.3);}83%{box-shadow:inset 0 0 0 2px #7c3aed,0 0 16px #7c3aed,0 0 32px rgba(124,58,237,0.3);}100%{box-shadow:inset 0 0 0 2px #ff0080,0 0 16px #ff0080,0 0 32px rgba(255,0,128,0.3);}}
+  /* ── TIER 3: ANIMATED ────────────────────────────────────────────────────── */
+  @keyframes frame-rainbow{
+    0%  {box-shadow:inset 0 0 0 2px #ff0080,0 0 14px #ff0080,0 0 28px rgba(255,0,128,0.5),0 0 56px rgba(255,0,128,0.2);}
+    20% {box-shadow:inset 0 0 0 2px #ff6600,0 0 14px #ff6600,0 0 28px rgba(255,102,0,0.5),0 0 56px rgba(255,102,0,0.2);}
+    40% {box-shadow:inset 0 0 0 2px #ffff00,0 0 14px #ffff00,0 0 28px rgba(255,255,0,0.5),0 0 56px rgba(255,255,0,0.2);}
+    60% {box-shadow:inset 0 0 0 2px #00ff87,0 0 14px #00ff87,0 0 28px rgba(0,255,135,0.5),0 0 56px rgba(0,255,135,0.2);}
+    80% {box-shadow:inset 0 0 0 2px #00d4ff,0 0 14px #00d4ff,0 0 28px rgba(0,212,255,0.5),0 0 56px rgba(0,212,255,0.2);}
+    100%{box-shadow:inset 0 0 0 2px #ff0080,0 0 14px #ff0080,0 0 28px rgba(255,0,128,0.5),0 0 56px rgba(255,0,128,0.2);}}
+  @keyframes frame-plasma{
+    0%  {box-shadow:inset 0 0 0 2px #c026d3,0 0 18px #c026d3,0 0 36px rgba(192,38,211,0.5),0 0 72px rgba(192,38,211,0.2);filter:brightness(1.1);}
+    33% {box-shadow:inset 0 0 0 2px #f0b824,0 0 22px #f0b824,0 0 44px rgba(240,184,36,0.5),0 0 88px rgba(240,184,36,0.2);filter:brightness(1.3);}
+    66% {box-shadow:inset 0 0 0 2px #7c3aed,0 0 18px #7c3aed,0 0 36px rgba(124,58,237,0.5),0 0 72px rgba(124,58,237,0.2);filter:brightness(1.1);}
+    100%{box-shadow:inset 0 0 0 2px #c026d3,0 0 18px #c026d3,0 0 36px rgba(192,38,211,0.5),0 0 72px rgba(192,38,211,0.2);filter:brightness(1.1);}}
+  @keyframes frame-aurora{
+    0%  {box-shadow:inset 0 0 0 2px #00c9ff,0 0 20px #00c9ff,0 0 40px rgba(0,201,255,0.4),0 0 80px rgba(0,201,255,0.15);}
+    25% {box-shadow:inset 0 0 0 3px #00ffb3,0 0 24px #00ffb3,0 0 48px rgba(0,255,179,0.4),0 0 96px rgba(0,255,179,0.15);}
+    50% {box-shadow:inset 0 0 0 2px #a78bfa,0 0 20px #a78bfa,0 0 40px rgba(167,139,250,0.4),0 0 80px rgba(167,139,250,0.15);}
+    75% {box-shadow:inset 0 0 0 3px #34d399,0 0 24px #34d399,0 0 48px rgba(52,211,153,0.4),0 0 96px rgba(52,211,153,0.15);}
+    100%{box-shadow:inset 0 0 0 2px #00c9ff,0 0 20px #00c9ff,0 0 40px rgba(0,201,255,0.4),0 0 80px rgba(0,201,255,0.15);}}
+  /* ── TIER 4: INSANE ─────────────────────────────────────────────────────── */
+  @keyframes frame-inferno{
+    0%  {box-shadow:inset 0 0 0 3px #ff1500,0 0 20px #ff1500,0 0 40px rgba(255,21,0,0.7),0 0 80px rgba(255,21,0,0.4),0 0 120px rgba(255,21,0,0.15);filter:brightness(1.2);}
+    20% {box-shadow:inset 0 0 0 4px #ff6600,0 0 28px #ff6600,0 0 56px rgba(255,102,0,0.8),0 0 100px rgba(255,102,0,0.4),0 0 160px rgba(255,102,0,0.15);filter:brightness(1.5);}
+    40% {box-shadow:inset 0 0 0 3px #ffcc00,0 0 32px #ffcc00,0 0 64px rgba(255,204,0,0.7),0 0 120px rgba(255,204,0,0.35);filter:brightness(1.6);}
+    60% {box-shadow:inset 0 0 0 4px #ff3d00,0 0 24px #ff3d00,0 0 48px rgba(255,61,0,0.8),0 0 96px rgba(255,61,0,0.4);filter:brightness(1.3);}
+    80% {box-shadow:inset 0 0 0 3px #ff0000,0 0 30px #ff0000,0 0 60px rgba(255,0,0,0.7),0 0 120px rgba(255,0,0,0.3);filter:brightness(1.4);}
+    100%{box-shadow:inset 0 0 0 3px #ff1500,0 0 20px #ff1500,0 0 40px rgba(255,21,0,0.7),0 0 80px rgba(255,21,0,0.4),0 0 120px rgba(255,21,0,0.15);filter:brightness(1.2);}}
+  @keyframes frame-void{
+    0%  {box-shadow:inset 0 0 0 3px #6d00ff,0 0 0 2px #000,0 0 24px #6d00ff,0 0 60px rgba(109,0,255,0.6),0 0 120px rgba(109,0,255,0.3),inset 0 0 30px rgba(109,0,255,0.4);filter:brightness(1.1);}
+    25% {box-shadow:inset 0 0 0 4px #000,0 0 0 2px #ff00ff,0 0 32px #ff00ff,0 0 80px rgba(255,0,255,0.5),0 0 140px rgba(255,0,255,0.2),inset 0 0 40px rgba(0,0,0,0.8);filter:brightness(0.8);}
+    50% {box-shadow:inset 0 0 0 3px #00ffff,0 0 0 1px #000,0 0 28px #00ffff,0 0 70px rgba(0,255,255,0.5),0 0 120px rgba(0,255,255,0.2),inset 0 0 35px rgba(0,255,255,0.3);filter:brightness(1.2);}
+    75% {box-shadow:inset 0 0 0 4px #1a0030,0 0 0 2px #9900ff,0 0 36px #9900ff,0 0 90px rgba(153,0,255,0.6),0 0 160px rgba(153,0,255,0.25),inset 0 0 45px rgba(153,0,255,0.35);filter:brightness(0.9);}
+    100%{box-shadow:inset 0 0 0 3px #6d00ff,0 0 0 2px #000,0 0 24px #6d00ff,0 0 60px rgba(109,0,255,0.6),0 0 120px rgba(109,0,255,0.3),inset 0 0 30px rgba(109,0,255,0.4);filter:brightness(1.1);}}
+  @keyframes frame-glitch{
+    0%,89%{box-shadow:inset 0 0 0 2px #00ff87,0 0 16px #00ff87,0 0 32px rgba(0,255,135,0.5);transform:translate(0,0);filter:hue-rotate(0deg);}
+    90%  {box-shadow:inset 0 0 0 4px #ff0080,6px 0 0 rgba(255,0,128,0.9),-6px 0 0 rgba(0,255,135,0.9),0 0 40px #ff0080;transform:translate(-3px,1px);filter:hue-rotate(180deg);}
+    91%  {box-shadow:inset 0 0 0 3px #00d4ff,-4px 0 0 rgba(255,0,0,0.7),4px 0 0 rgba(0,212,255,0.7);transform:translate(3px,-1px);filter:hue-rotate(90deg) saturate(3);}
+    92%  {box-shadow:inset 0 0 0 5px #ff4500,0 0 50px #ff4500,8px 2px 0 rgba(255,69,0,0.6),-8px -2px 0 rgba(0,255,135,0.6);transform:translate(-2px,2px);filter:brightness(2);}
+    93%  {box-shadow:inset 0 0 0 2px #ffff00,0 0 30px #ffff00,-3px 0 0 rgba(255,0,128,0.8),3px 0 0 rgba(0,255,255,0.8);transform:translate(2px,0);filter:invert(0.3);}
+    94%  {box-shadow:inset 0 0 0 3px #7c3aed,0 0 20px #7c3aed;transform:translate(0,0);filter:none;}
+    95%  {box-shadow:inset 0 0 0 2px #00ff87,0 0 16px #00ff87,10px 0 0 rgba(255,0,128,0.4),-10px 0 0 rgba(0,255,135,0.4);transform:translate(-1px,0);filter:saturate(2);}
+    96%  {box-shadow:inset 0 0 0 4px #ff0000,0 0 60px #ff0000;transform:translate(1px,-2px);filter:brightness(3) hue-rotate(270deg);}
+    97%  {box-shadow:inset 0 0 0 2px #00ffff,0 0 20px #00ffff;transform:translate(0,1px);filter:none;}
+    98%,100%{box-shadow:inset 0 0 0 2px #00ff87,0 0 16px #00ff87,0 0 32px rgba(0,255,135,0.5);transform:translate(0,0);filter:none;}}
+  @keyframes frame-holo{
+    0%  {box-shadow:inset 0 0 0 3px #ff0080,0 0 24px #ff0080,0 0 48px rgba(255,0,128,0.6),0 0 96px rgba(255,0,128,0.3),0 0 140px rgba(255,0,128,0.1);filter:brightness(1.3) saturate(1.5);}
+    14% {box-shadow:inset 0 0 0 3px #ff6600,0 0 28px #ff6600,0 0 56px rgba(255,102,0,0.6),0 0 100px rgba(255,102,0,0.3);filter:brightness(1.4) saturate(1.8);}
+    28% {box-shadow:inset 0 0 0 3px #ffee00,0 0 30px #ffee00,0 0 60px rgba(255,238,0,0.7),0 0 120px rgba(255,238,0,0.3);filter:brightness(1.5) saturate(2);}
+    42% {box-shadow:inset 0 0 0 3px #00ff87,0 0 28px #00ff87,0 0 56px rgba(0,255,135,0.6),0 0 112px rgba(0,255,135,0.3);filter:brightness(1.4) saturate(1.8);}
+    56% {box-shadow:inset 0 0 0 3px #00d4ff,0 0 28px #00d4ff,0 0 56px rgba(0,212,255,0.6),0 0 112px rgba(0,212,255,0.3);filter:brightness(1.4) saturate(1.5);}
+    70% {box-shadow:inset 0 0 0 3px #7c3aed,0 0 30px #7c3aed,0 0 60px rgba(124,58,237,0.6),0 0 120px rgba(124,58,237,0.3);filter:brightness(1.3) saturate(1.6);}
+    85% {box-shadow:inset 0 0 0 3px #ff00ff,0 0 32px #ff00ff,0 0 64px rgba(255,0,255,0.7),0 0 128px rgba(255,0,255,0.35);filter:brightness(1.5) saturate(2);}
+    100%{box-shadow:inset 0 0 0 3px #ff0080,0 0 24px #ff0080,0 0 48px rgba(255,0,128,0.6),0 0 96px rgba(255,0,128,0.3),0 0 140px rgba(255,0,128,0.1);filter:brightness(1.3) saturate(1.5);}}
   #app-screen{display:none;}#app-screen.active{display:flex;flex-direction:column;height:100vh;height:100dvh;width:100vw;overflow:hidden;}
   .app-layout{flex:1;min-height:0;display:flex;position:relative;z-index:10;overflow:hidden;width:100%;}
   .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow:hidden;}
@@ -2632,14 +2678,14 @@ const AVATAR_FRAMES={
   ocean:  {b:'#0ea5e9',g:'rgba(14,165,233,0.7)', tier:2,hrs:10, label:'OCEAN'},
   toxic:  {b:'#84cc16',g:'rgba(132,204,22,0.7)', tier:2,hrs:10, label:'TOXIC'},
   // Tier 3 — Animated (24 hours)
-  rainbow:{b:'#ff0080',g:'rgba(255,0,128,0.6)',  tier:3,hrs:24, label:'RAINBOW', anim:'frame-rainbow 2s linear infinite'},
-  plasma: {b:'#7c3aed',g:'rgba(124,58,237,0.7)', tier:3,hrs:24, label:'PLASMA',  anim:'frame-plasma 2.5s ease-in-out infinite'},
-  aurora: {b:'#00c9ff',g:'rgba(0,201,255,0.7)',  tier:3,hrs:24, label:'AURORA',  anim:'frame-aurora 3s ease-in-out infinite'},
+  rainbow:{b:'#ff0080',g:'rgba(255,0,128,0.7)',  tier:3,hrs:24, label:'RAINBOW', anim:'frame-rainbow 1.6s linear infinite'},
+  plasma: {b:'#c026d3',g:'rgba(192,38,211,0.8)', tier:3,hrs:24, label:'PLASMA',  anim:'frame-plasma 1.8s ease-in-out infinite'},
+  aurora: {b:'#00c9ff',g:'rgba(0,201,255,0.7)',  tier:3,hrs:24, label:'AURORA',  anim:'frame-aurora 2.5s ease-in-out infinite'},
   // Tier 4 — Insane (48 hours)
-  inferno:{b:'#ff4500',g:'rgba(255,69,0,0.9)',   tier:4,hrs:48, label:'INFERNO', anim:'frame-inferno 1.2s ease-in-out infinite', thick:3},
-  void:   {b:'#7c3aed',g:'rgba(124,58,237,0.9)', tier:4,hrs:48, label:'VOID',    anim:'frame-void 2s ease-in-out infinite',    thick:3},
-  glitch: {b:'#00ff87',g:'rgba(0,255,135,0.8)',  tier:4,hrs:48, label:'GLITCH',  anim:'frame-glitch 3s steps(1) infinite',    thick:2},
-  holo:   {b:'#ff0080',g:'rgba(255,0,128,0.8)',  tier:4,hrs:48, label:'HOLO',    anim:'frame-holo 1.5s linear infinite',      thick:2},
+  inferno:{b:'#ff3d00',g:'rgba(255,61,0,1)',     tier:4,hrs:48, label:'INFERNO', anim:'frame-inferno 0.9s ease-in-out infinite', thick:4},
+  void:   {b:'#6d00ff',g:'rgba(109,0,255,1)',    tier:4,hrs:48, label:'VOID',    anim:'frame-void 1.6s ease-in-out infinite',    thick:4},
+  glitch: {b:'#00ff87',g:'rgba(0,255,135,0.9)',  tier:4,hrs:48, label:'GLITCH',  anim:'frame-glitch 2s linear infinite',         thick:3},
+  holo:   {b:'#ff0080',g:'rgba(255,0,128,1)',    tier:4,hrs:48, label:'HOLO',    anim:'frame-holo 1.2s linear infinite',         thick:3},
   // Owner-only
   owner:  {b:'var(--accent)',g:'var(--glow)',     tier:0,hrs:0,  label:'NEXUS'},
 };
