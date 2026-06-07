@@ -3171,6 +3171,13 @@ async function doLogout(){
   if(inboxUnsub){inboxUnsub();inboxUnsub=null;}
   if(usersUnsub){usersUnsub();usersUnsub=null;}
   if(incomingCallUnsub){incomingCallUnsub();incomingCallUnsub=null;}
+  if(_acceptedInviteUnsub){_acceptedInviteUnsub();_acceptedInviteUnsub=null;}
+  if(_popupUnsub){_popupUnsub();_popupUnsub=null;}
+  if(_teamChatUnsub){_teamChatUnsub();_teamChatUnsub=null;}
+  if(callUnsub){callUnsub();callUnsub=null;}
+  signalUnsubs.forEach(u=>{try{u();}catch{}});signalUnsubs=[];
+  if(window._typingUnsub){window._typingUnsub();window._typingUnsub=null;}
+  if(window._activeMsgUnsub){window._activeMsgUnsub();window._activeMsgUnsub=null;}
   if(presenceInterval){clearInterval(presenceInterval);presenceInterval=null;}
   clsnrs={};acunsub=null;acid=null;aChats={};mCache={};inboxCount=0;
   if(activeCallId)endCall();
