@@ -1,5 +1,3 @@
-<a href="https://trendshift.io/repositories/21997" target="_blank"><img src="https://trendshift.io/api/badge/repositories/21997" alt="mvanhorn%2Flast30days-skill | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
 # 🔗 NEXUS
 
 ---
@@ -31,3 +29,36 @@
 ![Profile Image](https://avatars.githubusercontent.com/u/151978475?s=400&u=fafe8a510f7450e3b69458fc25106e58d3003eea&v=4)
 ![Profile Image](readme.png)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a href="https://trendshift.io/repositories/21997" target="_blank"><img src="https://trendshift.io/api/badge/repositories/21997" alt="mvanhorn%2Flast30days-skill | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
