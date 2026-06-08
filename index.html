@@ -3972,8 +3972,11 @@ function renderMsgs(cid){
       if(msg.gameId){
         const _gid=msg.gameId,_cid=cid,_opp=msg.senderUid===cu.uid?(aChats[cid]?.members?.find(m=>m!==cu.uid)):msg.senderUid;
         tb.onclick=()=>{
-          // Only open if not already watching this game
+          // Set full context then open modal, same as openTtt() does
           tttOppUid=_opp;
+          tttChatId=_cid;
+          tttGameId=null; // reset so tttOpenGame re-subscribes
+          openModal('ttt-modal');
           tttOpenGame(_gid,_cid);
         };
       }
@@ -10467,7 +10470,20 @@ function getRoleBadge(uid){
     elite:        '<span class="role-elite">★ ELITE</span>',
     wpm130:       '<span class="role-wpm130">⌨ 130WPM+</span>',
   };
-  return roles.map(r=>map[r]||'').join('');
+  let _out=roles.map(r=>map[r]||'').join('');
+  // Gender role
+  const _gr=(uid===cu?.uid&&cud)?cud.genderRole:(uCache[uid]?.genderRole||'');
+  if(_gr==='male') _out+='<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);color:#60a5fa;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">&#x2642; MALE</span>';
+  else if(_gr==='female') _out+='<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(236,72,153,0.15);border:1px solid rgba(236,72,153,0.4);color:#f472b6;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">&#x2640; FEMALE</span>';
+  // Custom role — only show to the user themselves
+  if(uid===cu?.uid){
+    const _cr=(cud?.customRole)||null;
+    if(_cr?.label){
+      const _col=_cr.color||'#a78bfa';
+      _out+='<span style="display:inline-flex;align-items:center;gap:3px;background:'+_col+'22;border:1px solid '+_col+'66;color:'+_col+';font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">'+(_cr.icon?_cr.icon+' ':'')+(typeof esc==='function'?esc(_cr.label):_cr.label)+'</span>';
+    }
+  }
+  return _out;
 }
 
 // ── CLEAR CHAT ────────────────────────────────────
