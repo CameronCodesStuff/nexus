@@ -1,3 +1,5 @@
+<a href="https://trendshift.io/repositories/21997" target="_blank"><img src="https://trendshift.io/api/badge/repositories/21997" alt="mvanhorn%2Flast30days-skill | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
 # 🔗 NEXUS
 
 ---
