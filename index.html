@@ -13780,7 +13780,14 @@ function toggleLike(id,btn,e){
 
 function unpublishArt(id,docId,btn,e){
   e.stopPropagation();
-  if(!confirm('UNPUBLISH THIS ART?\\nIt will be removed from the community gallery.'))return;
+  if(btn.dataset.confirm!=='yes'){
+    btn.dataset.confirm='yes';
+    btn.textContent='TAP AGAIN TO CONFIRM';
+    btn.style.borderColor='rgba(239,68,68,0.9)';
+    btn.style.color='#ef4444';
+    setTimeout(function(){if(btn.dataset.confirm==='yes'){btn.dataset.confirm='';btn.textContent='✕ UNPUBLISH';btn.style.borderColor='';btn.style.color='';}},3000);
+    return;
+  }
   btn.disabled=true;btn.textContent='REMOVING...';
   window.parent.postMessage({type:'pfUnpublish',id,docId},'*');
 }
@@ -13911,8 +13918,12 @@ window.addEventListener('message',function(e){
     cud=Object.assign({},cud,{pfLikes});
   }
 
+  // pfSaveLikes: debounce writes to avoid flooding Firestore channel
   if(d.type==='pfSaveLikes'){
-    if(cu) updateDoc(doc(db,'users',cu.uid),{pfLikes:d.likes||{}}).catch(()=>{});
+    clearTimeout(window._pfLikeWriteTimer);
+    window._pfLikeWriteTimer=setTimeout(function(){
+      if(cu) updateDoc(doc(db,'users',cu.uid),{pfLikes:d.likes||{}}).catch(()=>{});
+    },2000);
   }
 
   if(d.type==='pfUnpublish'){
@@ -18405,7 +18416,7 @@ function makePollCard(poll,isOw){
     <div style="font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#c084fc;">🎨 PIXELFORGE</div>
     <button onclick="N.closePixelForge()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:10px;padding:4px 12px;border-radius:5px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
   </div>
-  <iframe id="pixelforge-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+  <iframe id="pixelforge-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"></iframe>
 </div>
 </body>
 </html>
