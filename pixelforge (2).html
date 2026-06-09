@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIXELFORGE</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0c10;
+  --panel:    #0e1118;
+  --panel2:   #12151e;
+  --tile:     #0c0e16;
+  --border:   #1a1f2e;
+  --border2:  #252d40;
+  --accent:   #7c3aed;
+  --accent2:  #a855f7;
+  --neon:     #c084fc;
+  --neon2:    #e879f9;
+  --green:    #22c55e;
+  --red:      #ef4444;
+  --yellow:   #facc15;
+  --cyan:     #22d3ee;
+  --orange:   #f97316;
+  --text:     #dde4f0;
+  --text2:    #7a8aaa;
+  --text3:    #3a4460;
+  --px: 'Press Start 2P', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; image-rendering: pixelated; }
+
+/* ── PIXEL BORDER MIXIN ── */
+/* Hard 4-pixel inset shadow creates chunky retro border */
+.px-box {
+  border: 3px solid var(--border2);
+  box-shadow:
+    inset -3px -3px 0 #000,
+    inset 3px 3px 0 rgba(255,255,255,0.04);
+}
+.px-box-accent {
+  border: 3px solid var(--accent);
+  box-shadow:
+    inset -3px -3px 0 #000,
+    inset 3px 3px 0 rgba(192,132,252,0.15),
+    0 0 12px rgba(124,58,237,0.25);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--px);
+  font-size: 8px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  /* dithered scanline overlay */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.08) 2px,
+      rgba(0,0,0,0.08) 4px
+    );
+}
+
+/* ══ HEADER ══ */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 48px;
+  background: var(--panel);
+  border-bottom: 3px solid var(--border2);
+  box-shadow: 0 3px 0 #000;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  font-family: var(--px);
+  font-size: 11px;
+  color: var(--neon);
+  text-shadow:
+    2px 2px 0 var(--accent),
+    4px 4px 0 rgba(124,58,237,0.3);
+  letter-spacing: 2px;
+  line-height: 1;
+}
+.logo em {
+  color: var(--text3);
+  font-style: normal;
+}
+
+/* blinking cursor in logo */
+.blink {
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* pixel nav tabs */
+.nav-tabs {
+  display: flex;
+  gap: 0;
+}
+.nav-tab {
+  padding: 8px 14px;
+  background: var(--panel2);
+  border: 3px solid var(--border2);
+  border-right-width: 0;
+  color: var(--text2);
+  font-family: var(--px);
+  font-size: 7px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: background 0.05s, color 0.05s;
+  box-shadow: inset -2px -2px 0 #000;
+  position: relative;
+}
+.nav-tab:last-child { border-right-width: 3px; }
+.nav-tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent2);
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,0.4), inset 2px 2px 0 rgba(255,255,255,0.15);
+}
+.nav-tab:hover:not(.active) {
+  background: var(--border);
+  color: var(--text);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 6px;
+  color: var(--text3);
+  letter-spacing: 1px;
+}
+/* pixel status indicator — 4×4 block */
+.px-status {
+  width: 8px; height: 8px;
+  background: var(--green);
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px var(--green);
+  animation: pulse 2s step-end infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* ══ PAGES ══ */
+.page { display: none; }
+.page.active { display: flex; }
+
+/* ══ EDITOR PAGE ══ */
+#editor-page {
+  height: calc(100vh - 48px);
+  flex-direction: row;
+}
+
+/* ── LEFT TOOLBAR ── */
+.toolbar {
+  width: 56px;
+  background: var(--panel);
+  border-right: 3px solid var(--border2);
+  box-shadow: 3px 0 0 #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tool-btn {
+  width: 40px; height: 40px;
+  background: var(--panel2);
+  border: 3px solid var(--border2);
+  box-shadow: inset -2px -2px 0 #000, inset 2px 2px 0 rgba(255,255,255,0.03);
+  color: var(--text2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.05s;
+  padding: 0;
+}
+.tool-btn:hover {
+  border-color: var(--text3);
+  color: var(--text);
+  background: var(--border);
+}
+.tool-btn.active {
+  background: var(--accent);
+  border-color: var(--neon);
+  color: #fff;
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,0.4), inset 2px 2px 0 rgba(255,255,255,0.15), 0 0 10px rgba(124,58,237,0.4);
+}
+.tool-btn:active {
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.5);
+  transform: translate(1px,1px);
+}
+
+/* SVG pixel icons inside tool buttons */
+.tool-btn svg { width: 18px; height: 18px; }
+
+.tool-sep {
+  width: 32px; height: 3px;
+  background: var(--border2);
+  box-shadow: 0 1px 0 #000;
+  margin: 4px 0;
+}
+
+/* ── CANVAS AREA ── */
+.canvas-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  /* retro dot-matrix bg */
+  background-image:
+    radial-gradient(circle, rgba(124,58,237,0.04) 0%, transparent 60%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px);
+  overflow: auto;
+  position: relative;
+  gap: 12px;
+}
+
+#pixel-canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: crosshair;
+  border: 4px solid var(--border2);
+  box-shadow:
+    6px 6px 0 #000,
+    0 0 30px rgba(124,58,237,0.12),
+    inset 0 0 0 1px rgba(192,132,252,0.06);
+}
+
+/* retro status bar below canvas */
+.canvas-statusbar {
+  display: flex;
+  gap: 0;
+  background: var(--panel);
+  border: 3px solid var(--border2);
+  box-shadow: 3px 3px 0 #000;
+}
+.statusbar-cell {
+  padding: 5px 10px;
+  font-size: 6px;
+  color: var(--text3);
+  letter-spacing: 1px;
+  border-right: 2px solid var(--border2);
+}
+.statusbar-cell:last-child { border-right: none; }
+.statusbar-cell span { color: var(--cyan); }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  width: 196px;
+  background: var(--panel);
+  border-left: 3px solid var(--border2);
+  box-shadow: -3px 0 0 #000;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* retro scrollbar */
+.right-panel::-webkit-scrollbar { width: 8px; }
+.right-panel::-webkit-scrollbar-track { background: var(--bg); }
+.right-panel::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border: 2px solid var(--bg);
+}
+
+.rpanel-section {
+  padding: 10px;
+  border-bottom: 3px solid var(--border2);
+}
+
+/* section title bar — looks like a window titlebar */
+.rpanel-title {
+  font-size: 6px;
+  letter-spacing: 2px;
+  color: #fff;
+  background: var(--accent);
+  padding: 4px 6px;
+  margin: -10px -10px 10px -10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+}
+.rpanel-title::before {
+  content: '▶';
+  font-size: 5px;
+  color: var(--neon);
+}
+
+/* ── COLOR ── */
+.color-preview {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.color-swatch-main {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border2);
+  box-shadow: 3px 3px 0 #000, inset -2px -2px 0 rgba(0,0,0,0.3);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+.color-swatch-main input[type=color] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%; height: 100%;
+  border: none;
+  padding: 0;
+}
+.color-hex {
+  font-size: 7px;
+  color: var(--text2);
+  letter-spacing: 1px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px;
+}
+.palette-color {
+  aspect-ratio: 1;
+  cursor: pointer;
+  border: 2px solid transparent;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+  transition: transform 0.05s;
+}
+.palette-color:hover { transform: scale(1.2); border-color: rgba(255,255,255,0.4); }
+.palette-color.selected {
+  border-color: #fff;
+  box-shadow: 2px 2px 0 #000, 0 0 0 1px #fff;
+  transform: scale(1.1);
+}
+
+/* ── SIZE BTNS ── */
+.size-btns { display: flex; gap: 3px; flex-wrap: wrap; }
+.size-btn {
+  padding: 5px 7px;
+  background: var(--panel2);
+  border: 3px solid var(--border2);
+  box-shadow: 2px 2px 0 #000;
+  color: var(--text2);
+  font-family: var(--px);
+  font-size: 7px;
+  cursor: pointer;
+  transition: all 0.05s;
+}
+.size-btn:hover { border-color: var(--text3); color: var(--text); }
+.size-btn.active {
+  background: var(--accent);
+  border-color: var(--neon);
+  color: #fff;
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.3);
+}
+
+/* ── BRUSH ── */
+.brush-size-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brush-size-row input[type=range] {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+}
+.brush-size-val {
+  font-size: 8px;
+  color: var(--cyan);
+  min-width: 12px;
+  text-align: right;
+}
+
+/* ── ACTION BTNS ── */
+.action-btn {
+  width: 100%;
+  padding: 8px 6px;
+  background: var(--panel2);
+  border: 3px solid var(--border2);
+  box-shadow: 3px 3px 0 #000;
+  color: var(--text2);
+  font-family: var(--px);
+  font-size: 6px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.05s;
+}
+.action-btn:hover {
+  border-color: var(--text2);
+  color: var(--text);
+  background: var(--border);
+}
+.action-btn:active {
+  box-shadow: 1px 1px 0 #000;
+  transform: translate(2px, 2px);
+}
+.action-btn.publish {
+  border-color: var(--accent2);
+  color: var(--neon);
+  background: rgba(124,58,237,0.12);
+  box-shadow: 3px 3px 0 rgba(124,58,237,0.3);
+}
+.action-btn.publish:hover {
+  background: rgba(168,85,247,0.2);
+  border-color: var(--neon);
+  box-shadow: 3px 3px 0 var(--accent), 0 0 16px rgba(168,85,247,0.2);
+}
+
+/* ══ GALLERY PAGE ══ */
+#gallery-page {
+  flex-direction: column;
+  min-height: calc(100vh - 48px);
+  padding: 20px 20px;
+  background: var(--bg);
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.05) 3px, rgba(0,0,0,0.05) 6px);
+}
+
+.gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid var(--border2);
+  box-shadow: 0 3px 0 #000;
+}
+.gallery-title {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: var(--neon);
+  text-shadow: 2px 2px 0 var(--accent);
+}
+
+.gallery-sort { display: flex; gap: 3px; }
+.sort-btn {
+  padding: 6px 10px;
+  background: var(--panel2);
+  border: 3px solid var(--border2);
+  box-shadow: 2px 2px 0 #000;
+  color: var(--text2);
+  font-family: var(--px);
+  font-size: 6px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.05s;
+}
+.sort-btn.active {
+  background: var(--accent);
+  border-color: var(--neon);
+  color: #fff;
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.3);
+}
+.sort-btn:hover:not(.active) {
+  border-color: var(--text3);
+  color: var(--text);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.gallery-card {
+  background: var(--panel);
+  border: 3px solid var(--border2);
+  box-shadow: 5px 5px 0 #000;
+  cursor: pointer;
+  transition: transform 0.05s, box-shadow 0.05s;
+  position: relative;
+}
+.gallery-card:hover {
+  border-color: var(--accent);
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 #000, 0 0 20px rgba(124,58,237,0.15);
+}
+.gallery-card:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #000;
+}
+
+.gallery-canvas-wrap {
+  background: #080a0f;
+  /* checkerboard for transparency */
+  background-image:
+    linear-gradient(45deg, #0f1015 25%, transparent 25%),
+    linear-gradient(-45deg, #0f1015 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #0f1015 75%),
+    linear-gradient(-45deg, transparent 75%, #0f1015 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 152px;
+  border-bottom: 3px solid var(--border2);
+  overflow: hidden;
+}
+.gallery-canvas-wrap canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.gallery-card-info {
+  padding: 7px 8px;
+  background: var(--panel2);
+}
+.gallery-card-title {
+  font-size: 7px;
+  color: var(--text);
+  letter-spacing: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 5px;
+}
+.gallery-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 5px;
+  color: var(--text3);
+  letter-spacing: 1px;
+}
+
+.like-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--panel);
+  border: 2px solid var(--border2);
+  box-shadow: 2px 2px 0 #000;
+  color: var(--text3);
+  font-family: var(--px);
+  font-size: 6px;
+  cursor: pointer;
+  padding: 3px 5px;
+  transition: all 0.05s;
+  letter-spacing: 1px;
+}
+.like-btn:hover {
+  border-color: var(--neon2);
+  color: var(--neon2);
+  background: rgba(232,121,249,0.1);
+}
+.like-btn.liked {
+  color: var(--neon2);
+  border-color: var(--neon2);
+  background: rgba(232,121,249,0.12);
+  box-shadow: 2px 2px 0 rgba(232,121,249,0.2);
+}
+.like-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 #000; }
+
+/* ══ PUBLISH MODAL ══ */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  /* CRT scanline on overlay */
+  background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--panel2);
+  border: 4px solid var(--accent);
+  box-shadow:
+    8px 8px 0 #000,
+    0 0 40px rgba(124,58,237,0.3),
+    inset -3px -3px 0 rgba(0,0,0,0.3),
+    inset 3px 3px 0 rgba(192,132,252,0.08);
+  width: 340px;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* modal titlebar */
+.modal-titlebar {
+  background: var(--accent);
+  padding: 8px 12px;
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+}
+.modal-titlebar::before { content: '■'; color: var(--neon); font-size: 8px; }
+.modal-body { padding: 16px; }
+
+.modal-field { margin-bottom: 12px; }
+.modal-label {
+  display: block;
+  font-size: 6px;
+  letter-spacing: 2px;
+  color: var(--text3);
+  margin-bottom: 5px;
+}
+.modal-input {
+  width: 100%;
+  background: var(--bg);
+  border: 3px solid var(--border2);
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.4);
+  color: var(--text);
+  font-family: var(--px);
+  font-size: 8px;
+  padding: 7px 8px;
+  outline: none;
+  letter-spacing: 1px;
+}
+.modal-input:focus {
+  border-color: var(--accent);
+  box-shadow: inset 2px 2px 0 rgba(0,0,0,0.4), 0 0 0 1px var(--accent2);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.modal-btn {
+  flex: 1;
+  padding: 9px;
+  border: 3px solid var(--border2);
+  box-shadow: 3px 3px 0 #000;
+  font-family: var(--px);
+  font-size: 6px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.05s;
+}
+.modal-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 #000; }
+.modal-btn.cancel {
+  background: var(--panel);
+  color: var(--text2);
+  border-color: var(--border2);
+}
+.modal-btn.cancel:hover { border-color: var(--text2); color: var(--text); }
+.modal-btn.confirm {
+  background: var(--accent);
+  border-color: var(--neon);
+  color: #fff;
+  box-shadow: 3px 3px 0 rgba(124,58,237,0.5);
+}
+.modal-btn.confirm:hover {
+  background: var(--accent2);
+  box-shadow: 3px 3px 0 rgba(168,85,247,0.5), 0 0 12px rgba(168,85,247,0.3);
+}
+
+/* ══ TOAST ══ */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(70px);
+  background: var(--panel2);
+  border: 3px solid var(--border2);
+  box-shadow: 4px 4px 0 #000;
+  padding: 9px 16px;
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: var(--text);
+  z-index: 300;
+  transition: transform 0.2s cubic-bezier(0,0,0.2,1.4);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: var(--green); }
+.toast.success .toast-icon { color: var(--green); }
+.toast.error { border-color: var(--red); }
+.toast.error .toast-icon { color: var(--red); }
+
+/* ══ EMPTY STATE ══ */
+.empty-gallery {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text3);
+  font-size: 7px;
+  letter-spacing: 2px;
+  line-height: 2.5;
+}
+.empty-icon { font-size: 32px; margin-bottom: 16px; display: block; }
+
+/* ══ LOADING ══ */
+.loading-grid {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 10px;
+  color: var(--text3);
+  font-size: 7px;
+  letter-spacing: 2px;
+}
+/* pixel spinner — rotating 8-step */
+.px-spinner {
+  width: 16px; height: 16px;
+  background: var(--accent);
+  animation: pxspin 0.6s steps(8) infinite;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+@keyframes pxspin { to { transform: rotate(360deg); } }
+
+/* global scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header>
+  <div class="logo">PIXEL<em>FORGE</em><span class="blink">_</span></div>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('editor', this)">
+      [✏] DRAW
+    </button>
+    <button class="nav-tab" onclick="showPage('gallery', this)">
+      [◈] EXPLORE
+    </button>
+  </div>
+
+  <div class="header-right">
+    <div class="px-status"></div>
+    <span id="grid-indicator">16×16</span>
+    &nbsp;|&nbsp;
+    <span id="fps-counter">READY</span>
+  </div>
+</header>
+
+<!-- ══ EDITOR ══ -->
+<div id="editor-page" class="page active">
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <!-- Pencil -->
+    <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')" title="Pencil (P)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="1" width="2" height="2" fill="currentColor"/>
+        <rect x="12" y="3" width="2" height="2" fill="currentColor"/>
+        <rect x="8" y="3" width="2" height="2" fill="currentColor"/>
+        <rect x="10" y="5" width="2" height="2" fill="currentColor"/>
+        <rect x="8" y="5" width="2" height="2" fill="currentColor"/>
+        <rect x="6" y="7" width="4" height="2" fill="currentColor"/>
+        <rect x="4" y="9" width="4" height="2" fill="currentColor"/>
+        <rect x="2" y="11" width="4" height="2" fill="currentColor"/>
+        <rect x="2" y="13" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="15" width="2" height="2" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <!-- Eraser -->
+    <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')" title="Eraser (E)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="8" width="14" height="6" fill="currentColor"/>
+        <rect x="2" y="6" width="14" height="2" fill="currentColor" opacity="0.5"/>
+        <rect x="2" y="14" width="8" height="2" fill="currentColor" opacity="0.4"/>
+        <rect x="6" y="8" width="2" height="6" fill="rgba(0,0,0,0.3)"/>
+      </svg>
+    </button>
+
+    <!-- Fill -->
+    <button class="tool-btn" id="tool-fill" onclick="setTool('fill')" title="Fill (F)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="4" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="2" width="6" height="2" fill="currentColor"/>
+        <rect x="10" y="4" width="2" height="2" fill="currentColor"/>
+        <rect x="2" y="6" width="10" height="6" fill="currentColor"/>
+        <rect x="4" y="12" width="6" height="2" fill="currentColor"/>
+        <rect x="12" y="8" width="2" height="2" fill="currentColor"/>
+        <rect x="14" y="10" width="2" height="4" fill="currentColor"/>
+        <rect x="12" y="14" width="4" height="2" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <!-- Eyedropper -->
+    <button class="tool-btn" id="tool-eyedrop" onclick="setTool('eyedrop')" title="Eyedropper (I)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="2" width="4" height="2" fill="currentColor"/>
+        <rect x="12" y="4" width="2" height="4" fill="currentColor"/>
+        <rect x="10" y="8" width="2" height="2" fill="currentColor"/>
+        <rect x="8" y="10" width="2" height="2" fill="currentColor"/>
+        <rect x="6" y="12" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="14" width="2" height="2" fill="currentColor"/>
+        <rect x="2" y="14" width="2" height="4" fill="currentColor"/>
+        <rect x="4" y="16" width="2" height="2" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <div class="tool-sep"></div>
+
+    <!-- Line -->
+    <button class="tool-btn" id="tool-line" onclick="setTool('line')" title="Line (L)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="14" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="12" width="2" height="2" fill="currentColor"/>
+        <rect x="6" y="10" width="2" height="2" fill="currentColor"/>
+        <rect x="8" y="8" width="2" height="2" fill="currentColor"/>
+        <rect x="10" y="6" width="2" height="2" fill="currentColor"/>
+        <rect x="12" y="4" width="2" height="2" fill="currentColor"/>
+        <rect x="14" y="2" width="2" height="2" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <!-- Rect -->
+    <button class="tool-btn" id="tool-rect" onclick="setTool('rect')" title="Rectangle (R)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="3" width="14" height="2" fill="currentColor"/>
+        <rect x="2" y="13" width="14" height="2" fill="currentColor"/>
+        <rect x="2" y="3" width="2" height="12" fill="currentColor"/>
+        <rect x="14" y="3" width="2" height="12" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <div class="tool-sep"></div>
+
+    <!-- Undo -->
+    <button class="tool-btn" onclick="undo()" title="Undo (Ctrl+Z)">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="6" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="4" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="8" width="6" height="2" fill="currentColor"/>
+        <rect x="10" y="6" width="2" height="6" fill="currentColor"/>
+        <rect x="8" y="12" width="4" height="2" fill="currentColor"/>
+        <rect x="4" y="12" width="4" height="2" fill="currentColor"/>
+        <rect x="2" y="10" width="2" height="2" fill="currentColor"/>
+      </svg>
+    </button>
+
+    <!-- Clear -->
+    <button class="tool-btn" onclick="clearCanvas()" title="Clear Canvas">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="2" height="2" fill="currentColor"/>
+        <rect x="14" y="2" width="2" height="2" fill="currentColor"/>
+        <rect x="4" y="4" width="2" height="2" fill="currentColor"/>
+        <rect x="12" y="4" width="2" height="2" fill="currentColor"/>
+        <rect x="6" y="6" width="6" height="6" fill="currentColor"/>
+        <rect x="4" y="12" width="2" height="2" fill="currentColor"/>
+        <rect x="12" y="12" width="2" height="2" fill="currentColor"/>
+        <rect x="2" y="14" width="2" height="2" fill="currentColor"/>
+        <rect x="14" y="14" width="2" height="2" fill="currentColor"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-area">
+    <canvas id="pixel-canvas"></canvas>
+    <div class="canvas-statusbar">
+      <div class="statusbar-cell">XY: <span id="coord-display">--,--</span></div>
+      <div class="statusbar-cell">COL: <span id="color-display">------</span></div>
+      <div class="statusbar-cell">ZOOM: <span id="zoom-display">×8</span></div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="right-panel">
+
+    <div class="rpanel-section">
+      <div class="rpanel-title">COLOR</div>
+      <div class="color-preview">
+        <div class="color-swatch-main" id="main-swatch" style="background:#7c3aed">
+          <input type="color" id="color-picker" value="#7c3aed" oninput="updateColor(this.value)">
+        </div>
+        <div class="color-hex" id="hex-label">#7C3AED</div>
+      </div>
+      <div class="palette-grid" id="palette-grid"></div>
+    </div>
+
+    <div class="rpanel-section">
+      <div class="rpanel-title">CANVAS SIZE</div>
+      <div class="size-btns">
+        <button class="size-btn active" onclick="resizeCanvas(16, this)">16</button>
+        <button class="size-btn" onclick="resizeCanvas(24, this)">24</button>
+        <button class="size-btn" onclick="resizeCanvas(32, this)">32</button>
+        <button class="size-btn" onclick="resizeCanvas(48, this)">48</button>
+      </div>
+    </div>
+
+    <div class="rpanel-section">
+      <div class="rpanel-title">BRUSH SIZE</div>
+      <div class="brush-size-row">
+        <input type="range" id="brush-size" min="1" max="5" value="1" oninput="updateBrushSize(this.value)">
+        <span class="brush-size-val" id="brush-val">1</span>
+      </div>
+    </div>
+
+    <div class="rpanel-section">
+      <div class="rpanel-title">ACTIONS</div>
+      <button class="action-btn" id="btn-save-draft" onclick="saveDraft()" title="Save Draft">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="2" y="0" width="4" height="3" fill="currentColor" opacity="0.6"/><rect x="1" y="5" width="6" height="3" fill="currentColor" opacity="0.4"/></svg>
+        SAVE DRAFT
+      </button>
+      <button class="action-btn" id="btn-load-draft" onclick="loadDraft()" title="Load Draft" style="opacity:0.4;">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="1" y="2" width="8" height="7" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="4" y="0" width="2" height="5" fill="currentColor"/><rect x="2" y="3" width="2" height="2" fill="currentColor"/><rect x="6" y="3" width="2" height="2" fill="currentColor"/></svg>
+        LOAD DRAFT
+      </button>
+      <button class="action-btn" onclick="downloadArt()">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="4" y="0" width="2" height="6" fill="currentColor"/><rect x="2" y="5" width="2" height="2" fill="currentColor"/><rect x="6" y="5" width="2" height="2" fill="currentColor"/><rect x="0" y="8" width="10" height="2" fill="currentColor"/></svg>
+        EXPORT PNG
+      </button>
+      <button class="action-btn publish" onclick="openPublishModal()">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><rect x="4" y="0" width="2" height="2" fill="currentColor"/><rect x="2" y="2" width="2" height="2" fill="currentColor"/><rect x="6" y="2" width="2" height="2" fill="currentColor"/><rect x="0" y="4" width="10" height="2" fill="currentColor"/><rect x="0" y="6" width="10" height="4" fill="currentColor" opacity="0.5"/></svg>
+        PUBLISH
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ GALLERY ══ -->
+<div id="gallery-page" class="page">
+  <div class="gallery-header">
+    <div class="gallery-title">▶ COMMUNITY GALLERY</div>
+    <div class="gallery-sort">
+      <button class="sort-btn active" id="sort-new" onclick="setSortMode('newest')">NEWEST</button>
+      <button class="sort-btn" id="sort-top" onclick="setSortMode('top')">TOP</button>
+    </div>
+  </div>
+  <div class="gallery-grid" id="gallery-grid">
+    <div class="loading-grid"><div class="px-spinner"></div>&nbsp;LOADING...</div>
+  </div>
+</div>
+
+<!-- ══ PUBLISH MODAL ══ -->
+<div class="modal-overlay" id="publish-modal">
+  <div class="modal">
+    <div class="modal-titlebar">■ PUBLISH ARTWORK</div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label class="modal-label">▶ TITLE</label>
+        <input class="modal-input" id="publish-title" type="text" placeholder="NAME YOUR ART..." maxlength="40">
+      </div>
+      <div class="modal-field">
+        <label class="modal-label">▶ AUTHOR TAG</label>
+        <input class="modal-input" id="publish-author" type="text" placeholder="YOUR HANDLE..." maxlength="24">
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn cancel" onclick="closePublishModal()">CANCEL</button>
+        <button class="modal-btn confirm" onclick="publishArt()">PUBLISH ▶</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toast-icon">■</span>
+  <span id="toast-msg">DONE</span>
+</div>
+
+<script>
+// ═══ STORAGE ═══
+const STORAGE_KEY = 'pixelforge_gallery_v2';
+const LIKES_KEY = 'pixelforge_likes_v2';
+const DRAFT_KEY = 'pixelforge_draft_v1';
+
+function loadGallery() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
+}
+function saveGallery(d) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); } catch {}
+}
+function loadLikes() {
+  try { return JSON.parse(localStorage.getItem(LIKES_KEY)) || {}; } catch { return {}; }
+}
+function saveLikes(d) {
+  try { localStorage.setItem(LIKES_KEY, JSON.stringify(d)); } catch {}
+}
+
+// ── Draft save/load ──
+function saveDraft() {
+  try {
+    const draft = { pixels: [...pixels], gridSize, savedAt: Date.now() };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    showToast('DRAFT SAVED!', 'success');
+    updateDraftBtnState();
+  } catch { showToast('SAVE FAILED', 'error'); }
+}
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) { showToast('NO DRAFT FOUND', 'error'); return; }
+    const draft = JSON.parse(raw);
+    if (!draft.pixels || !draft.gridSize) { showToast('DRAFT CORRUPT', 'error'); return; }
+    if (!confirm('LOAD DRAFT?\nThis will replace your current canvas.')) return;
+    pushUndo();
+    // Resize canvas if needed
+    if (draft.gridSize !== gridSize) initCanvas(draft.gridSize);
+    pixels = draft.pixels.map(c => c || null);
+    render();
+    const age = formatDraftAge(draft.savedAt);
+    showToast('DRAFT LOADED · SAVED ' + age, 'success');
+  } catch { showToast('LOAD FAILED', 'error'); }
+}
+function formatDraftAge(ts) {
+  if (!ts) return 'UNKNOWN';
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return 'JUST NOW';
+  if (m < 60) return m + 'M AGO';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'H AGO';
+  return Math.floor(h / 24) + 'D AGO';
+}
+function hasDraft() {
+  try { return !!localStorage.getItem(DRAFT_KEY); } catch { return false; }
+}
+function updateDraftBtnState() {
+  const loadBtn = document.getElementById('btn-load-draft');
+  if (loadBtn) {
+    const has = hasDraft();
+    loadBtn.style.opacity = has ? '1' : '0.4';
+    loadBtn.title = has ? 'Load Draft' : 'No Draft Saved';
+  }
+  const saveBtn = document.getElementById('btn-save-draft');
+  if (saveBtn) {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        saveBtn.title = 'Save Draft (last: ' + formatDraftAge(d.savedAt) + ')';
+      } else {
+        saveBtn.title = 'Save Draft';
+      }
+    } catch {}
+  }
+}
+
+// ═══ CANVAS ═══
+const canvas = document.getElementById('pixel-canvas');
+const ctx = canvas.getContext('2d');
+
+let gridSize = 16;
+let cellSize = 28;
+let pixels = [];
+let undoStack = [];
+let currentColor = '#7c3aed';
+let currentTool = 'pencil';
+let brushSize = 1;
+let isDrawing = false;
+let lineStart = null;
+let previewPixels = null;
+let sortMode = 'newest';
+
+function initCanvas(size) {
+  gridSize = size;
+  if (size <= 16) cellSize = 28;
+  else if (size <= 24) cellSize = 20;
+  else if (size <= 32) cellSize = 15;
+  else cellSize = 10;
+
+  canvas.width = gridSize * cellSize;
+  canvas.height = gridSize * cellSize;
+
+  if (pixels.length !== gridSize * gridSize) {
+    pixels = new Array(gridSize * gridSize).fill(null);
+  }
+  document.getElementById('grid-indicator').textContent = `${gridSize}×${gridSize}`;
+  document.getElementById('zoom-display').textContent = `×${cellSize}`;
+  render();
+}
+
+function resizeCanvas(newSize, btn) {
+  undoStack = [];
+  pixels = new Array(newSize * newSize).fill(null);
+  document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  initCanvas(newSize);
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const src = previewPixels || pixels;
+  for (let i = 0; i < gridSize * gridSize; i++) {
+    const px = i % gridSize, py = Math.floor(i / gridSize);
+    const x = px * cellSize, y = py * cellSize;
+    const c = src[i];
+    if (!c) {
+      // checkerboard transparent
+      ctx.fillStyle = (px + py) % 2 === 0 ? '#111520' : '#0d1018';
+    } else {
+      ctx.fillStyle = c;
+    }
+    ctx.fillRect(x, y, cellSize, cellSize);
+  }
+  // Grid lines — pixel-crisp 1px
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= gridSize; x++) {
+    ctx.beginPath(); ctx.moveTo(x * cellSize + 0.5, 0); ctx.lineTo(x * cellSize + 0.5, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y <= gridSize; y++) {
+    ctx.beginPath(); ctx.moveTo(0, y * cellSize + 0.5); ctx.lineTo(canvas.width, y * cellSize + 0.5); ctx.stroke();
+  }
+}
+
+function getCell(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const x = Math.floor(((e.clientX - rect.left) * sx) / cellSize);
+  const y = Math.floor(((e.clientY - rect.top) * sy) / cellSize);
+  if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) return null;
+  return { x, y, idx: y * gridSize + x };
+}
+
+function pushUndo() {
+  undoStack.push([...pixels]);
+  if (undoStack.length > 50) undoStack.shift();
+}
+
+function undo() {
+  if (!undoStack.length) return;
+  pixels = undoStack.pop();
+  render();
+}
+
+function paintCell(x, y, color) {
+  const half = Math.floor(brushSize / 2);
+  for (let dy = -half; dy <= half; dy++)
+    for (let dx = -half; dx <= half; dx++) {
+      const nx = x+dx, ny = y+dy;
+      if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize)
+        pixels[ny * gridSize + nx] = color;
+    }
+}
+
+function floodFill(idx, newColor) {
+  const oldColor = pixels[idx];
+  if (oldColor === newColor) return;
+  const stack = [idx], visited = new Set();
+  while (stack.length) {
+    const i = stack.pop();
+    if (visited.has(i) || pixels[i] !== oldColor) continue;
+    visited.add(i); pixels[i] = newColor;
+    const x = i % gridSize, y = Math.floor(i / gridSize);
+    if (x > 0) stack.push(i-1);
+    if (x < gridSize-1) stack.push(i+1);
+    if (y > 0) stack.push(i-gridSize);
+    if (y < gridSize-1) stack.push(i+gridSize);
+  }
+}
+
+function getLinePixels(x0,y0,x1,y1) {
+  const pts=[];let dx=Math.abs(x1-x0),dy=Math.abs(y1-y0);
+  let sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx-dy;
+  while(true){pts.push({x:x0,y:y0});if(x0===x1&&y0===y1)break;
+    let e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}
+  return pts;
+}
+function getRectPixels(x0,y0,x1,y1) {
+  const pts=[],mnx=Math.min(x0,x1),mxx=Math.max(x0,x1),mny=Math.min(y0,y1),mxy=Math.max(y0,y1);
+  for(let x=mnx;x<=mxx;x++){pts.push({x,y:mny});pts.push({x,y:mxy});}
+  for(let y=mny;y<=mxy;y++){pts.push({x:mnx,y});pts.push({x:mxx,y});}
+  return pts;
+}
+
+// ── mouse ──
+canvas.addEventListener('mousedown', e => {
+  const cell = getCell(e); if (!cell) return;
+  isDrawing = true;
+  if (currentTool==='eyedrop') {
+    const c = pixels[cell.idx]; if(c) updateColor(c); setTool('pencil'); return;
+  }
+  if (currentTool==='fill') { pushUndo(); floodFill(cell.idx, currentColor); render(); return; }
+  if (currentTool==='line'||currentTool==='rect') { lineStart={x:cell.x,y:cell.y}; return; }
+  pushUndo();
+  paintCell(cell.x, cell.y, currentTool==='eraser' ? null : currentColor);
+  render();
+});
+
+canvas.addEventListener('mousemove', e => {
+  const cell = getCell(e);
+  if (cell) {
+    document.getElementById('coord-display').textContent = `${cell.x},${cell.y}`;
+    const c = pixels[cell.idx];
+    document.getElementById('color-display').textContent = c ? c.replace('#','').toUpperCase() : '------';
+  }
+  if (!isDrawing || !cell) return;
+  if ((currentTool==='line'||currentTool==='rect') && lineStart) {
+    previewPixels = [...pixels];
+    const pts = currentTool==='line'
+      ? getLinePixels(lineStart.x,lineStart.y,cell.x,cell.y)
+      : getRectPixels(lineStart.x,lineStart.y,cell.x,cell.y);
+    pts.forEach(p => {
+      if(p.x>=0&&p.x<gridSize&&p.y>=0&&p.y<gridSize)
+        previewPixels[p.y*gridSize+p.x] = currentColor;
+    });
+    render(); return;
+  }
+  if (currentTool==='pencil'||currentTool==='eraser') {
+    paintCell(cell.x, cell.y, currentTool==='eraser' ? null : currentColor);
+    render();
+  }
+});
+
+canvas.addEventListener('mouseup', e => {
+  if (!isDrawing) return;
+  const cell = getCell(e);
+  if ((currentTool==='line'||currentTool==='rect') && lineStart && cell) {
+    pushUndo();
+    const pts = currentTool==='line'
+      ? getLinePixels(lineStart.x,lineStart.y,cell.x,cell.y)
+      : getRectPixels(lineStart.x,lineStart.y,cell.x,cell.y);
+    pts.forEach(p => {
+      if(p.x>=0&&p.x<gridSize&&p.y>=0&&p.y<gridSize)
+        pixels[p.y*gridSize+p.x] = currentColor;
+    });
+  }
+  previewPixels = null; lineStart = null; isDrawing = false;
+  render();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  document.getElementById('coord-display').textContent = '--,--';
+  document.getElementById('color-display').textContent = '------';
+});
+
+// keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.ctrlKey && e.key === 'z') { undo(); return; }
+  const map = { p:'pencil', e:'eraser', f:'fill', i:'eyedrop', l:'line', r:'rect' };
+  if (map[e.key]) setTool(map[e.key]);
+});
+
+// ── tools ──
+function setTool(t) {
+  currentTool = t;
+  document.querySelectorAll('.tool-btn[id^="tool-"]').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`tool-${t}`);
+  if (btn) btn.classList.add('active');
+  const cursors = { eyedrop:'cell', fill:'cell' };
+  canvas.style.cursor = cursors[t] || 'crosshair';
+}
+
+function updateColor(c) {
+  currentColor = c;
+  document.getElementById('main-swatch').style.background = c;
+  document.getElementById('color-picker').value = c;
+  document.getElementById('hex-label').textContent = c.toUpperCase();
+}
+
+function updateBrushSize(v) {
+  brushSize = parseInt(v);
+  document.getElementById('brush-val').textContent = v;
+}
+
+function clearCanvas() {
+  if (!confirm('CLEAR CANVAS?')) return;
+  pushUndo();
+  pixels = new Array(gridSize*gridSize).fill(null);
+  render();
+}
+
+// ── palette ──
+const PALETTE = [
+  '#000000','#1a1a2e','#16213e','#0f3460','#533483','#7c3aed',
+  '#a855f7','#e879f9','#ec4899','#f43f5e','#ef4444','#f97316',
+  '#eab308','#84cc16','#22c55e','#10b981','#14b8a6','#06b6d4',
+  '#0ea5e9','#3b82f6','#6366f1','#ffffff','#e2e8f0','#94a3b8',
+  '#475569','#1e293b','#a16207','#92400e','#7f1d1d','#1e3a5f',
+  '#d4a017','#c0c0c0','#b45309','#064e3b','#134e4a','#1e1b4b',
+];
+function buildPalette() {
+  const grid = document.getElementById('palette-grid');
+  grid.innerHTML = '';
+  PALETTE.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'palette-color';
+    d.style.background = c;
+    d.title = c;
+    d.onclick = () => {
+      updateColor(c);
+      document.querySelectorAll('.palette-color').forEach(x => x.classList.remove('selected'));
+      d.classList.add('selected');
+    };
+    grid.appendChild(d);
+  });
+}
+
+// ── export ──
+function downloadArt() {
+  const exp = document.createElement('canvas');
+  const scale = Math.max(1, Math.floor(512/gridSize));
+  exp.width = gridSize*scale; exp.height = gridSize*scale;
+  const ec = exp.getContext('2d');
+  pixels.forEach((c,i) => {
+    if (!c) return;
+    ec.fillStyle = c;
+    ec.fillRect((i%gridSize)*scale, Math.floor(i/gridSize)*scale, scale, scale);
+  });
+  const a = document.createElement('a');
+  a.download = 'pixelforge.png';
+  a.href = exp.toDataURL('image/png');
+  a.click();
+  showToast('PNG EXPORTED!', 'success');
+}
+
+// ── publish ──
+function openPublishModal() {
+  document.getElementById('publish-modal').classList.add('open');
+  setTimeout(() => document.getElementById('publish-title').focus(), 100);
+}
+function closePublishModal() {
+  document.getElementById('publish-modal').classList.remove('open');
+}
+
+function publishArt() {
+  const title = document.getElementById('publish-title').value.trim() || 'UNTITLED';
+  const author = document.getElementById('publish-author').value.trim() || 'ANON';
+  const exp = document.createElement('canvas');
+  exp.width = gridSize; exp.height = gridSize;
+  const ec = exp.getContext('2d');
+  pixels.forEach((c,i) => {
+    ec.fillStyle = c || '#000';
+    ec.fillRect(i%gridSize, Math.floor(i/gridSize), 1, 1);
+  });
+  const entry = {
+    id: Date.now().toString(),
+    title: title.toUpperCase(),
+    author: author.toUpperCase(),
+    dataUrl: exp.toDataURL(),
+    pixelData: [...pixels],
+    gridSize,
+    likes: 0,
+    createdAt: Date.now()
+  };
+  const gallery = loadGallery();
+  gallery.unshift(entry);
+  saveGallery(gallery);
+  closePublishModal();
+  showToast(`"${title}" PUBLISHED!`, 'success');
+  document.getElementById('publish-title').value = '';
+  document.getElementById('publish-author').value = '';
+}
+
+// ── gallery ──
+function setSortMode(mode) {
+  sortMode = mode;
+  document.getElementById('sort-new').classList.toggle('active', mode==='newest');
+  document.getElementById('sort-top').classList.toggle('active', mode==='top');
+  renderGallery();
+}
+
+function renderGallery() {
+  const grid = document.getElementById('gallery-grid');
+  let gallery = loadGallery();
+  if (sortMode === 'top') gallery = [...gallery].sort((a,b) => b.likes - a.likes);
+  const likes = loadLikes();
+
+  if (!gallery.length) {
+    grid.innerHTML = `<div class="empty-gallery"><span class="empty-icon">◈</span>NO ARTWORK YET<br><br>BE THE FIRST TO PUBLISH</div>`;
+    return;
+  }
+  grid.innerHTML = '';
+  gallery.forEach(entry => {
+    const card = document.createElement('div');
+    card.className = 'gallery-card';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'gallery-canvas-wrap';
+    const c = document.createElement('canvas');
+    const sz = entry.gridSize || 16;
+    const scale = Math.max(1, Math.floor(152 / sz));
+    c.width = sz*scale; c.height = sz*scale;
+    const ec = c.getContext('2d');
+    ec.imageSmoothingEnabled = false;
+    if (entry.pixelData) {
+      entry.pixelData.forEach((col, i) => {
+        if (!col) return;
+        ec.fillStyle = col;
+        ec.fillRect((i%sz)*scale, Math.floor(i/sz)*scale, scale, scale);
+      });
+    }
+    wrap.appendChild(c);
+
+    const info = document.createElement('div');
+    info.className = 'gallery-card-info';
+    const isLiked = likes[entry.id];
+    info.innerHTML = `
+      <div class="gallery-card-title">${escHtml(entry.title)}</div>
+      <div class="gallery-card-meta">
+        <span>${escHtml(entry.author)} · ${getAge(entry.createdAt)}</span>
+        <button class="like-btn ${isLiked?'liked':''}" onclick="toggleLike('${entry.id}',this,event)">
+          ${isLiked?'♥':'♡'}&nbsp;<span class="lc">${entry.likes||0}</span>
+        </button>
+      </div>
+    `;
+    card.appendChild(wrap);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+}
+
+function toggleLike(id, btn, e) {
+  e.stopPropagation();
+  const gallery = loadGallery();
+  const likes = loadLikes();
+  const entry = gallery.find(x => x.id === id);
+  if (!entry) return;
+  if (likes[id]) {
+    delete likes[id];
+    entry.likes = Math.max(0, (entry.likes||1)-1);
+    btn.classList.remove('liked');
+    btn.innerHTML = `♡&nbsp;<span class="lc">${entry.likes}</span>`;
+  } else {
+    likes[id] = true;
+    entry.likes = (entry.likes||0)+1;
+    btn.classList.add('liked');
+    btn.innerHTML = `♥&nbsp;<span class="lc">${entry.likes}</span>`;
+  }
+  saveLikes(likes);
+  saveGallery(gallery);
+}
+
+function getAge(ts) {
+  const d = Date.now()-ts, m = Math.floor(d/60000);
+  if (m<1) return 'NOW';
+  if (m<60) return `${m}M`;
+  const h = Math.floor(m/60);
+  if (h<24) return `${h}H`;
+  return `${Math.floor(h/24)}D`;
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── page switch ──
+function showPage(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`${page}-page`).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (page==='gallery') renderGallery();
+}
+
+// ── toast ──
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = type==='success' ? '■' : '✕';
+  t.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── seed ── (no fake seed data — gallery starts empty)
+function seedIfEmpty() {
+  // Gallery starts empty; users publish their own art
+}
+
+// ── init ──
+buildPalette();
+seedIfEmpty();
+initCanvas(16);
+updateDraftBtnState();
+</script>
+</body>
+</html>
