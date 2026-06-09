@@ -13814,6 +13814,14 @@ initCanvas(16);
 updateDraftBtnState();
 window.parent.postMessage({type:'pfReady'},'*');
 <\/script>
+<div id="pixelforge-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:3000;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#0e1118;border-bottom:2px solid #1a1f2e;flex-shrink:0;">
+    <div style="font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#c084fc;">🎨 PIXELFORGE</div>
+    <button onclick="N.closePixelForge()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:10px;padding:4px 12px;border-radius:5px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
+  </div>
+  <iframe id="pixelforge-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
+</div>
+
 </body>
 </html>
 `;
@@ -17794,12 +17802,6 @@ function makePollCard(poll,isOw){
         <span style="font-size:9px;font-family:var(--font-mono);color:#c9a84c;letter-spacing:1px;">IDLE</span>
       </button>
 
-      <button onclick="N.closeModal('games-hub-modal');N.openPixelForge()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(124,58,237,0.12)'" onmouseout="this.style.background='none'">
-        <span style="font-size:16px;width:22px;text-align:center;">🎨</span>
-        <span style="flex:1;">PixelForge</span>
-        <span style="font-size:9px;font-family:var(--font-mono);color:#a78bfa;letter-spacing:1px;">ART</span>
-      </button>
-
       <button onclick="N.closeModal('games-hub-modal');N.openWhackGame()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
         <span style="font-size:16px;width:22px;text-align:center;">🔨</span>
         <span style="flex:1;">Whack-A-Mole</span>
@@ -17814,6 +17816,11 @@ function makePollCard(poll,isOw){
         <span style="font-size:16px;width:22px;text-align:center;">🔴</span>
         <span style="flex:1;">The Button</span>
         <span style="font-size:9px;font-family:var(--font-mono);color:#ff3355;letter-spacing:1px;">DEDICATED</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openPixelForge()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(124,58,237,0.12)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🎨</span>
+        <span style="flex:1;">PixelForge</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#a78bfa;letter-spacing:1px;">ART</span>
       </button>
 
     </div>
