@@ -13047,30 +13047,9 @@ header {
 .toast.error .toast-icon { color: var(--red); }
 
 /* ══ EMPTY STATE ══ */
-.unpublish-btn {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 3px 0;
-  background: none;
-  border: 1px solid rgba(239,68,68,0.4);
-  border-radius: 3px;
-  color: rgba(239,68,68,0.7);
-  font-family: var(--px);
-  font-size: 6px;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.unpublish-btn:hover {
-  background: rgba(239,68,68,0.12);
-  border-color: rgba(239,68,68,0.8);
-  color: #ef4444;
-}
-.unpublish-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.unpublish-btn{display:block;width:100%;margin-top:4px;padding:3px 0;background:none;border:1px solid rgba(239,68,68,0.4);border-radius:3px;color:rgba(239,68,68,0.7);font-family:var(--px);font-size:6px;letter-spacing:1px;cursor:pointer;transition:all 0.15s;}
+.unpublish-btn:hover{background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.8);color:#ef4444;}
+.unpublish-btn:disabled{opacity:0.4;cursor:not-allowed;}
 .empty-gallery {
   grid-column: 1 / -1;
   text-align: center;
@@ -13363,16 +13342,18 @@ const STORAGE_KEY = 'pixelforge_gallery_v2';
 const LIKES_KEY = 'pixelforge_likes_v2';
 const DRAFT_KEY = 'pixelforge_draft_v1';
 
-let _pfGallery=[],_pfLikes={},_pfUsername='ANON',_pfUid=null,_pfGalleryLoaded=false,_pfCallbacks=[];
+let _pfGallery=[],_pfLikes={},_pfUsername='ANON',_pfUid=null,_pfGalleryLoaded=false;
 function loadGallery(){return _pfGallery;}function saveGallery(d){_pfGallery=d;}
 function loadLikes(){return _pfLikes;}function saveLikes(d){_pfLikes=d;window.parent.postMessage({type:'pfSaveLikes',likes:d},'*');}
 function pfRequestGallery(){window.parent.postMessage({type:'pfLoadGallery'},'*');}
 window.addEventListener('message',function(e){
   const d=e.data;if(!d)return;
-  if(d.type==='pfGalleryData'){_pfGallery=d.gallery||[];_pfLikes=d.likes||{};_pfGalleryLoaded=true;_pfCallbacks.forEach(fn=>fn());_pfCallbacks=[];renderGallery();}
+  if(d.type==='pfGalleryData'){_pfGallery=d.gallery||[];_pfLikes=d.likes||{};_pfGalleryLoaded=true;renderGallery();}
   if(d.type==='pfUserInfo'){_pfUsername=d.username||'ANON';_pfUid=d.uid||null;const a=document.getElementById('publish-author');if(a&&!a.value)a.value=_pfUsername;}
   if(d.type==='pfPublishOk'){showToast('PUBLISHED TO NEXUS!','success');pfRequestGallery();}
   if(d.type==='pfPublishFail'){showToast('PUBLISH FAILED','error');}
+  if(d.type==='pfUnpublishOk'){showToast('ART UNPUBLISHED','success');pfRequestGallery();}
+  if(d.type==='pfUnpublishFail'){showToast('FAILED: '+(d.msg||'ERROR'),'error');}
 });
 
 // ── Draft save/load ──
@@ -13769,6 +13750,7 @@ function renderGallery() {
     info.className = 'gallery-card-info';
     const isLiked = likes[entry.id];
     const isOwn = entry.uid && entry.uid === _pfUid;
+    const unpublishBtn = isOwn ? \`<button class="unpublish-btn" onclick="unpublishArt('\${entry.id}','\${entry._docId||''}',this,event)">✕ UNPUBLISH</button>\` : '';
     info.innerHTML = \`
       <div class="gallery-card-title">\${escHtml(entry.title)}</div>
       <div class="gallery-card-meta">
@@ -13777,7 +13759,7 @@ function renderGallery() {
           \${isLiked?'♥':'♡'}&nbsp;<span class="lc">\${entry.likes||0}</span>
         </button>
       </div>
-      \${isOwn ? \`<button class="unpublish-btn" onclick="unpublishArt('\${entry.id}','\${entry._docId||''}',this,event)" title="Unpublish your art">✕ UNPUBLISH</button>\` : ''}
+      \${unpublishBtn}
     \`;
     card.appendChild(wrap);
     card.appendChild(info);
@@ -13789,30 +13771,19 @@ function toggleLike(id,btn,e){
   e.stopPropagation();const gallery=loadGallery();const likes=loadLikes();
   const entry=gallery.find(x=>x.id===id);if(!entry)return;
   const wasLiked=!!likes[id];
-  if(wasLiked){delete likes[id];entry.likes=Math.max(0,(entry.likes||1)-1);btn.classList.remove('liked');btn.innerHTML=\`♡&nbsp;<span class="lc">\${entry.likes}</span>\`;}
-  else{likes[id]=true;entry.likes=(entry.likes||0)+1;btn.classList.add('liked');btn.innerHTML=\`♥&nbsp;<span class="lc">\${entry.likes}</span>\`;}
+  if(wasLiked){delete likes[id];entry.likes=Math.max(0,(entry.likes||1)-1);btn.classList.remove('liked');}
+  else{likes[id]=true;entry.likes=(entry.likes||0)+1;btn.classList.add('liked');}
   saveLikes(likes);saveGallery(gallery);
   window.parent.postMessage({type:'pfToggleLike',id,delta:wasLiked?-1:1},'*');
+  renderGallery();
 }
 
-function unpublishArt(id, docId, btn, e) {
+function unpublishArt(id,docId,btn,e){
   e.stopPropagation();
-  if (!confirm('UNPUBLISH THIS ART?\nIt will be removed from the community gallery.')) return;
-  btn.disabled = true;
-  btn.textContent = 'REMOVING...';
-  window.parent.postMessage({type:'pfUnpublish', id, docId},'*');
+  if(!confirm('UNPUBLISH THIS ART?\\nIt will be removed from the community gallery.'))return;
+  btn.disabled=true;btn.textContent='REMOVING...';
+  window.parent.postMessage({type:'pfUnpublish',id,docId},'*');
 }
-window.addEventListener('message', function(e2) {
-  const d2 = e2.data; if (!d2) return;
-  if (d2.type === 'pfUnpublishOk') {
-    showToast('ART UNPUBLISHED', 'success');
-    pfRequestGallery();
-  }
-  if (d2.type === 'pfUnpublishFail') {
-    showToast('FAILED: ' + (d2.msg||'ERROR'), 'error');
-  }
-}, {passive:true});
-
 function getAge(ts) {
   const d = Date.now()-ts, m = Math.floor(d/60000);
   if (m<1) return 'NOW';
