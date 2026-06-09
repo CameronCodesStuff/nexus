@@ -3285,13 +3285,11 @@ async function enterApp(){
         const g=d.data();
         if(g.id&&!COMMUNITY_GAMES.find(x=>x.id===g.id)) COMMUNITY_GAMES.push(g);
       });
-      // Built-in games
-      const _builtIn=[{"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "\ud83c\udfb0", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>\ud83c\udfb0 Casino Slots \ud83c\udfb0</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">\ud83c\udf52</div> <div class=\"reel\" id=\"r2\">\ud83c\udf4b</div> <div class=\"reel\" id=\"r3\">\u2b50</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> <script> const symbols=[\"\ud83c\udf52\",\"\ud83c\udf4b\",\"\ud83c\udf4a\",\"\u2b50\",\"\ud83d\udc8e\",\"7\ufe0f\u20e3\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"\ud83d\udc8e\" && s2===\"\ud83d\udc8e\" && s3===\"\ud83d\udc8e\"){ win=jackpot; jackpot=5000; msg=\"\ud83d\udc8e JACKPOT! \ud83d\udc8e\"; } else if(s1===\"7\ufe0f\u20e3\" && s2===\"7\ufe0f\u20e3\" && s3===\"7\ufe0f\u20e3\"){ win=currentBet*100; msg=\"\ud83d\udd25 MEGA JACKPOT \ud83d\udd25\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"\ud83c\udf89 BIG WIN \ud83c\udf89\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"\u2728 Small Win \u2728\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); </script> \n<script>\nfunction reportScoreToNexus(){\n  const score=Number(localStorage.biggest)||0;\n  const bal=Number(localStorage.balance)||1000;\n  try{\n    window.opener&&window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n    window.parent&&window.parent!==window&&window.parent.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\n// Auto-report after every spin\nconst _origSave=window.save;\nwindow.save=function(){_origSave&&_origSave();reportScoreToNexus();};\n</script>\n<div style=\"margin-top:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    \ud83d\udcca Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true}];
-      _builtIn.forEach(g=>{if(!COMMUNITY_GAMES.find(x=>x.id===g.id))COMMUNITY_GAMES.unshift(g);});
+      const _bi={"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "🎰", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>🎰 Casino Slots 🎰</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">🍒</div> <div class=\"reel\" id=\"r2\">🍋</div> <div class=\"reel\" id=\"r3\">⭐</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> <script> const symbols=[\"🍒\",\"🍋\",\"🍊\",\"⭐\",\"💎\",\"7️⃣\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"💎\" && s2===\"💎\" && s3===\"💎\"){ win=jackpot; jackpot=5000; msg=\"💎 JACKPOT! 💎\"; } else if(s1===\"7️⃣\" && s2===\"7️⃣\" && s3===\"7️⃣\"){ win=currentBet*100; msg=\"🔥 MEGA JACKPOT 🔥\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"🎉 BIG WIN 🎉\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"✨ Small Win ✨\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); </script> \n<script>\nfunction reportScoreToNexus(){\n  var score=Number(localStorage.biggest)||0;\n  var bal=Number(localStorage.balance)||1000;\n  try{\n    if(window.opener) window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\nvar _origSave=window.save;\nwindow.save=function(){if(_origSave)_origSave();setTimeout(reportScoreToNexus,100);};\n</script>\n<div style=\"margin-top:20px;padding-bottom:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true};
+      if(!COMMUNITY_GAMES.find(x=>x.id===_bi.id))COMMUNITY_GAMES.unshift(_bi);
     }).catch(()=>{
-      // Fallback: still add built-in games even if Firestore fails
-      const _builtIn=[{"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "\ud83c\udfb0", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>\ud83c\udfb0 Casino Slots \ud83c\udfb0</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">\ud83c\udf52</div> <div class=\"reel\" id=\"r2\">\ud83c\udf4b</div> <div class=\"reel\" id=\"r3\">\u2b50</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> <script> const symbols=[\"\ud83c\udf52\",\"\ud83c\udf4b\",\"\ud83c\udf4a\",\"\u2b50\",\"\ud83d\udc8e\",\"7\ufe0f\u20e3\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"\ud83d\udc8e\" && s2===\"\ud83d\udc8e\" && s3===\"\ud83d\udc8e\"){ win=jackpot; jackpot=5000; msg=\"\ud83d\udc8e JACKPOT! \ud83d\udc8e\"; } else if(s1===\"7\ufe0f\u20e3\" && s2===\"7\ufe0f\u20e3\" && s3===\"7\ufe0f\u20e3\"){ win=currentBet*100; msg=\"\ud83d\udd25 MEGA JACKPOT \ud83d\udd25\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"\ud83c\udf89 BIG WIN \ud83c\udf89\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"\u2728 Small Win \u2728\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); </script> \n<script>\nfunction reportScoreToNexus(){\n  const score=Number(localStorage.biggest)||0;\n  const bal=Number(localStorage.balance)||1000;\n  try{\n    window.opener&&window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n    window.parent&&window.parent!==window&&window.parent.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\n// Auto-report after every spin\nconst _origSave=window.save;\nwindow.save=function(){_origSave&&_origSave();reportScoreToNexus();};\n</script>\n<div style=\"margin-top:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    \ud83d\udcca Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true}];
-      _builtIn.forEach(g=>{if(!COMMUNITY_GAMES.find(x=>x.id===g.id))COMMUNITY_GAMES.unshift(g);});
+      const _bi={"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "🎰", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>🎰 Casino Slots 🎰</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">🍒</div> <div class=\"reel\" id=\"r2\">🍋</div> <div class=\"reel\" id=\"r3\">⭐</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> <script> const symbols=[\"🍒\",\"🍋\",\"🍊\",\"⭐\",\"💎\",\"7️⃣\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"💎\" && s2===\"💎\" && s3===\"💎\"){ win=jackpot; jackpot=5000; msg=\"💎 JACKPOT! 💎\"; } else if(s1===\"7️⃣\" && s2===\"7️⃣\" && s3===\"7️⃣\"){ win=currentBet*100; msg=\"🔥 MEGA JACKPOT 🔥\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"🎉 BIG WIN 🎉\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"✨ Small Win ✨\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); </script> \n<script>\nfunction reportScoreToNexus(){\n  var score=Number(localStorage.biggest)||0;\n  var bal=Number(localStorage.balance)||1000;\n  try{\n    if(window.opener) window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\nvar _origSave=window.save;\nwindow.save=function(){if(_origSave)_origSave();setTimeout(reportScoreToNexus,100);};\n</script>\n<div style=\"margin-top:20px;padding-bottom:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true};
+      if(!COMMUNITY_GAMES.find(x=>x.id===_bi.id))COMMUNITY_GAMES.unshift(_bi);
     });
     startGameAutosave();
     // Wait for owner check to resolve before assigning streak king
@@ -11944,10 +11942,10 @@ function drawBg(){
   stars.forEach(s=>{
     const a=s.brightness*(0.5+0.5*Math.sin(bgT*s.speed+s.phase));
     bgCtx.beginPath();bgCtx.arc(s.x,s.y,s.r,0,Math.PI*2);
-    bgCtx.fillStyle=\`rgba(255,255,255,\${a})\`;bgCtx.fill();
+    bgCtx.fillStyle=`rgba(255,255,255,${a})`;bgCtx.fill();
     if(s.r>1){
       bgCtx.beginPath();bgCtx.arc(s.x,s.y,s.r*2.5,0,Math.PI*2);
-      bgCtx.fillStyle=\`rgba(200,220,255,\${a*0.15})\`;bgCtx.fill();
+      bgCtx.fillStyle=`rgba(200,220,255,${a*0.15})`;bgCtx.fill();
     }
   });
   bgT+=0.016;requestAnimationFrame(drawBg);
@@ -11955,7 +11953,7 @@ function drawBg(){
 window.addEventListener('resize',resizeBg);resizeBg();drawBg();
 
 function normalMoleSVG(){
-  return\`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+  return`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="body-g" cx="42%" cy="35%" r="58%">
       <stop offset="0%" stop-color="#A0735A"/>
@@ -12027,12 +12025,12 @@ function normalMoleSVG(){
   <path d="M28 112 Q26 125 28 128" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
   <path d="M72 112 Q74 125 72 128" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
   <path d="M82 108 Q86 120 84 124" stroke="#C0A080" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-</svg>\`;
+</svg>`;
 
 }
 
 function goldMoleSVG(){
-  return\`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+  return`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="gbody" cx="42%" cy="35%" r="58%">
       <stop offset="0%" stop-color="#FFE066"/>
@@ -12099,11 +12097,11 @@ function goldMoleSVG(){
   <text x="82" y="30" font-size="9" fill="#FFD700" opacity="0.8">✦</text>
   <text x="48" y="122" font-size="8" fill="#FFD700" opacity="0.6">✦</text>
   <animateTransform attributeName="transform" type="translate" values="0,0;0,-4;0,-1;0,-4;0,0" dur="0.9s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"/>
-</svg>\`;
+</svg>`;
 }
 
 function bombMoleSVG(){
-  return\`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+  return`<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="bbody" cx="42%" cy="35%" r="58%">
       <stop offset="0%" stop-color="#555"/>
@@ -12153,7 +12151,7 @@ function bombMoleSVG(){
   <line x1="16" y1="70" x2="37" y2="70" stroke="rgba(180,180,180,0.4)" stroke-width="0.7"/>
   <line x1="62" y1="67" x2="82" y2="66" stroke="rgba(180,180,180,0.5)" stroke-width="0.8"/>
   <line x1="63" y1="70" x2="84" y2="70" stroke="rgba(180,180,180,0.4)" stroke-width="0.7"/>
-</svg>\`;
+</svg>`;
 }
 
 function makeHoleSVG(seed){
@@ -12181,9 +12179,9 @@ function makeHoleSVG(seed){
     const by=52+Math.sin(angle)*r*0.38;
     const bh=8+rnd()*12;
     const lean=(rnd()-0.5)*8;
-    const green=\`hsl(\${105+rnd()*25},\${52+rnd()*25}%,\${22+rnd()*18}%)\`;
-    const tip=\`hsl(\${115+rnd()*20},\${55+rnd()*20}%,\${30+rnd()*14}%)\`;
-    blades.push(\`<path d="M\${bx.toFixed(1)} \${by.toFixed(1)} Q\${(bx+lean).toFixed(1)} \${(by-bh*0.6).toFixed(1)} \${(bx+lean*1.4).toFixed(1)} \${(by-bh).toFixed(1)}" stroke="url(#gb\${i%4})" stroke-width="\${0.9+rnd()*1.1}" fill="none" stroke-linecap="round"/>\`);
+    const green=`hsl(${105+rnd()*25},${52+rnd()*25}%,${22+rnd()*18}%)`;
+    const tip=`hsl(${115+rnd()*20},${55+rnd()*20}%,${30+rnd()*14}%)`;
+    blades.push(`<path d="M${bx.toFixed(1)} ${by.toFixed(1)} Q${(bx+lean).toFixed(1)} ${(by-bh*0.6).toFixed(1)} ${(bx+lean*1.4).toFixed(1)} ${(by-bh).toFixed(1)}" stroke="url(#gb${i%4})" stroke-width="${0.9+rnd()*1.1}" fill="none" stroke-linecap="round"/>`);
   }
 
   
@@ -12195,43 +12193,43 @@ function makeHoleSVG(seed){
     const by=50+Math.sin(angle)*r*0.35;
     const bh=5+rnd()*7;
     const lean=(rnd()-0.5)*5;
-    backBlades.push(\`<path d="M\${bx.toFixed(1)} \${by.toFixed(1)} Q\${(bx+lean).toFixed(1)} \${(by-bh*0.5).toFixed(1)} \${(bx+lean*1.3).toFixed(1)} \${(by-bh).toFixed(1)}" stroke="hsl(\${108+rnd()*20},\${48+rnd()*20}%,\${18+rnd()*12}%)" stroke-width="\${0.7+rnd()*0.9}" fill="none" stroke-linecap="round"/>\`);
+    backBlades.push(`<path d="M${bx.toFixed(1)} ${by.toFixed(1)} Q${(bx+lean).toFixed(1)} ${(by-bh*0.5).toFixed(1)} ${(bx+lean*1.3).toFixed(1)} ${(by-bh).toFixed(1)}" stroke="hsl(${108+rnd()*20},${48+rnd()*20}%,${18+rnd()*12}%)" stroke-width="${0.7+rnd()*0.9}" fill="none" stroke-linecap="round"/>`);
   }
 
   const uid=seed; 
 
-  return \`<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" overflow="visible">
   <defs>
     
-    <radialGradient id="dg\${uid}" cx="38%" cy="28%" r="68%">
+    <radialGradient id="dg${uid}" cx="38%" cy="28%" r="68%">
       <stop offset="0%"  stop-color="#9C6030"/>
       <stop offset="30%" stop-color="#7A4520"/>
       <stop offset="65%" stop-color="#562E10"/>
       <stop offset="100%" stop-color="#341A06"/>
     </radialGradient>
     
-    <radialGradient id="ds\${uid}" cx="50%" cy="80%" r="55%">
+    <radialGradient id="ds${uid}" cx="50%" cy="80%" r="55%">
       <stop offset="0%"  stop-color="#B07040" stop-opacity="0.3"/>
       <stop offset="100%" stop-color="#7A4520" stop-opacity="0"/>
     </radialGradient>
     
-    <radialGradient id="hg\${uid}" cx="50%" cy="100%" r="70%">
+    <radialGradient id="hg${uid}" cx="50%" cy="100%" r="70%">
       <stop offset="0%"  stop-color="#3a1c06"/>
       <stop offset="35%" stop-color="#1a0900"/>
       <stop offset="100%" stop-color="#060200"/>
     </radialGradient>
     
-    <radialGradient id="hl\${uid}" cx="50%" cy="0%" r="80%">
+    <radialGradient id="hl${uid}" cx="50%" cy="0%" r="80%">
       <stop offset="0%"  stop-color="#60380A" stop-opacity="0.35"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </radialGradient>
     
-    <linearGradient id="rl\${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
+    <linearGradient id="rl${uid}" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%"  stop-color="#C08040" stop-opacity="0.6"/>
       <stop offset="100%" stop-color="#6B3A18" stop-opacity="0"/>
     </linearGradient>
     
-    <linearGradient id="gg\${uid}" x1="0%" y1="100%" x2="0%" y2="0%">
+    <linearGradient id="gg${uid}" x1="0%" y1="100%" x2="0%" y2="0%">
       <stop offset="0%"  stop-color="#2E6B10"/>
       <stop offset="60%" stop-color="#48A020"/>
       <stop offset="100%" stop-color="#5DC030"/>
@@ -12250,31 +12248,31 @@ function makeHoleSVG(seed){
       <stop offset="0%" stop-color="#2a5a0e"/><stop offset="100%" stop-color="#50a022"/>
     </linearGradient>
     
-    <radialGradient id="sh\${uid}" cx="50%" cy="50%" r="50%">
+    <radialGradient id="sh${uid}" cx="50%" cy="50%" r="50%">
       <stop offset="0%"  stop-color="#000000" stop-opacity="0.55"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
     </radialGradient>
     
-    <clipPath id="hc\${uid}">
+    <clipPath id="hc${uid}">
       <ellipse cx="50" cy="50" rx="20" ry="10.5"/>
     </clipPath>
     
-    <clipPath id="mc\${uid}">
+    <clipPath id="mc${uid}">
       <ellipse cx="50" cy="68" rx="40" ry="28"/>
     </clipPath>
   </defs>
 
   
-  <ellipse cx="50" cy="95" rx="40" ry="7" fill="url(#sh\${uid})"/>
+  <ellipse cx="50" cy="95" rx="40" ry="7" fill="url(#sh${uid})"/>
 
   
-  \${backBlades.join('')}
+  ${backBlades.join('')}
 
   
   
-  <ellipse cx="50" cy="72" rx="42" ry="26" fill="url(#dg\${uid})"/>
+  <ellipse cx="50" cy="72" rx="42" ry="26" fill="url(#dg${uid})"/>
   
-  <ellipse cx="50" cy="72" rx="42" ry="26" fill="url(#ds\${uid})"/>
+  <ellipse cx="50" cy="72" rx="42" ry="26" fill="url(#ds${uid})"/>
   
   <ellipse cx="50" cy="47" rx="40" ry="7" fill="none" stroke="rgba(180,110,50,0.25)" stroke-width="2"/>
   
@@ -12286,19 +12284,19 @@ function makeHoleSVG(seed){
   <path d="M38 80 Q42 77 44 79" stroke="rgba(30,12,2,0.3)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
 
   
-  \${pebbles.map(p=>\`
-  <g transform="rotate(\${p.rot.toFixed(1)},\${p.px.toFixed(1)},\${p.py.toFixed(1)})">
-    <ellipse cx="\${p.px.toFixed(1)}" cy="\${p.py.toFixed(1)}" rx="\${p.rw.toFixed(1)}" ry="\${p.rh.toFixed(1)}" fill="\${p.light?'#A87848':'#6B4020'}" opacity="0.75"/>
-    <ellipse cx="\${(p.px-p.rw*0.25).toFixed(1)}" cy="\${(p.py-p.rh*0.3).toFixed(1)}" rx="\${(p.rw*0.4).toFixed(1)}" ry="\${(p.rh*0.35).toFixed(1)}" fill="rgba(255,200,120,0.3)"/>
-  </g>\`).join('')}
+  ${pebbles.map(p=>`
+  <g transform="rotate(${p.rot.toFixed(1)},${p.px.toFixed(1)},${p.py.toFixed(1)})">
+    <ellipse cx="${p.px.toFixed(1)}" cy="${p.py.toFixed(1)}" rx="${p.rw.toFixed(1)}" ry="${p.rh.toFixed(1)}" fill="${p.light?'#A87848':'#6B4020'}" opacity="0.75"/>
+    <ellipse cx="${(p.px-p.rw*0.25).toFixed(1)}" cy="${(p.py-p.rh*0.3).toFixed(1)}" rx="${(p.rw*0.4).toFixed(1)}" ry="${(p.rh*0.35).toFixed(1)}" fill="rgba(255,200,120,0.3)"/>
+  </g>`).join('')}
 
   
   
   <ellipse cx="50" cy="50.5" rx="21.5" ry="11.5" fill="rgba(0,0,0,0.7)"/>
   
-  <ellipse cx="50" cy="50" rx="20" ry="10.5" fill="url(#hg\${uid})"/>
+  <ellipse cx="50" cy="50" rx="20" ry="10.5" fill="url(#hg${uid})"/>
   
-  <ellipse cx="50" cy="50" rx="20" ry="10.5" fill="url(#hl\${uid})"/>
+  <ellipse cx="50" cy="50" rx="20" ry="10.5" fill="url(#hl${uid})"/>
   
   <path d="M30 50 A20 10.5 0 0 1 70 50" fill="none" stroke="rgba(80,40,10,0.6)" stroke-width="3"/>
   
@@ -12308,7 +12306,7 @@ function makeHoleSVG(seed){
 
   
   
-  <ellipse cx="50" cy="50" rx="22" ry="11.5" fill="none" stroke="url(#rl\${uid})" stroke-width="2.5"/>
+  <ellipse cx="50" cy="50" rx="22" ry="11.5" fill="none" stroke="url(#rl${uid})" stroke-width="2.5"/>
   
   <path d="M32 51 Q50 56.5 68 51" fill="none" stroke="rgba(160,90,35,0.7)" stroke-width="1.8" stroke-linecap="round"/>
   
@@ -12316,7 +12314,7 @@ function makeHoleSVG(seed){
 
   
   
-  <ellipse cx="50" cy="47" rx="38" ry="14" fill="none" stroke="url(#gg\${uid})" stroke-width="11"/>
+  <ellipse cx="50" cy="47" rx="38" ry="14" fill="none" stroke="url(#gg${uid})" stroke-width="11"/>
   
   <ellipse cx="50" cy="47.5" rx="30" ry="10" fill="none" stroke="rgba(10,40,5,0.6)" stroke-width="4"/>
   
@@ -12327,13 +12325,13 @@ function makeHoleSVG(seed){
   <path d="M20 48 Q50 54 80 48" fill="none" stroke="rgba(10,35,5,0.4)" stroke-width="2" stroke-linecap="round"/>
 
   
-  \${blades.join('')}
+  ${blades.join('')}
 
   
   <path d="M26 46 Q28 40 27 37" stroke="rgba(180,255,100,0.2)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
   <path d="M50 44 Q51 37 50 34" stroke="rgba(180,255,100,0.18)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
   <path d="M74 46 Q72 40 73 37" stroke="rgba(180,255,100,0.2)" stroke-width="0.5" fill="none" stroke-linecap="round"/>
-</svg>\`;
+</svg>`;
 }
 
 function buildBoard(){
@@ -12341,16 +12339,16 @@ function buildBoard(){
   for(let i=0;i<9;i++){
     const wrap=document.createElement('div');
     wrap.className='hole-wrap';
-    wrap.innerHTML=\`
+    wrap.innerHTML=`
       <div class="hole-scene">
         <svg class="hole-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" overflow="visible">
-          \${makeHoleSVG(i+1).replace(/<svg[^>]*>/,'').replace('</svg>','')}
+          ${makeHoleSVG(i+1).replace(/<svg[^>]*>/,'').replace('</svg>','')}
         </svg>
-        <div class="mole" id="mole-\${i}"></div>
-      </div>\`;
+        <div class="mole" id="mole-${i}"></div>
+      </div>`;
     wrap.addEventListener('click',()=>{if(gameActive&&!moles[i]?.active){streak=0;spawnHitFx(i,'MISS','miss');updateHUD()}});
     board.appendChild(wrap);
-    const mel=document.getElementById(\`mole-\${i}\`);
+    const mel=document.getElementById(`mole-${i}`);
     mel.addEventListener('click',e=>{e.stopPropagation();onHit(i,e)});
     moles.push({el:mel,active:false,type:'normal'});
   }
@@ -12397,7 +12395,7 @@ function onHit(idx,e){
     let pts=m.type==='gold'?50:10;
     if(streak>=5)pts=Math.round(pts*(1+streak*0.12));
     score+=pts;
-    spawnHitFx(idx,\`+\${pts}\`,pts>=30?'big':'pts');
+    spawnHitFx(idx,`+${pts}`,pts>=30?'big':'pts');
     spawnParticles(idx,m.type==='gold'?'gold':'normal');
     if(streak>=3)showCombo(streak);
     flashScreen('rgba(255,230,0,0.06)');
@@ -12430,7 +12428,7 @@ function spawnParticles(idx,type){
     const ty=Math.sin(angle)*dist-20;
     const sz=3+Math.random()*6;
     const dur=0.4+Math.random()*0.5;
-    p.style.cssText=\`width:\${sz}px;height:\${sz}px;background:\${cols[Math.floor(Math.random()*cols.length)]};left:50%;top:40%;--tx:\${tx}px;--ty:\${ty}px;--dur:\${dur}s;border-radius:\${type==='bomb'?'2px':'50%'}\`;
+    p.style.cssText=`width:${sz}px;height:${sz}px;background:${cols[Math.floor(Math.random()*cols.length)]};left:50%;top:40%;--tx:${tx}px;--ty:${ty}px;--dur:${dur}s;border-radius:${type==='bomb'?'2px':'50%'}`;
     wrap.appendChild(p);
     p.addEventListener('animationend',()=>p.remove());
   }
@@ -12441,7 +12439,7 @@ function spawnParticles(idx,type){
       s.className='star-particle';
       const angle=(Math.PI*2/3)*i;
       const dist=40+Math.random()*30;
-      s.style.cssText=\`left:50%;top:30%;--tx:\${Math.cos(angle)*dist}px;--ty:\${Math.sin(angle)*dist-30}px;--dur:0.8s;--sz:\${14+Math.random()*10}px;--rot:\${Math.random()*360}deg;color:#FFD700;text-shadow:0 0 8px #FFD700\`;
+      s.style.cssText=`left:50%;top:30%;--tx:${Math.cos(angle)*dist}px;--ty:${Math.sin(angle)*dist-30}px;--dur:0.8s;--sz:${14+Math.random()*10}px;--rot:${Math.random()*360}deg;color:#FFD700;text-shadow:0 0 8px #FFD700`;
       s.textContent=ch;
       wrap.appendChild(s);
       s.addEventListener('animationend',()=>s.remove());
@@ -12460,7 +12458,7 @@ function spawnHitFx(idx,text,cls){
 
 function showCombo(n){
   const msgs=[,,,'COMBO!','GREAT!','AWESOME!','INSANE!','GODLIKE!'];
-  comboDisplay.textContent=\`\${n}× \${msgs[Math.min(n,7)]||'LEGENDARY!'}\`;
+  comboDisplay.textContent=`${n}× ${msgs[Math.min(n,7)]||'LEGENDARY!'}`;
   comboDisplay.className='';void comboDisplay.offsetWidth;comboDisplay.className='show';
 }
 
