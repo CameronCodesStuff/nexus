@@ -13047,6 +13047,30 @@ header {
 .toast.error .toast-icon { color: var(--red); }
 
 /* ══ EMPTY STATE ══ */
+.unpublish-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 3px 0;
+  background: none;
+  border: 1px solid rgba(239,68,68,0.4);
+  border-radius: 3px;
+  color: rgba(239,68,68,0.7);
+  font-family: var(--px);
+  font-size: 6px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.unpublish-btn:hover {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.8);
+  color: #ef4444;
+}
+.unpublish-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .empty-gallery {
   grid-column: 1 / -1;
   text-align: center;
@@ -13744,6 +13768,7 @@ function renderGallery() {
     const info = document.createElement('div');
     info.className = 'gallery-card-info';
     const isLiked = likes[entry.id];
+    const isOwn = entry.uid && entry.uid === _pfUid;
     info.innerHTML = \`
       <div class="gallery-card-title">\${escHtml(entry.title)}</div>
       <div class="gallery-card-meta">
@@ -13752,6 +13777,7 @@ function renderGallery() {
           \${isLiked?'♥':'♡'}&nbsp;<span class="lc">\${entry.likes||0}</span>
         </button>
       </div>
+      \${isOwn ? \`<button class="unpublish-btn" onclick="unpublishArt('\${entry.id}','\${entry._docId||''}',this,event)" title="Unpublish your art">✕ UNPUBLISH</button>\` : ''}
     \`;
     card.appendChild(wrap);
     card.appendChild(info);
@@ -13768,6 +13794,24 @@ function toggleLike(id,btn,e){
   saveLikes(likes);saveGallery(gallery);
   window.parent.postMessage({type:'pfToggleLike',id,delta:wasLiked?-1:1},'*');
 }
+
+function unpublishArt(id, docId, btn, e) {
+  e.stopPropagation();
+  if (!confirm('UNPUBLISH THIS ART?\nIt will be removed from the community gallery.')) return;
+  btn.disabled = true;
+  btn.textContent = 'REMOVING...';
+  window.parent.postMessage({type:'pfUnpublish', id, docId},'*');
+}
+window.addEventListener('message', function(e2) {
+  const d2 = e2.data; if (!d2) return;
+  if (d2.type === 'pfUnpublishOk') {
+    showToast('ART UNPUBLISHED', 'success');
+    pfRequestGallery();
+  }
+  if (d2.type === 'pfUnpublishFail') {
+    showToast('FAILED: ' + (d2.msg||'ERROR'), 'error');
+  }
+}, {passive:true});
 
 function getAge(ts) {
   const d = Date.now()-ts, m = Math.floor(d/60000);
@@ -13897,15 +13941,30 @@ window.addEventListener('message',function(e){
   }
 
   if(d.type==='pfSaveLikes'){
-    // Also save to user doc for persistence
     if(cu) updateDoc(doc(db,'users',cu.uid),{pfLikes:d.likes||{}}).catch(()=>{});
+  }
+
+  if(d.type==='pfUnpublish'){
+    if(!cu||!d.docId) return;
+    // Verify ownership before deleting
+    const docRef=doc(db,'pixelforgeGallery',d.docId);
+    getDoc(docRef).then(snap=>{
+      if(!snap.exists()) return iframe.contentWindow.postMessage({type:'pfUnpublishFail',msg:'Not found'},'*');
+      if(snap.data().uid!==cu.uid && cud?.username!=='owner'){
+        return iframe.contentWindow.postMessage({type:'pfUnpublishFail',msg:'Not your art'},'*');
+      }
+      deleteDoc(docRef).then(()=>{
+        iframe.contentWindow.postMessage({type:'pfUnpublishOk'},'*');
+        _pfLoadAndSend(iframe);
+      }).catch(()=>iframe.contentWindow.postMessage({type:'pfUnpublishFail',msg:'Delete failed'},'*'));
+    }).catch(()=>iframe.contentWindow.postMessage({type:'pfUnpublishFail',msg:'Error'},'*'));
   }
 });
 
 async function _pfLoadAndSend(iframe){
   try{
     const snap=await getDocs(query(collection(db,'pixelforgeGallery'),limit(50)));
-    const gallery=snap.docs.map(d=>({...d.data()})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const gallery=snap.docs.map(d=>({_docId:d.id,...d.data()})).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     const likes=cud?.pfLikes||{};
     iframe.contentWindow.postMessage({type:'pfGalleryData',gallery,likes},'*');
   }catch(e){
