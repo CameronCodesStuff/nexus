@@ -13481,6 +13481,19 @@ var COMMUNITY_GAMES = [
     tagColor: "#00ff88",
     html: "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Maze Escape</title> <style> body{ background:#111; color:white; font-family:Arial,sans-serif; text-align:center; } h1{ color:#00ff88; } #stats{ margin:15px; font-size:22px; } button{ padding:10px 20px; font-size:18px; cursor:pointer; background:#00ff88; border:none; border-radius:5px; margin-bottom:10px; } canvas{ border:3px solid #00ff88; background:#222; } </style> </head> <body> <h1>Maze Escape</h1> <div id=\"stats\"> Level: <span id=\"level\">1</span> | Time: <span id=\"time\">0</span>s | Points: <span id=\"points\">0</span> </div> <button onclick=\"resetGame()\">New Game</button> <br> <canvas id=\"maze\" width=\"600\" height=\"600\"></canvas> <script> const canvas = document.getElementById(\"maze\"); const ctx = canvas.getContext(\"2d\"); let level = 1; let rows = 15; let cols = 15; let size = 40; let maze = []; let timer = 0; let points = 0; let interval; let player = {x:0,y:0}; let exit = {x:cols-1,y:rows-1}; function Cell(x,y){ this.x = x; this.y = y; this.visited = false; this.walls = { top:true, right:true, bottom:true, left:true }; } function index(x,y){ if(x < 0 || y < 0 || x >= cols || y >= rows){ return -1; } return x + y * cols; } function generateMaze(){ maze = []; for(let y=0;y<rows;y++){ for(let x=0;x<cols;x++){ maze.push(new Cell(x,y)); } } let current = maze[0]; let stack = []; current.visited = true; while(true){ let neighbors = []; let top = maze[index(current.x,current.y-1)]; let right = maze[index(current.x+1,current.y)]; let bottom = maze[index(current.x,current.y+1)]; let left = maze[index(current.x-1,current.y)]; if(top && !top.visited) neighbors.push(top); if(right && !right.visited) neighbors.push(right); if(bottom && !bottom.visited) neighbors.push(bottom); if(left && !left.visited) neighbors.push(left); if(neighbors.length > 0){ let next = neighbors[ Math.floor(Math.random()*neighbors.length) ]; stack.push(current); if(next.y === current.y - 1){ current.walls.top = false; next.walls.bottom = false; } if(next.x === current.x + 1){ current.walls.right = false; next.walls.left = false; } if(next.y === current.y + 1){ current.walls.bottom = false; next.walls.top = false; } if(next.x === current.x - 1){ current.walls.left = false; next.walls.right = false; } next.visited = true; current = next; }else if(stack.length > 0){ current = stack.pop(); }else{ break; } } } function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height); maze.forEach(cell=>{ let x = cell.x * size; let y = cell.y * size; ctx.strokeStyle = \"white\"; if(cell.walls.top){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+size,y); ctx.stroke(); } if(cell.walls.right){ ctx.beginPath(); ctx.moveTo(x+size,y); ctx.lineTo(x+size,y+size); ctx.stroke(); } if(cell.walls.bottom){ ctx.beginPath(); ctx.moveTo(x,y+size); ctx.lineTo(x+size,y+size); ctx.stroke(); } if(cell.walls.left){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+size); ctx.stroke(); } }); ctx.fillStyle = \"lime\"; ctx.fillRect( exit.x*size+size*0.25, exit.y*size+size*0.25, size*0.5, size*0.5 ); ctx.fillStyle = \"red\"; ctx.beginPath(); ctx.arc( player.x*size+size/2, player.y*size+size/2, size/4, 0, Math.PI*2 ); ctx.fill(); } function move(dx,dy){ let current = maze[index(player.x,player.y)]; if(dx===1 && !current.walls.right) player.x++; if(dx===-1 && !current.walls.left) player.x--; if(dy===1 && !current.walls.bottom) player.y++; if(dy===-1 && !current.walls.top) player.y--; draw(); if(player.x===exit.x && player.y===exit.y){ clearInterval(interval); let reward = level * 500; points += reward; document.getElementById(\"points\").textContent = points; alert( \"Level \" + level + \" Complete!\\n\\nReward: $\" + reward ); level++; document.getElementById(\"level\").textContent = level; if(level <= 10){ rows += 2; cols += 2; } size = Math.max( 15, Math.floor(600 / cols) ); startLevel(); } } document.addEventListener(\"keydown\",(e)=>{ switch(e.key){ case \"ArrowUp\": case \"w\": case \"W\": move(0,-1); break; case \"ArrowDown\": case \"s\": case \"S\": move(0,1); break; case \"ArrowLeft\": case \"a\": case \"A\": move(-1,0); break; case \"ArrowRight\": case \"d\": case \"D\": move(1,0); break; } }); function startLevel(){ canvas.width = cols * size; canvas.height = rows * size; player = {x:0,y:0}; exit = { x:cols-1, y:rows-1 }; generateMaze(); timer = 0; document.getElementById(\"time\").textContent = 0; clearInterval(interval); interval = setInterval(()=>{ timer++; document.getElementById(\"time\").textContent = timer; },1000); draw(); } function resetGame(){ level = 1; rows = 15; cols = 15; size = 40; points = 0; document.getElementById(\"points\").textContent = 0; document.getElementById(\"level\").textContent = 1; startLevel(); } startLevel(); <\/script> </body> </html>"
   }
+  ,
+  {
+    id: "casino_slots",
+    title: "Casino Slots",
+    icon: "🎰",
+    desc: "Spin the reels and chase the jackpot! Match symbols to win big — hit diamonds for the progressive jackpot.",
+    creators: ["God_slayer28"],
+    tag: "CASINO",
+    tagColor: "#f0b824",
+    html: "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>🎰 Casino Slots 🎰</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">🍒</div> <div class=\"reel\" id=\"r2\">🍋</div> <div class=\"reel\" id=\"r3\">⭐</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> <script> const symbols=[\"🍒\",\"🍋\",\"🍊\",\"⭐\",\"💎\",\"7️⃣\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"💎\" && s2===\"💎\" && s3===\"💎\"){ win=jackpot; jackpot=5000; msg=\"💎 JACKPOT! 💎\"; } else if(s1===\"7️⃣\" && s2===\"7️⃣\" && s3===\"7️⃣\"){ win=currentBet*100; msg=\"🔥 MEGA JACKPOT 🔥\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"🎉 BIG WIN 🎉\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"✨ Small Win ✨\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); <\/script> </body> </html>",
+    link: "",
+    globalLikes: 0
+  }
 ];
 
 function openButtonMashGame(){
@@ -13497,6 +13510,15 @@ function openButtonMashGame(){
 }
 
 function openCommunityGames(){
+  cgCurrentSection='games';
+  cgCurrentLbTab='likes';
+  // Reset tab UI
+  document.getElementById('cg-sec-games')?.classList.add('active');
+  document.getElementById('cg-sec-leaderboard')?.classList.remove('active');
+  const gPanel=document.getElementById('cg-panel-games');
+  const lPanel=document.getElementById('cg-panel-leaderboard');
+  if(gPanel) gPanel.style.display='flex';
+  if(lPanel) lPanel.style.display='none';
   renderCommunityGames();
   openModal('community-games-modal');
 }
@@ -13690,6 +13712,112 @@ async function toggleCommunityLike(id,btn){
     const gRef=doc(db,'communityGameStats',id);
     await setDoc(gRef,{likes:increment(wasLiked?-1:1)},{merge:true});
   }catch(e){}
+}
+
+// ── Community Games Tabs ─────────────────────────────────────────────────
+let cgCurrentSection='games';
+let cgCurrentLbTab='likes';
+
+function cgSection(sec){
+  cgCurrentSection=sec;
+  document.getElementById('cg-sec-games')?.classList.toggle('active',sec==='games');
+  document.getElementById('cg-sec-leaderboard')?.classList.toggle('active',sec==='leaderboard');
+  const gPanel=document.getElementById('cg-panel-games');
+  const lPanel=document.getElementById('cg-panel-leaderboard');
+  if(gPanel){ gPanel.style.display=sec==='games'?'flex':'none'; }
+  if(lPanel){ lPanel.style.display=sec==='leaderboard'?'flex':'none'; }
+  if(sec==='leaderboard') renderCommunityLeaderboard(cgCurrentLbTab);
+}
+
+function cgLbTab(tab){
+  cgCurrentLbTab=tab;
+  document.getElementById('cg-lb-tab-likes')?.classList.toggle('active',tab==='likes');
+  document.getElementById('cg-lb-tab-plays')?.classList.toggle('active',tab==='plays');
+  renderCommunityLeaderboard(tab);
+}
+
+async function renderCommunityLeaderboard(tab){
+  const body=document.getElementById('cg-lb-body');
+  if(!body) return;
+  body.innerHTML='<div style="text-align:center;color:var(--text-dim);font-family:var(--font-mono);font-size:10px;padding:20px;">Loading…</div>';
+  try{
+    // Pull stats from Firestore communityGameStats, fall back to local globalLikes
+    const statsMap={};
+    try{
+      const snap=await getDocs(collection(db,'communityGameStats'));
+      snap.forEach(d=>{ statsMap[d.id]={...d.data()}; });
+    }catch(e){}
+
+    // Merge with local registry
+    const games=COMMUNITY_GAMES.map(g=>{
+      const s=statsMap[g.id]||{};
+      return {
+        ...g,
+        statLikes: s.likes!=null ? s.likes : (g.globalLikes||0),
+        statPlays: s.plays||0
+      };
+    });
+
+    const sortKey=tab==='likes'?'statLikes':'statPlays';
+    games.sort((a,b)=>(b[sortKey]||0)-(a[sortKey]||0));
+
+    body.innerHTML='';
+    games.forEach((g,i)=>{
+      const rank=i+1;
+      const rankColors=['#f0b824','#c0c0c0','#cd7f32'];
+      const rankColor=rankColors[i]||'var(--text-dim)';
+      const val=tab==='likes'?g.statLikes:g.statPlays;
+
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;border-radius:5px;';
+      row.onmouseenter=()=>row.style.background='rgba(68,102,255,0.07)';
+      row.onmouseleave=()=>row.style.background='transparent';
+      row.onclick=()=>{ cgSection('games'); setTimeout(()=>openCommunityGame(g.id),100); };
+
+      // Rank
+      const rankEl=document.createElement('div');
+      rankEl.style.cssText='font-family:var(--font-mono);font-size:12px;font-weight:700;color:'+rankColor+';width:22px;text-align:center;flex-shrink:0;';
+      rankEl.textContent='#'+rank;
+
+      // Icon
+      const iconEl=document.createElement('div');
+      iconEl.style.cssText='font-size:18px;flex-shrink:0;width:24px;text-align:center;';
+      iconEl.textContent=g.icon;
+
+      // Info
+      const info=document.createElement('div');
+      info.style.cssText='flex:1;min-width:0;';
+      const titleEl=document.createElement('div');
+      titleEl.style.cssText='font-size:12px;font-weight:700;color:var(--text);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      titleEl.textContent=g.title;
+      const tagEl=document.createElement('span');
+      tagEl.style.cssText='font-size:8px;font-family:var(--font-mono);letter-spacing:1px;color:'+g.tagColor+';border:1px solid '+g.tagColor+'44;padding:1px 5px;border-radius:3px;margin-left:6px;';
+      tagEl.textContent=g.tag;
+      titleEl.appendChild(tagEl);
+      const subEl=document.createElement('div');
+      subEl.style.cssText='font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;';
+      subEl.textContent='by @'+(g.creators||[]).join(', @');
+      info.appendChild(titleEl);
+      info.appendChild(subEl);
+
+      // Stat value
+      const statEl=document.createElement('div');
+      statEl.style.cssText='font-family:var(--font-mono);font-size:12px;font-weight:700;color:'+(tab==='likes'?'#e74c3c':'var(--accent)')+';flex-shrink:0;text-align:right;';
+      statEl.textContent=(tab==='likes'?'♥ ':'▶ ')+val;
+
+      row.appendChild(rankEl);
+      row.appendChild(iconEl);
+      row.appendChild(info);
+      row.appendChild(statEl);
+      body.appendChild(row);
+    });
+
+    if(!games.length){
+      body.innerHTML='<div style="text-align:center;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:24px;">No games yet.</div>';
+    }
+  }catch(e){
+    body.innerHTML='<div style="text-align:center;color:var(--danger);font-family:var(--font-mono);font-size:10px;padding:20px;">Failed to load leaderboard.</div>';
+  }
 }
 
 async function submitCommunityGame(){
@@ -16691,7 +16819,7 @@ window._N = {
   openDriveGame, closeDriveGame,
   openWhackGame, closeWhackGame,
   openInkDefense, openButtonMashGame,
-  openCommunityGames, renderCommunityGames, openCommunityGame, toggleCommunityFav, toggleCommunityLike, openProfileByUsername,
+  openCommunityGames, renderCommunityGames, openCommunityGame, toggleCommunityFav, toggleCommunityLike, cgSection, cgLbTab, renderCommunityLeaderboard, openProfileByUsername,
   submitCommunityGame, loadGameSubmissions, approveGameSubmission, rejectGameSubmission,
   submitTeamApplication, loadTeamApplications, approveTeamApplication, rejectTeamApplication, downloadGameFile,
   openTrialTest, submitTrialTest,
@@ -17313,13 +17441,30 @@ function makePollCard(poll,isOw){
   <div class="modal" style="width:400px;max-height:85vh;display:flex;flex-direction:column;">
     <div class="modal-title">👥 COMMUNITY GAMES</div>
     <button class="modal-close" onclick="N.closeModal('community-games-modal')">✕</button>
-    <div style="padding:4px 0 10px;">
-      <button onclick="N.openModal('submit-game-modal')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,200,100,0.08));border:1px solid rgba(0,255,136,0.4);color:#00ff88;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:2px;padding:9px;border-radius:7px;cursor:pointer;margin-bottom:8px;transition:all 0.15s;" onmouseover="this.style.background='rgba(0,255,136,0.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,200,100,0.08))'">
-        ＋ SUBMIT A GAME
-      </button>
-      <input id="cg-search" type="text" placeholder="Search games or creators…" oninput="N.renderCommunityGames(this.value)" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:7px 10px;border-radius:6px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+    <!-- Section tabs -->
+    <div class="lb-tabs" style="margin-bottom:0;flex-shrink:0;">
+      <div class="lb-tab active" id="cg-sec-games" onclick="N.cgSection('games')" style="font-size:10px;padding:10px 14px;">🎮 GAMES</div>
+      <div class="lb-tab" id="cg-sec-leaderboard" onclick="N.cgSection('leaderboard')" style="font-size:10px;padding:10px 14px;">🏆 LEADERBOARD</div>
     </div>
-    <div id="cg-list" style="overflow-y:auto;flex:1;padding-right:2px;"></div>
+    <!-- GAMES panel -->
+    <div id="cg-panel-games" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
+      <div style="padding:10px 0 10px;flex-shrink:0;">
+        <button onclick="N.openModal('submit-game-modal')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,200,100,0.08));border:1px solid rgba(0,255,136,0.4);color:#00ff88;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:2px;padding:9px;border-radius:7px;cursor:pointer;margin-bottom:8px;transition:all 0.15s;" onmouseover="this.style.background='rgba(0,255,136,0.25)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,200,100,0.08))'">
+          ＋ SUBMIT A GAME
+        </button>
+        <input id="cg-search" type="text" placeholder="Search games or creators…" oninput="N.renderCommunityGames(this.value)" style="width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:7px 10px;border-radius:6px;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+      <div id="cg-list" style="overflow-y:auto;flex:1;padding-right:2px;"></div>
+    </div>
+    <!-- LEADERBOARD panel -->
+    <div id="cg-panel-leaderboard" style="display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
+      <!-- Sub-tabs: Likes / Plays -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div class="lb-tab active" id="cg-lb-tab-likes" onclick="N.cgLbTab('likes')" style="font-size:9px;padding:8px 14px;white-space:nowrap;">♥ MOST LIKED</div>
+        <div class="lb-tab" id="cg-lb-tab-plays" onclick="N.cgLbTab('plays')" style="font-size:9px;padding:8px 14px;white-space:nowrap;">▶ MOST PLAYED</div>
+      </div>
+      <div id="cg-lb-body" style="overflow-y:auto;flex:1;padding-top:8px;"></div>
+    </div>
   </div>
 </div>
 
