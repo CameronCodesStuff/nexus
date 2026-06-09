@@ -13814,14 +13814,6 @@ initCanvas(16);
 updateDraftBtnState();
 window.parent.postMessage({type:'pfReady'},'*');
 <\/script>
-<div id="pixelforge-overlay" style="display:none;position:fixed;inset:0;background:#000;z-index:3000;flex-direction:column;">
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#0e1118;border-bottom:2px solid #1a1f2e;flex-shrink:0;">
-    <div style="font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#c084fc;">🎨 PIXELFORGE</div>
-    <button onclick="N.closePixelForge()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:10px;padding:4px 12px;border-radius:5px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
-  </div>
-  <iframe id="pixelforge-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
-</div>
-
 </body>
 </html>
 `;
@@ -18377,6 +18369,13 @@ function makePollCard(poll,isOw){
   <button id="lightbox-close" onclick="closeLightbox()">✕</button>
   <img id="lightbox-img" src="" alt="">
   <button id="lightbox-dl" onclick="dlLightbox()">⬇ DOWNLOAD</button>
+</div>
+<div id="pixelforge-overlay" style="display:none;position:fixed;inset:0;background:#0a0c10;z-index:3000;flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#0e1118;border-bottom:2px solid #1a1f2e;flex-shrink:0;">
+    <div style="font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#c084fc;">🎨 PIXELFORGE</div>
+    <button onclick="N.closePixelForge()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:10px;padding:4px 12px;border-radius:5px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
+  </div>
+  <iframe id="pixelforge-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms"></iframe>
 </div>
 </body>
 </html>
