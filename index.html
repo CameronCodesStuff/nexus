@@ -14554,15 +14554,9 @@ print(f'Written: {len(ac)} chars')
 PYEOF`;
 
 function openAirCanvas(){
-  const overlay=document.getElementById('projects-overlay');
-  if(!overlay)return;
-  overlay.style.display='flex';
-  const iframe=document.getElementById('projects-iframe');
-  if(iframe&&!iframe._acLoaded){
-    iframe._acLoaded=true;
-    const blob=new Blob([_AIRCANVAS_HTML],{type:'text/html'});
-    iframe.src=URL.createObjectURL(blob);
-  }
+  const blob=new Blob([_AIRCANVAS_HTML],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank');
 }
 
 function closeProjects(){
