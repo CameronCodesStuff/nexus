@@ -6043,22 +6043,15 @@ const ICE_SERVERS = {
     {urls:'stun:stun.l.google.com:19302'},
     {urls:'stun:stun1.l.google.com:19302'},
     {urls:'stun:stun.cloudflare.com:3478'},
-    // Metered.ca free TURN (UDP + TCP + TLS)
-    {urls:'turn:a.relay.metered.ca:80',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
-    {urls:'turn:a.relay.metered.ca:80?transport=tcp',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
-    {urls:'turn:a.relay.metered.ca:443',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
-    {urls:'turns:a.relay.metered.ca:443',username:'e7f4e9e4a1b7c6d3e8f2',credential:'openrelayproject'},
-    // OpenRelay fallback
-    {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
-    {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
-    // FreeTurn
+    // FreeTurn (TURN relay for cross-network calls)
     {urls:'turn:freeturn.net:3478',username:'free',credential:'free'},
     {urls:'turns:freeturn.net:5349',username:'free',credential:'free'},
   ],
   iceCandidatePoolSize:10,
   bundlePolicy:'max-compat',
-  rtcpMuxPolicy:'negotiate',
-  iceTransportPolicy:'all',
+  // NOTE: rtcpMuxPolicy:'negotiate' was removed — modern Chrome throws a
+  // TypeError constructing RTCPeerConnection with it, which broke all calls.
+  // The default ('require') is correct for all current browsers.
 };
 
 let incomingCallUnsub = null;// listener for incoming calls (declared early)
@@ -6589,6 +6582,12 @@ function attachRemoteStream(uid, stream, mode){
     if(tile){
       tile.innerHTML=`<video autoplay playsinline style="width:100%;height:100%;object-fit:contain;border-radius:12px;"></video><div class="video-tile-label">🖥️ ${esc(uCache[uid]?.displayName||'Screen')}</div>`;
       tile.querySelector('video').srcObject=stream;
+    } else {
+      // We're the sharer — no screen tile on this side, but we still need to
+      // HEAR the viewers' mics. Attach their audio to a hidden audio element.
+      let ael=document.getElementById('audio-el-'+uid);
+      if(!ael){ael=document.createElement('audio');ael.id='audio-el-'+uid;ael.autoplay=true;document.body.appendChild(ael);}
+      ael.srcObject=stream;
     }
   } else {
     // Video mode — update existing tile (created as placeholder in openCallUI) or add new one
