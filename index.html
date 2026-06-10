@@ -1228,6 +1228,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
                 📎<input type="file" id="file-input" style="display:none" onchange="N.handleFileAttach(this)">
               </label>
               <button class="icon-btn" id="voice-btn" title="Voice note (tap to record, tap to send)" onclick="N.toggleRecording()">🎙️</button>
+              <button class="icon-btn" title="Send a GIF" onclick="N.openGifPicker()" style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:#00d4ff;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">GIF</button>
             </div>
             <div class="input-field-wrap">
               <textarea class="msg-input" id="msg-input" placeholder="Send a message…" rows="1"
@@ -3967,6 +3968,14 @@ function renderMsgs(cid){
       sysDiv.textContent=msg.text||'';
       area.insertBefore(sysDiv,wipe);
       ls=null;gEl=null; // break grouping after system msg
+    } else if(msg.type==='gif'){
+      const gifImg=document.createElement('img');
+      gifImg.src=msg.gifUrl||'';
+      gifImg.alt=msg.gifTitle||'GIF';
+      gifImg.loading='lazy';
+      gifImg.style.cssText='max-width:240px;max-height:200px;border-radius:10px;display:block;cursor:pointer;object-fit:cover;';
+      gifImg.onclick=()=>openLightbox(msg.gifUrl,msg.gifTitle||'GIF');
+      wr.appendChild(gifImg);
     } else if(msg.type==='ttt'||msg.type==='ttt_move'){
       const tb=document.createElement('div');tb.className='msg-bubble';
       tb.style.cssText='display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 12px;';
@@ -4066,6 +4075,106 @@ function scrollToMsg(msgId){
   const el=document.getElementById('msg-'+msgId);
   if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.background='rgba(68,102,255,0.15)';setTimeout(()=>el.style.background='',1200);}
 }
+
+const GIPHY_KEY='1WqC6G6zYHV22U2vS0VlezwzN5h56it5';
+let _gifPickerOpen=false;
+let _gifSearchTimer=null;
+
+function openGifPicker(){
+  if(_gifPickerOpen) return closeGifPicker();
+  _gifPickerOpen=true;
+  let picker=document.getElementById('gif-picker');
+  if(!picker){
+    picker=document.createElement('div');
+    picker.id='gif-picker';
+    picker.style.cssText='position:absolute;bottom:64px;left:0;right:0;z-index:500;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;box-shadow:0 8px 32px rgba(0,0,0,0.5);';
+    picker.innerHTML=
+      '<div style="display:flex;gap:8px;margin-bottom:8px;">'
+      +'<input id="gif-search-inp" type="text" placeholder="Search GIFs…" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;border-radius:7px;outline:none;" oninput="N._gifSearch(this.value)">'
+      +'<button onclick="N.closeGifPicker()" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-mono);font-size:10px;padding:5px 10px;border-radius:7px;cursor:pointer;">✕</button>'
+      +'</div>'
+      +'<div id="gif-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:240px;overflow-y:auto;"></div>';
+    const inputBar=document.querySelector('.input-bar');
+    inputBar?.parentElement?.appendChild(picker);
+  }
+  picker.style.display='block';
+  setTimeout(()=>document.getElementById('gif-search-inp')?.focus(),50);
+  _gifLoadTrending();
+}
+
+function closeGifPicker(){
+  _gifPickerOpen=false;
+  const p=document.getElementById('gif-picker');
+  if(p) p.style.display='none';
+}
+
+async function _gifSearch(q){
+  clearTimeout(_gifSearchTimer);
+  _gifSearchTimer=setTimeout(async()=>{
+    if(!q.trim()) return _gifLoadTrending();
+    try{
+      const res=await fetch('https://api.giphy.com/v1/gifs/search?api_key='+GIPHY_KEY+'&q='+encodeURIComponent(q)+'&limit=18&rating=pg-13');
+      const data=await res.json();
+      _gifRenderGrid(data.data||[]);
+    }catch{}
+  },400);
+}
+
+async function _gifLoadTrending(){
+  try{
+    const res=await fetch('https://api.giphy.com/v1/gifs/trending?api_key='+GIPHY_KEY+'&limit=18&rating=pg-13');
+    const data=await res.json();
+    _gifRenderGrid(data.data||[]);
+  }catch{}
+}
+
+function _gifRenderGrid(gifs){
+  const grid=document.getElementById('gif-grid');
+  if(!grid) return;
+  grid.innerHTML='';
+  if(!gifs.length){
+    grid.innerHTML='<div style="grid-column:span 3;text-align:center;color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:20px;">No GIFs found</div>';
+    return;
+  }
+  gifs.forEach(g=>{
+    const img=document.createElement('img');
+    img.src=g.images?.fixed_height_small?.url||g.images?.preview_gif?.url||'';
+    img.alt=g.title||'GIF';
+    img.loading='lazy';
+    img.style.cssText='width:100%;height:80px;object-fit:cover;border-radius:7px;cursor:pointer;transition:transform 0.15s;border:2px solid transparent;';
+    img.onmouseover=function(){this.style.transform='scale(1.04)';this.style.borderColor='var(--accent)';};
+    img.onmouseout=function(){this.style.transform='';this.style.borderColor='transparent';};
+    img.onclick=()=>sendGif(
+      g.images?.original?.url||g.images?.fixed_height?.url||'',
+      g.title||'GIF'
+    );
+    grid.appendChild(img);
+  });
+}
+
+async function sendGif(gifUrl,gifTitle){
+  if(!cu||!acid||!gifUrl) return;
+  closeGifPicker();
+  try{
+    await addDoc(collection(db,'chats',acid,'messages'),{
+      senderUid:cu.uid,
+      senderName:cud?.displayName||'User',
+      text:'',
+      gifUrl,
+      gifTitle:gifTitle||'GIF',
+      ts:serverTimestamp(),
+      type:'gif',
+      reactions:{}
+    });
+    await updateDoc(doc(db,'chats',acid),{
+      lastMessage:'📷 GIF',
+      lastTs:serverTimestamp(),
+      lastSenderUid:cu.uid,
+      lastSenderName:cud?.displayName||'User'
+    });
+  }catch(e){toast('Failed to send GIF: '+e.message,'danger');}
+}
+
 
 async function sendMessage(){
   if(!acid||!cu)return;
@@ -14226,6 +14335,7 @@ function savePNG(){
   const a=document.createElement('a');a.download='air-canvas-'+Date.now()+'.png';a.href=out.toDataURL('image/png');a.click();
 }
 document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'&&_gifPickerOpen){closeGifPicker();return;}
   const k=e.key.toLowerCase();
   if(k==='z'){paths.pop();activePath=null;renderInk();}
   if(k==='c'){paths=[];activePath=null;renderInk();}
@@ -17780,7 +17890,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openGamesHub, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openGifPicker, closeGifPicker, _gifSearch, sendGif, openGamesHub, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -18762,7 +18872,7 @@ function makePollCard(poll,isOw){
     <div style="font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#22d3ee;">🔭 PROJECTS</div>
     <button onclick="N.closeProjects()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:10px;padding:4px 12px;border-radius:5px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
   </div>
-  <iframe id="projects-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals allow-camera allow-microphone"></iframe>
+  <iframe id="projects-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" allow="camera; microphone"></iframe>
 </div>
 
 </body>
