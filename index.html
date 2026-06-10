@@ -4093,7 +4093,7 @@ function openGifPicker(){
       +'<input id="gif-search-inp" type="text" placeholder="Search GIFs…" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:7px 10px;border-radius:7px;outline:none;" oninput="N._gifSearch(this.value)">'
       +'<button onclick="N.closeGifPicker()" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-mono);font-size:10px;padding:5px 10px;border-radius:7px;cursor:pointer;">✕</button>'
       +'</div>'
-      +'<div id="gif-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:240px;overflow-y:auto;"></div>';
+      +'<div id="gif-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;height:300px;overflow-y:auto;align-content:start;"></div>';
     const inputBar=document.querySelector('.input-bar');
     inputBar?.parentElement?.appendChild(picker);
   }
@@ -4138,10 +4138,10 @@ function _gifRenderGrid(gifs){
   }
   gifs.forEach(g=>{
     const img=document.createElement('img');
-    img.src=g.images?.fixed_height_small?.url||g.images?.preview_gif?.url||'';
+    img.src=g.images?.fixed_height_small?.url||g.images?.fixed_height_downsampled?.url||g.images?.preview_gif?.url||'';
     img.alt=g.title||'GIF';
     img.loading='lazy';
-    img.style.cssText='width:100%;height:80px;object-fit:cover;border-radius:7px;cursor:pointer;transition:transform 0.15s;border:2px solid transparent;';
+    img.style.cssText='width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:7px;cursor:pointer;transition:transform 0.15s;border:2px solid transparent;display:block;';
     img.onmouseover=function(){this.style.transform='scale(1.04)';this.style.borderColor='var(--accent)';};
     img.onmouseout=function(){this.style.transform='';this.style.borderColor='transparent';};
     img.onclick=()=>sendGif(
