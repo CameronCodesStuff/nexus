@@ -13737,12 +13737,19 @@ function renderGallery() {
     c.width = sz*scale; c.height = sz*scale;
     const ec = c.getContext('2d');
     ec.imageSmoothingEnabled = false;
-    if (entry.pixelData) {
+    if (entry.pixelData && entry.pixelData.length) {
       entry.pixelData.forEach((col, i) => {
         if (!col) return;
         ec.fillStyle = col;
         ec.fillRect((i%sz)*scale, Math.floor(i/sz)*scale, scale, scale);
       });
+    } else if (entry.dataUrl) {
+      const img = new Image();
+      img.onload = function() {
+        ec.imageSmoothingEnabled = false;
+        ec.drawImage(img, 0, 0, c.width, c.height);
+      };
+      img.src = entry.dataUrl;
     }
     wrap.appendChild(c);
 
@@ -13895,7 +13902,6 @@ window.addEventListener('message',function(e){
     const entry={...d.entry,uid:cu.uid,author:(d.entry.author||cud?.username||'ANON').toUpperCase()};
     // Strip pixelData if too large (keep dataUrl only for display)
     const storeEntry={...entry};
-    if(storeEntry.pixelData&&storeEntry.pixelData.length>1024) delete storeEntry.pixelData;
     addDoc(collection(db,'pixelforgeGallery'),storeEntry)
       .then(()=>{iframe.contentWindow.postMessage({type:'pfPublishOk'},'*');})
       .catch(()=>{iframe.contentWindow.postMessage({type:'pfPublishFail'},'*');});
