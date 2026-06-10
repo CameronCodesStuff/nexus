@@ -5,10 +5,25 @@
 <meta name="theme-color" content="#4466ff">
 <script>
 if('serviceWorker' in navigator && location.protocol==='https:'){
-  var _swc="const CACHE='nexus-v1';"
+  var _swc="const CACHE='nexus-v2';"
     +"self.addEventListener('install',function(e){e.waitUntil(self.skipWaiting());});"
-    +"self.addEventListener('activate',function(e){e.waitUntil(clients.claim());});"
-    +"self.addEventListener('fetch',function(e){if(e.request.mode==='navigate')e.respondWith(fetch(e.request).catch(function(){return caches.match(e.request);}));});"
+    +"self.addEventListener('activate',function(e){e.waitUntil(Promise.all(["
+    +"  clients.claim(),"
+    +"  caches.keys().then(function(keys){return Promise.all(keys.filter(function(k){return k!==CACHE;}).map(function(k){return caches.delete(k);}));})"
+    +"]));});"
+    +"self.addEventListener('fetch',function(e){"
+    +"  if(e.request.mode!=='navigate')return;"
+    +"  e.respondWith("
+    +"    fetch(e.request).then(function(res){"
+    +"      if(res&&res.ok){var copy=res.clone();caches.open(CACHE).then(function(c){c.put('./',copy);}).catch(function(){});}"
+    +"      return res;"
+    +"    }).catch(function(){"
+    +"      return caches.match(e.request).then(function(hit){return hit||caches.match('./');}).then(function(hit){"
+    +"        return hit||new Response('<h1>Offline</h1><p>NEXUS needs a connection for first load.</p>',{status:503,headers:{'Content-Type':'text/html'}});"
+    +"      });"
+    +"    })"
+    +"  );"
+    +"});"
     +"self.addEventListener('notificationclick',function(e){"
     +"  var chatId=e.notification.data&&e.notification.data.chatId;"
     +"  e.notification.close();"
@@ -585,6 +600,21 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .reply-bar-content{flex:1;min-width:0;border-left:3px solid var(--accent);padding-left:10px;}
   .reply-bar-name{font-size:11px;font-family:var(--font-display);color:var(--accent);letter-spacing:1px;margin-bottom:2px;}
   .reply-bar-text{font-size:12px;font-family:var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .edit-bar{display:none;align-items:center;gap:10px;padding:8px 16px;background:var(--panel);border-top:1px solid var(--border);}
+  .edit-bar.active{display:flex;}
+  .edit-bar-content{flex:1;min-width:0;border-left:3px solid var(--accent2);padding-left:10px;}
+  .edit-bar-name{font-size:11px;font-family:var(--font-display);color:var(--accent2);letter-spacing:1px;margin-bottom:2px;}
+  .edit-bar-text{font-size:12px;font-family:var(--font-mono);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .msg-edited-tag{font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-left:6px;opacity:0.7;letter-spacing:0.5px;user-select:none;}
+  .mention{color:var(--accent2);background:rgba(0,212,255,0.1);border-radius:4px;padding:0 3px;font-weight:600;cursor:pointer;}
+  .mention.mention-me{color:var(--accent);background:rgba(68,102,255,0.18);}
+  .msg-bubble.mentions-me{border-left:2px solid var(--accent);box-shadow:inset 3px 0 12px -6px var(--glow);}
+  .mention-dropdown{display:none;position:absolute;bottom:100%;left:60px;right:60px;max-width:340px;max-height:200px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border);border-radius:10px;box-shadow:0 -8px 32px rgba(0,0,0,0.6),0 0 20px var(--glow);z-index:60;padding:4px;}
+  .mention-dropdown.open{display:block;}
+  .mention-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-family:var(--font-mono);font-size:12px;color:var(--text);}
+  .mention-item:hover,.mention-item.sel{background:rgba(68,102,255,0.15);}
+  .mention-item .m-handle{color:var(--accent2);font-weight:600;}
+  .mention-item .m-name{color:var(--text-dim);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .reply-cancel{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0;}
   .reply-cancel:hover{color:var(--text);}
   .msg-actions-row{display:flex;gap:4px;align-items:center;}
@@ -1209,6 +1239,14 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
             </div>
             <button class="reply-cancel" onclick="N.clearReply()" title="Cancel reply">✕</button>
           </div>
+          <div id="edit-bar" class="edit-bar">
+            <div class="edit-bar-content">
+              <div class="edit-bar-name">✏️ EDITING MESSAGE</div>
+              <div class="edit-bar-text" id="edit-bar-text"></div>
+            </div>
+            <button class="reply-cancel" onclick="N.cancelEdit()" title="Cancel edit">✕</button>
+          </div>
+          <div id="mention-dropdown" class="mention-dropdown"></div>
           <div class="input-hint" id="input-hint" style="display:none;"></div>
           <div id="voice-recording-ui" style="display:none;align-items:center;gap:10px;padding:6px 24px;background:var(--panel);border-top:1px solid var(--border);">
             <div style="width:10px;height:10px;border-radius:50%;background:var(--danger);animation:mic-pulse 1s infinite;flex-shrink:0;"></div>
@@ -1231,7 +1269,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
             </div>
             <div class="input-field-wrap">
               <textarea class="msg-input" id="msg-input" placeholder="Send a message…" rows="1"
-                onkeydown="N.handleInputKey(event)" oninput="N.autoResize(this);window.sendTyping&&window.sendTyping()"></textarea>
+                onkeydown="N.handleInputKey(event)" oninput="N.autoResize(this);N.handleMentionInput&&N.handleMentionInput();window.sendTyping&&window.sendTyping()" onblur="setTimeout(()=>N.closeMentionDropdown&&N.closeMentionDropdown(),150)"></textarea>
               <button class="emoji-toggle" onclick="N.toggleEmojiPicker()">😊</button>
             </div>
             <button class="send-btn" onclick="N.sendMessage()">➤</button>
@@ -2643,7 +2681,7 @@ const THEMES=[
 
 // ── UTILS ──────────────────────────────────────
 const $=id=>document.getElementById(id);
-const esc=s=>s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';
+const esc=s=>s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'):'';
 const ago=d=>{const t=Date.now()-d;if(t<6e4)return'now';if(t<36e5)return~~(t/6e4)+'m';if(t<864e5)return~~(t/36e5)+'h';return~~(t/864e5)+'d';};
 const fmtT=d=>d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 const fmtD=d=>{const t=new Date();if(d.toDateString()===t.toDateString())return'TODAY';const y=new Date(t);y.setDate(y.getDate()-1);return d.toDateString()===y.toDateString()?'YESTERDAY':d.toLocaleDateString([],{month:'short',day:'numeric'});};
@@ -3231,7 +3269,9 @@ async function doLogout(){
   if(usersUnsub){usersUnsub();usersUnsub=null;}
   if(incomingCallUnsub){incomingCallUnsub();incomingCallUnsub=null;}
   if(typeof _acceptedInviteUnsub==='function'){_acceptedInviteUnsub();}
-  if(typeof _popupUnsub==='function'){_popupUnsub();}
+  if(typeof _popupUnsub==='function'){_popupUnsub();_popupUnsub=null;}
+  if(typeof _announceUnsub==='function'){_announceUnsub();_announceUnsub=null;}
+  if(window._ownDocUnsub){window._ownDocUnsub();window._ownDocUnsub=null;}
   if(typeof _teamChatUnsub==='function'){_teamChatUnsub();}
   if(typeof callUnsub==='function'){callUnsub();}
   if(window._typingUnsub){window._typingUnsub();window._typingUnsub=null;}
@@ -3280,17 +3320,16 @@ async function enterApp(){
     setDoc(doc(db,'config','stats'),{pageViews:increment(1)},{merge:true}).catch(()=>{});
     loadCommunityGameStats().catch(()=>{});
     // Load any owner-approved community games from Firestore into the live registry
+    // Built-in community game (defined once; used on both success and failure paths)
+    const _builtinCasinoSlots={"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "🎰", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>🎰 Casino Slots 🎰</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">🍒</div> <div class=\"reel\" id=\"r2\">🍋</div> <div class=\"reel\" id=\"r3\">⭐</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> \u003cscript> const symbols=[\"🍒\",\"🍋\",\"🍊\",\"⭐\",\"💎\",\"7️⃣\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"💎\" && s2===\"💎\" && s3===\"💎\"){ win=jackpot; jackpot=5000; msg=\"💎 JACKPOT! 💎\"; } else if(s1===\"7️⃣\" && s2===\"7️⃣\" && s3===\"7️⃣\"){ win=currentBet*100; msg=\"🔥 MEGA JACKPOT 🔥\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"🎉 BIG WIN 🎉\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"✨ Small Win ✨\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); <\/script> \n\u003cscript>\nfunction reportScoreToNexus(){\n  var score=Number(localStorage.biggest)||0;\n  var bal=Number(localStorage.balance)||1000;\n  try{\n    if(window.opener) window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\nvar _origSave=window.save;\nwindow.save=function(){if(_origSave)_origSave();setTimeout(reportScoreToNexus,100);};\n<\/script>\n<div style=\"margin-top:20px;padding-bottom:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true};
+    const _ensureBuiltinGame=()=>{if(!COMMUNITY_GAMES.find(x=>x.id===_builtinCasinoSlots.id))COMMUNITY_GAMES.unshift(_builtinCasinoSlots);};
     getDocs(collection(db,'communityGamesApproved')).then(snap=>{
       snap.forEach(d=>{
         const g=d.data();
         if(g.id&&!COMMUNITY_GAMES.find(x=>x.id===g.id)) COMMUNITY_GAMES.push(g);
       });
-      const _bi={"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "🎰", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>🎰 Casino Slots 🎰</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">🍒</div> <div class=\"reel\" id=\"r2\">🍋</div> <div class=\"reel\" id=\"r3\">⭐</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> \u003cscript> const symbols=[\"🍒\",\"🍋\",\"🍊\",\"⭐\",\"💎\",\"7️⃣\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"💎\" && s2===\"💎\" && s3===\"💎\"){ win=jackpot; jackpot=5000; msg=\"💎 JACKPOT! 💎\"; } else if(s1===\"7️⃣\" && s2===\"7️⃣\" && s3===\"7️⃣\"){ win=currentBet*100; msg=\"🔥 MEGA JACKPOT 🔥\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"🎉 BIG WIN 🎉\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"✨ Small Win ✨\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); <\/script> \n\u003cscript>\nfunction reportScoreToNexus(){\n  var score=Number(localStorage.biggest)||0;\n  var bal=Number(localStorage.balance)||1000;\n  try{\n    if(window.opener) window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\nvar _origSave=window.save;\nwindow.save=function(){if(_origSave)_origSave();setTimeout(reportScoreToNexus,100);};\n<\/script>\n<div style=\"margin-top:20px;padding-bottom:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true};
-      if(!COMMUNITY_GAMES.find(x=>x.id===_bi.id))COMMUNITY_GAMES.unshift(_bi);
-    }).catch(()=>{
-      const _bi={"id": "cg_casino_slots", "title": "Casino Slots", "desc": "Spin the reels! Match symbols to win big. Hit the diamond jackpot for the ultimate prize.", "icon": "🎰", "creators": ["God_slayer28"], "tag": "COMMUNITY", "tagColor": "#00ff88", "html": "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Casino Slots</title> <style> body{ margin:0; font-family:Arial, sans-serif; background:#111; color:white; text-align:center; } h1{ color:gold; text-shadow:0 0 15px gold; } #balance{ font-size:24px; margin:15px; } .slot-machine{ display:flex; justify-content:center; gap:20px; margin:30px; } .reel{ width:120px; height:120px; background:#222; border:4px solid gold; border-radius:15px; display:flex; justify-content:center; align-items:center; font-size:60px; box-shadow:0 0 20px gold; } button{ padding:12px 25px; font-size:18px; margin:5px; border:none; border-radius:10px; cursor:pointer; } .spin{ background:gold; color:black; font-weight:bold; } .bet{ background:#00cc66; color:white; } #message{ font-size:24px; margin-top:20px; color:gold; } #stats{ margin-top:20px; } .winAnim{ animation:flash .4s infinite alternate; } @keyframes flash{ from{transform:scale(1);} to{transform:scale(1.1);} } </style> </head> <body> <h1>🎰 Casino Slots 🎰</h1> <div id=\"balance\"></div> <div> <button class=\"bet\" onclick=\"setBet(10)\">$10</button> <button class=\"bet\" onclick=\"setBet(25)\">$25</button> <button class=\"bet\" onclick=\"setBet(50)\">$50</button> <button class=\"bet\" onclick=\"setBet(100)\">$100</button> </div> <h2>Current Bet: $<span id=\"bet\">10</span></h2> <div class=\"slot-machine\"> <div class=\"reel\" id=\"r1\">🍒</div> <div class=\"reel\" id=\"r2\">🍋</div> <div class=\"reel\" id=\"r3\">⭐</div> </div> <button class=\"spin\" onclick=\"spin()\">SPIN</button> <div id=\"message\"></div> <div id=\"stats\"> <p>Total Spins: <span id=\"spins\">0</span></p> <p>Total Winnings: $<span id=\"winnings\">0</span></p> <p>Biggest Win: $<span id=\"biggest\">0</span></p> <p>Jackpot: $<span id=\"jackpot\">5000</span></p> </div> \u003cscript> const symbols=[\"🍒\",\"🍋\",\"🍊\",\"⭐\",\"💎\",\"7️⃣\"]; let balance=Number(localStorage.balance)||1000; let currentBet=10; let spins=Number(localStorage.spins)||0; let winnings=Number(localStorage.winnings)||0; let biggest=Number(localStorage.biggest)||0; let jackpot=Number(localStorage.jackpot)||5000; function save(){ localStorage.balance=balance; localStorage.spins=spins; localStorage.winnings=winnings; localStorage.biggest=biggest; localStorage.jackpot=jackpot; } function updateUI(){ document.getElementById(\"balance\").innerHTML= \"Balance: $\" + balance; document.getElementById(\"spins\").innerHTML=spins; document.getElementById(\"winnings\").innerHTML=winnings; document.getElementById(\"biggest\").innerHTML=biggest; document.getElementById(\"jackpot\").innerHTML=jackpot; } function setBet(amount){ currentBet=amount; document.getElementById(\"bet\").innerHTML=amount; } function randomSymbol(){ return symbols[Math.floor(Math.random()*symbols.length)]; } function spin(){ if(balance < currentBet){ alert(\"Not enough money!\"); return; } balance -= currentBet; jackpot += Math.floor(currentBet*0.2); let animation=setInterval(()=>{ document.getElementById(\"r1\").innerHTML=randomSymbol(); document.getElementById(\"r2\").innerHTML=randomSymbol(); document.getElementById(\"r3\").innerHTML=randomSymbol(); },100); setTimeout(()=>{ clearInterval(animation); let s1=randomSymbol(); let s2=randomSymbol(); let s3=randomSymbol(); document.getElementById(\"r1\").innerHTML=s1; document.getElementById(\"r2\").innerHTML=s2; document.getElementById(\"r3\").innerHTML=s3; let win=0; let msg=\"No Win\"; if(s1===\"💎\" && s2===\"💎\" && s3===\"💎\"){ win=jackpot; jackpot=5000; msg=\"💎 JACKPOT! 💎\"; } else if(s1===\"7️⃣\" && s2===\"7️⃣\" && s3===\"7️⃣\"){ win=currentBet*100; msg=\"🔥 MEGA JACKPOT 🔥\"; } else if(s1===s2 && s2===s3){ win=currentBet*20; msg=\"🎉 BIG WIN 🎉\"; } else if(s1===s2 || s2===s3 || s1===s3){ win=currentBet*3; msg=\"✨ Small Win ✨\"; } balance+=win; winnings+=win; spins++; if(win>biggest){ biggest=win; } document.getElementById(\"message\").innerHTML= msg + (win>0 ? \" +$\"+win : \"\"); if(win>0){ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.add(\"winAnim\"); }); setTimeout(()=>{ document.querySelectorAll(\".reel\").forEach(r=>{ r.classList.remove(\"winAnim\"); }); },2000); } save(); updateUI(); },1500); } updateUI(); <\/script> \n\u003cscript>\nfunction reportScoreToNexus(){\n  var score=Number(localStorage.biggest)||0;\n  var bal=Number(localStorage.balance)||1000;\n  try{\n    if(window.opener) window.opener.postMessage({type:'cgScore',gameId:'cg_casino_slots',score:score,detail:'Biggest win: $'+score+' | Balance: $'+bal},'*');\n  }catch(e){}\n}\nvar _origSave=window.save;\nwindow.save=function(){if(_origSave)_origSave();setTimeout(reportScoreToNexus,100);};\n<\/script>\n<div style=\"margin-top:20px;padding-bottom:20px;\">\n  <button onclick=\"reportScoreToNexus()\" style=\"background:#7c3aed;color:white;border:none;padding:10px 22px;border-radius:10px;font-size:16px;cursor:pointer;font-weight:bold;\">\n    Post Score to NEXUS\n  </button>\n  <p style=\"font-size:12px;color:#aaa;margin-top:6px;\">Posts your biggest win to the NEXUS leaderboard</p>\n</div>\n</body> </html>", "link": "", "globalLikes": 0, "hasLeaderboard": true};
-      if(!COMMUNITY_GAMES.find(x=>x.id===_bi.id))COMMUNITY_GAMES.unshift(_bi);
-    });
+      _ensureBuiltinGame();
+    }).catch(_ensureBuiltinGame);
     startGameAutosave();
     // Wait for owner check to resolve before assigning streak king
     // (isOwner must be set first so we know whether to do full query or personal check)
@@ -3394,7 +3433,8 @@ async function enterApp(){
         }catch{}
       }
       if(window._N&&window._N.renderSettings) window._N.renderSettings();
-      onSnapshot(doc(db,'users',uid),snap=>{
+      if(window._ownDocUnsub){window._ownDocUnsub();window._ownDocUnsub=null;}
+      window._ownDocUnsub=onSnapshot(doc(db,'users',uid),snap=>{
         if(!snap.exists()) return;
         const d=snap.data();
         if(!d) return;
@@ -3600,7 +3640,8 @@ function setupChatsListener(){
         if(prev&&next.lastTs?.seconds&&(!prev.lastTs?.seconds||next.lastTs.seconds>prev.lastTs.seconds)
           &&next.lastSenderUid&&next.lastSenderUid!==cu.uid){
           const senderName=uCache[next.lastSenderUid]?.displayName||next.lastSenderName||'Someone';
-          sendMsgNotification(next.id,senderName,next.lastMessage||'');
+          const isMention=textMentionsMe(next.lastMessage||'');
+          sendMsgNotification(next.id,senderName,next.lastMessage||'',isMention);
         }
         aChats[ch.doc.id]=next;
       }
@@ -3756,6 +3797,8 @@ function openChat(cid){
   const tttBtn=$('ttt-btn');
   if(tttBtn) tttBtn.style.display=(!ig)?'flex':'none';
   clearReply();
+  cancelEdit();
+  closeMentionDropdown();
   window._forceScrollBottom=true;
   subMsgs(cid);renderSidebar();
   setTimeout(()=>applyChatBgPreset(cid),50);
@@ -3988,6 +4031,11 @@ function renderMsgs(cid){
       wr.appendChild(tb);
     } else {
       const b=document.createElement('div');b.className='msg-bubble';b.innerHTML=fmtMsg(msg.text);
+      if(msg.editedAt){
+        const _et=document.createElement('span');_et.className='msg-edited-tag';_et.textContent='(edited)';
+        b.appendChild(_et);
+      }
+      if(msg.senderUid!==cu.uid&&textMentionsMe(msg.text)) b.classList.add('mentions-me');
       // Apply sender's custom bubble colour if set
       if(msg.senderUid && msg.senderUid!==cu.uid){
         const _sd=uCache[msg.senderUid];
@@ -4010,6 +4058,12 @@ function renderMsgs(cid){
     const abRow=document.createElement('div');abRow.className='msg-actions-row';
     abRow.appendChild(rb);
     if(msg.senderUid===cu.uid){
+      if(msg.type==='text'||(!msg.type&&msg.text)){
+        const eb_btn=document.createElement('button');eb_btn.className='msg-del-btn';eb_btn.textContent='✏️';eb_btn.title='Edit message';
+        const _emid=msg.id;const _ecid=cid;
+        eb_btn.onclick=()=>startEditMessage(_emid,_ecid);
+        abRow.appendChild(eb_btn);
+      }
       const db_btn=document.createElement('button');db_btn.className='msg-del-btn';db_btn.textContent='🗑';db_btn.title='Delete message';
       const _mid=msg.id;const _cid=cid;
       db_btn.onclick=()=>deleteMessage(_mid,_cid);
@@ -4037,7 +4091,18 @@ function renderMsgs(cid){
   }
 }
 
-const fmtMsg=t=>t?esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>'):'';
+const fmtMsg=t=>{
+  if(!t) return '';
+  let h=esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+  // Highlight @mentions of known users (escaped text, so safe to wrap in spans)
+  h=h.replace(/(^|[\s(])@([A-Za-z0-9_.\-]{2,32})/g,(m,pre,name)=>{
+    const uid=findUidByUsername(name);
+    if(!uid) return m;
+    const isMe=cud&&(cud.username||'').toLowerCase()===name.toLowerCase();
+    return pre+'<span class="mention'+(isMe?' mention-me':'')+'" onclick="N.openProfileModal(\''+uid+'\')">@'+name+'</span>';
+  });
+  return h;
+};
 
 // ── SEND ───────────────────────────────────────
 // ── REPLY SYSTEM ──────────────────────────────
@@ -4046,6 +4111,7 @@ let replyingTo = null; // { id, senderName, text }
 function setReply(msg, cid){
   unlockAch('reply_msg');
   markDailyChallengeDone('dc_reply');
+  cancelEdit();
   replyingTo = {
     id: msg.id,
     senderName: uCache[msg.senderUid]?.displayName || msg.senderName || 'User',
@@ -4070,6 +4136,8 @@ function scrollToMsg(msgId){
 async function sendMessage(){
   if(!acid||!cu)return;
   if(!aChats[acid]){toast('Chat not ready yet.','danger');return;}
+  closeMentionDropdown();
+  if(editingMsg){await commitEdit();return;}
   const inp=$('msg-input'),text=inp.value.trim();
   if(pf){await sendFile(pf);return;}
   if(!text)return;
@@ -4108,7 +4176,16 @@ async function sendMessage(){
   }catch(e){toast('Send failed: '+e.message,'danger');}
 }
 
-const handleInputKey=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}};
+const handleInputKey=e=>{
+  if(_mentionState){
+    if(e.key==='ArrowDown'){e.preventDefault();_mentionState.sel=(_mentionState.sel+1)%_mentionState.items.length;renderMentionDropdown();return;}
+    if(e.key==='ArrowUp'){e.preventDefault();_mentionState.sel=(_mentionState.sel-1+_mentionState.items.length)%_mentionState.items.length;renderMentionDropdown();return;}
+    if(e.key==='Tab'||e.key==='Enter'){e.preventDefault();pickMention();return;}
+    if(e.key==='Escape'){closeMentionDropdown();return;}
+  }
+  if(e.key==='Escape'&&editingMsg){cancelEdit();return;}
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}
+};
 const autoResize=el=>{el.style.height='22px';el.style.height=Math.min(el.scrollHeight,140)+'px';};
 
 function handleFileAttach(input){
@@ -4249,6 +4326,127 @@ async function deleteMessage(msgId, chatId){
       lastTs: last?.ts||serverTimestamp()
     });
   }catch(e){toast('Delete failed: '+e.message,'danger');}
+}
+
+// ── EDIT MESSAGE ─────────────────────────────────
+let editingMsg=null; // { id, cid, origText }
+
+function startEditMessage(msgId, chatId){
+  const msg=(mCache[chatId]||[]).find(m=>m.id===msgId);
+  if(!msg||msg.senderUid!==cu?.uid) return;
+  clearReply();
+  editingMsg={id:msgId,cid:chatId,origText:msg.text||''};
+  const inp=$('msg-input');
+  if(inp){inp.value=msg.text||'';autoResize(inp);inp.focus();}
+  $('edit-bar')?.classList.add('active');
+  const t=$('edit-bar-text');if(t) t.textContent=(msg.text||'').substring(0,100);
+}
+
+function cancelEdit(){
+  if(!editingMsg) return;
+  editingMsg=null;
+  $('edit-bar')?.classList.remove('active');
+  const inp=$('msg-input');
+  if(inp){inp.value='';inp.style.height='22px';}
+}
+
+async function commitEdit(){
+  const em=editingMsg;
+  if(!em) return;
+  const inp=$('msg-input'),text=inp.value.trim();
+  if(!text){toast('Message cannot be empty — use 🗑 to delete instead.','danger');return;}
+  if(text===em.origText){cancelEdit();return;}
+  try{
+    await updateDoc(doc(db,'chats',em.cid,'messages',em.id),{text,editedAt:serverTimestamp()});
+    // If it was the latest message, refresh the sidebar preview too
+    const msgs=mCache[em.cid]||[];
+    const last=msgs[msgs.length-1];
+    if(last&&last.id===em.id){
+      updateDoc(doc(db,'chats',em.cid),{lastMessage:text.substring(0,80)}).catch(()=>{});
+    }
+    cancelEdit();
+  }catch(e){toast('Edit failed: '+e.message,'danger');}
+}
+
+// ── @MENTIONS ─────────────────────────────────────
+function findUidByUsername(name){
+  if(!name) return null;
+  const n=String(name).toLowerCase();
+  for(const uid of Object.keys(uCache)){
+    if((uCache[uid]?.username||'').toLowerCase()===n) return uid;
+  }
+  return null;
+}
+
+function textMentionsMe(t){
+  if(!t||!cud?.username) return false;
+  const safe=cud.username.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp('(^|[\\s(])@'+safe+'($|[^A-Za-z0-9_])','i').test(t);
+}
+
+let _mentionState=null; // { start, items, sel }
+
+function getMentionCandidates(prefix){
+  const chat=aChats[acid];if(!chat) return [];
+  const p=(prefix||'').toLowerCase();
+  const out=[];
+  (chat.members||[]).forEach(uid=>{
+    if(uid===cu?.uid) return;
+    const u=uCache[uid];if(!u?.username) return;
+    if(!p||u.username.toLowerCase().startsWith(p)||(u.displayName||'').toLowerCase().startsWith(p)){
+      out.push({uid,username:u.username,displayName:u.displayName||u.username});
+    }
+  });
+  return out.slice(0,8);
+}
+
+function handleMentionInput(){
+  const inp=$('msg-input');
+  if(!inp) return;
+  const pos=inp.selectionStart??inp.value.length;
+  const upto=inp.value.slice(0,pos);
+  const m=upto.match(/(^|[\s(])@([A-Za-z0-9_.\-]*)$/);
+  if(!m){closeMentionDropdown();return;}
+  const items=getMentionCandidates(m[2]);
+  if(!items.length){closeMentionDropdown();return;}
+  _mentionState={start:pos-m[2].length-1,items,sel:0};
+  renderMentionDropdown();
+}
+
+function renderMentionDropdown(){
+  const dd=$('mention-dropdown');
+  if(!dd||!_mentionState) return;
+  dd.innerHTML='';
+  _mentionState.items.forEach((it,i)=>{
+    const el=document.createElement('div');
+    el.className='mention-item'+(i===_mentionState.sel?' sel':'');
+    const h=document.createElement('span');h.className='m-handle';h.textContent='@'+it.username;
+    const n=document.createElement('span');n.className='m-name';n.textContent=it.displayName;
+    el.appendChild(h);el.appendChild(n);
+    el.onmousedown=e=>{e.preventDefault();pickMention(i);};
+    dd.appendChild(el);
+  });
+  dd.classList.add('open');
+}
+
+function closeMentionDropdown(){
+  _mentionState=null;
+  $('mention-dropdown')?.classList.remove('open');
+}
+
+function pickMention(i){
+  const st=_mentionState;
+  if(!st) return;
+  const it=st.items[typeof i==='number'?i:st.sel];
+  if(!it) return;
+  const inp=$('msg-input');
+  const pos=inp.selectionStart??inp.value.length;
+  inp.value=inp.value.slice(0,st.start)+'@'+it.username+' '+inp.value.slice(pos);
+  const np=st.start+it.username.length+2;
+  closeMentionDropdown();
+  inp.focus();
+  inp.setSelectionRange(np,np);
+  autoResize(inp);
 }
 
 // ── REACTIONS ──────────────────────────────────
@@ -5347,18 +5545,25 @@ async function requestNotifPermissionSilently(){
   }
 }
 
-function sendMsgNotification(chatId, senderName, text){
+function sendMsgNotification(chatId, senderName, text, isMention){
   if(!notifEnabled()) return;
-  if(!('Notification' in window)||Notification.permission!=='granted') return;
-  // Don't notify if user is actively looking at this chat in this tab
-  if(!document.hidden && acid===chatId) return;
+  // If user is actively looking at this chat, skip the browser notification —
+  // but still surface a toast for mentions so they're never silent
+  if(!document.hidden && acid===chatId){
+    if(isMention) toast('💬 '+senderName+' mentioned you','success');
+    return;
+  }
+  if(!('Notification' in window)||Notification.permission!=='granted'){
+    if(isMention) toast('💬 '+senderName+' mentioned you','success');
+    return;
+  }
   const chat=aChats[chatId];
-  const chatName=chat?.type==='group'?(chat.name||'Group chat'):senderName;
+  const chatName=(isMention?'💬 ':'')+(chat?.type==='group'?(chat.name||'Group chat'):senderName)+(isMention?' mentioned you':'');
   const body=text?.length>80?text.slice(0,80)+'…':text||'New message';
   const opts={
     body,
     icon:'https://avatars.githubusercontent.com/u/151978475?v=4',
-    tag:'nexus-msg-'+chatId,
+    tag:(isMention?'nexus-mention-':'nexus-msg-')+chatId,
     renotify:true,
     data:{chatId}
   };
@@ -8699,6 +8904,7 @@ async function adminClearPopup(){
 let _popupUnsub=null;
 function checkPopup(){
   try{
+    if(_popupUnsub){_popupUnsub();_popupUnsub=null;}
     _popupUnsub=onSnapshot(doc(db,'config','popup'),snap=>{
       if(!snap.exists()) return;
       const d=snap.data();
@@ -8850,10 +9056,12 @@ async function checkReferralRole(){
   }catch{}
 }
 
+let _announceUnsub=null;
 function checkAnnouncement(){
   // Live listener — banner appears/disappears for all users instantly
   try{
-    onSnapshot(doc(db,'config','announcement'),snap=>{
+    if(_announceUnsub){_announceUnsub();_announceUnsub=null;}
+    _announceUnsub=onSnapshot(doc(db,'config','announcement'),snap=>{
       if(!snap.exists()){hideAnnouncement();return;}
       const d=snap.data();
       if(!d.active){hideAnnouncement();return;}
@@ -17402,6 +17610,7 @@ window._N = {
   openModal, closeModal,
   filterFeed: v=>{ffilter=v.toLowerCase();renderSidebar();},
   openChat, sendMessage, handleInputKey, autoResize,
+  cancelEdit, handleMentionInput, closeMentionDropdown,
   handleFileAttach, toggleEmojiPicker,
   confirmWipe, doWipe, cancelWipe,
   startDM, startCall, endCall, answerCall, rejectCall,
