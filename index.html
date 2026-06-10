@@ -9211,44 +9211,57 @@ function drawDailyWheel(canvas){
   const total=WHEEL_PRIZES.reduce((s,p)=>s+p.weight,0);
   ctx.clearRect(0,0,W,W);
   let angle=0;
-  WHEEL_PRIZES.forEach((p,i)=>{
+  WHEEL_PRIZES.forEach((p)=>{
     const arc=(p.weight/total)*(Math.PI*2);
+    // Segment fill
     ctx.beginPath();
     ctx.fillStyle=p.color;
     ctx.moveTo(r,r);
     ctx.arc(r,r,r,angle,angle+arc);
     ctx.lineTo(r,r);
     ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.15)';
+    ctx.strokeStyle='rgba(0,0,0,0.35)';
     ctx.lineWidth=1.5;
     ctx.stroke();
-    // Label
+    // ── Label: split emoji from text, draw separately ──
+    // arcPx = arc length at 75% radius — use to decide font size
+    const arcPx=arc*(r*0.75);
+    const minArcForText=18; // skip text if segment too thin
     ctx.save();
     ctx.translate(r,r);
     ctx.rotate(angle+arc/2);
-    ctx.fillStyle='#fff';
-    ctx.font='bold 9.5px Arial';
-    ctx.textAlign='right';
-    ctx.textBaseline='middle';
-    ctx.shadowColor='rgba(0,0,0,0.7)';
-    ctx.shadowBlur=3;
-    ctx.fillText(p.label,r-10,0);
-    ctx.shadowBlur=0;
-    ctx.restore();
-    // Mark rare prizes with a star outline
-    if(p.rare){
-      ctx.save();
-      ctx.translate(r,r);
-      ctx.rotate(angle+arc/2);
-      ctx.strokeStyle='#ffcc00';
-      ctx.lineWidth=2;
-      ctx.beginPath();
-      ctx.arc(r-8,0,6,0,Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
+    // Draw text from near edge inward
+    const innerPad=p.rare?24:14;
+    const textX=r-innerPad;
+    // Split label: first char(s) = emoji, rest = text
+    const parts=p.label.split(' ');
+    const emoji=parts[0];
+    const text=parts.slice(1).join(' ');
+    // Emoji
+    ctx.shadowColor='rgba(0,0,0,0.8)';ctx.shadowBlur=4;
+    const emojiFontSize=Math.max(10,Math.min(16,arcPx*0.28));
+    ctx.font=emojiFontSize+'px Arial';
+    ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillText(emoji,textX,0);
+    // Text (if arc is wide enough)
+    if(arcPx>=minArcForText&&text){
+      const textFontSize=Math.max(7,Math.min(11,arcPx*0.18));
+      ctx.font='700 '+textFontSize+'px Arial';
+      ctx.fillStyle='rgba(255,255,255,0.92)';
+      ctx.fillText(text,textX-emojiFontSize-3,0);
     }
+    ctx.shadowBlur=0;
+    // Rare: gold ring highlight
+    if(p.rare){
+      ctx.strokeStyle='#ffcc00';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(r-10,0,8,0,Math.PI*2);ctx.stroke();
+    }
+    ctx.restore();
     angle+=arc;
   });
+  // Outer ring border
+  ctx.beginPath();ctx.arc(r,r,r-1,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=2;ctx.stroke();
 }
 
 async function spinDailyWheel(){
@@ -9341,6 +9354,26 @@ function renderWheelSection(container){
     +'</div>'
     +'<button id="wheel-spin-btn" onclick="N.spinDailyWheel()" style="'+btnStyle+'"'+(canSpin?'':' disabled')+'>'+(canSpin?'🎪 SPIN!':'✓ SPUN TODAY')+'</button>'
     +'<div id="wheel-result" style="text-align:center;margin-top:10px;font-size:13px;font-family:var(--font-display);letter-spacing:1px;min-height:20px;color:#ffcc00;"></div>';
+  // Prize legend below wheel
+  const legend=document.createElement('div');
+  legend.style.cssText='margin-top:14px;';
+  legend.innerHTML='<div style="font-family:var(--font-display);font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-bottom:8px;">PRIZES</div>';
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:4px;';
+  // Sort by rarity (rarest last so they appear at bottom)
+  const sorted=[...WHEEL_PRIZES].sort((a,b)=>b.weight-a.weight);
+  const totalW=WHEEL_PRIZES.reduce((s,p)=>s+p.weight,0);
+  sorted.forEach(p=>{
+    const pct=Math.round((p.weight/totalW)*100);
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;padding:4px 7px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid '+(p.rare?'rgba(255,204,0,0.3)':'rgba(255,255,255,0.06)')+';';
+    row.innerHTML='<div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:'+p.color+';"></div>'
+      +'<div style="flex:1;font-size:10px;font-family:var(--font-mono);color:'+(p.rare?'#ffcc00':'var(--text)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(p.label)+'</div>'
+      +'<div style="font-size:8px;font-family:var(--font-mono);color:var(--text-dim);flex-shrink:0;">'+pct+'%</div>';
+    grid.appendChild(row);
+  });
+  legend.appendChild(grid);
+  section.appendChild(legend);
   container.appendChild(section);
   drawDailyWheel(document.getElementById('daily-wheel-canvas'));
 }
