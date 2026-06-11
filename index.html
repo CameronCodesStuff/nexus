@@ -12257,7 +12257,7 @@ let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
   main:  [{id:'overall',label:'★ OVERALL'},{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
-  games: [{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'}],
+  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'}],
 };
 let lbCurrentSection='main';
 
@@ -15217,31 +15217,6 @@ var COMMUNITY_GAMES = [
     tag: "PUZZLE",
     tagColor: "#00ff88",
     html: "<!DOCTYPE html> <html> <head> <meta charset=\"UTF-8\"> <title>Maze Escape</title> <style> body{ background:#111; color:white; font-family:Arial,sans-serif; text-align:center; } h1{ color:#00ff88; } #stats{ margin:15px; font-size:22px; } button{ padding:10px 20px; font-size:18px; cursor:pointer; background:#00ff88; border:none; border-radius:5px; margin-bottom:10px; } canvas{ border:3px solid #00ff88; background:#222; } </style> </head> <body> <h1>Maze Escape</h1> <div id=\"stats\"> Level: <span id=\"level\">1</span> | Time: <span id=\"time\">0</span>s | Points: <span id=\"points\">0</span> </div> <button onclick=\"resetGame()\">New Game</button> <br> <canvas id=\"maze\" width=\"600\" height=\"600\"></canvas> \x3cscript> const canvas = document.getElementById(\"maze\"); const ctx = canvas.getContext(\"2d\"); let level = 1; let rows = 15; let cols = 15; let size = 40; let maze = []; let timer = 0; let points = 0; let interval; let player = {x:0,y:0}; let exit = {x:cols-1,y:rows-1}; function Cell(x,y){ this.x = x; this.y = y; this.visited = false; this.walls = { top:true, right:true, bottom:true, left:true }; } function index(x,y){ if(x < 0 || y < 0 || x >= cols || y >= rows){ return -1; } return x + y * cols; } function generateMaze(){ maze = []; for(let y=0;y<rows;y++){ for(let x=0;x<cols;x++){ maze.push(new Cell(x,y)); } } let current = maze[0]; let stack = []; current.visited = true; while(true){ let neighbors = []; let top = maze[index(current.x,current.y-1)]; let right = maze[index(current.x+1,current.y)]; let bottom = maze[index(current.x,current.y+1)]; let left = maze[index(current.x-1,current.y)]; if(top && !top.visited) neighbors.push(top); if(right && !right.visited) neighbors.push(right); if(bottom && !bottom.visited) neighbors.push(bottom); if(left && !left.visited) neighbors.push(left); if(neighbors.length > 0){ let next = neighbors[ Math.floor(Math.random()*neighbors.length) ]; stack.push(current); if(next.y === current.y - 1){ current.walls.top = false; next.walls.bottom = false; } if(next.x === current.x + 1){ current.walls.right = false; next.walls.left = false; } if(next.y === current.y + 1){ current.walls.bottom = false; next.walls.top = false; } if(next.x === current.x - 1){ current.walls.left = false; next.walls.right = false; } next.visited = true; current = next; }else if(stack.length > 0){ current = stack.pop(); }else{ break; } } } function draw(){ ctx.clearRect(0,0,canvas.width,canvas.height); maze.forEach(cell=>{ let x = cell.x * size; let y = cell.y * size; ctx.strokeStyle = \"white\"; if(cell.walls.top){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+size,y); ctx.stroke(); } if(cell.walls.right){ ctx.beginPath(); ctx.moveTo(x+size,y); ctx.lineTo(x+size,y+size); ctx.stroke(); } if(cell.walls.bottom){ ctx.beginPath(); ctx.moveTo(x,y+size); ctx.lineTo(x+size,y+size); ctx.stroke(); } if(cell.walls.left){ ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+size); ctx.stroke(); } }); ctx.fillStyle = \"lime\"; ctx.fillRect( exit.x*size+size*0.25, exit.y*size+size*0.25, size*0.5, size*0.5 ); ctx.fillStyle = \"red\"; ctx.beginPath(); ctx.arc( player.x*size+size/2, player.y*size+size/2, size/4, 0, Math.PI*2 ); ctx.fill(); } function move(dx,dy){ let current = maze[index(player.x,player.y)]; if(dx===1 && !current.walls.right) player.x++; if(dx===-1 && !current.walls.left) player.x--; if(dy===1 && !current.walls.bottom) player.y++; if(dy===-1 && !current.walls.top) player.y--; draw(); if(player.x===exit.x && player.y===exit.y){ clearInterval(interval); let reward = level * 500; points += reward; document.getElementById(\"points\").textContent = points; alert( \"Level \" + level + \" Complete!\\n\\nReward: $\" + reward ); level++; document.getElementById(\"level\").textContent = level; if(level <= 10){ rows += 2; cols += 2; } size = Math.max( 15, Math.floor(600 / cols) ); startLevel(); } } document.addEventListener(\"keydown\",(e)=>{ switch(e.key){ case \"ArrowUp\": case \"w\": case \"W\": move(0,-1); break; case \"ArrowDown\": case \"s\": case \"S\": move(0,1); break; case \"ArrowLeft\": case \"a\": case \"A\": move(-1,0); break; case \"ArrowRight\": case \"d\": case \"D\": move(1,0); break; } }); function startLevel(){ canvas.width = cols * size; canvas.height = rows * size; player = {x:0,y:0}; exit = { x:cols-1, y:rows-1 }; generateMaze(); timer = 0; document.getElementById(\"time\").textContent = 0; clearInterval(interval); interval = setInterval(()=>{ timer++; document.getElementById(\"time\").textContent = timer; },1000); draw(); } function resetGame(){ level = 1; rows = 15; cols = 15; size = 40; points = 0; document.getElementById(\"points\").textContent = 0; document.getElementById(\"level\").textContent = 1; startLevel(); } startLevel(); <\/script> </body> </html>"
-  }
-,
-  {
-    id: "whg",
-    title: "World's Hardest Game",
-    icon: "🟥",
-    desc: "Dodge blue circles, collect coins, reach the green zone. Procedurally generated levels that never end.",
-    creators: ["CameronCodesStuff"],
-    tag: "DODGE",
-    tagColor: "#44dd44",
-    html: "",
-    link: "",
-    globalLikes: 0
-  },
-  {
-    id: "gauntlet",
-    title: "The Gauntlet",
-    icon: "🔴",
-    desc: "Survive 60 seconds of relentless bullet patterns across 6 escalating phases. One hit = death.",
-    creators: ["CameronCodesStuff"],
-    tag: "SURVIVE",
-    tagColor: "#e24b4a",
-    html: "",
-    link: "",
-    globalLikes: 0
   }
 ];
 
