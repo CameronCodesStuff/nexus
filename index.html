@@ -247,7 +247,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
   #active-chat{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
   .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-dim);min-height:0;}
-  #donation-panel{position:fixed;bottom:20px;right:20px;z-index:50;width:240px;background:var(--panel);border:1px solid rgba(240,184,36,0.22);border-radius:12px;padding:12px 14px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 0 1px rgba(240,184,36,0.06);backdrop-filter:blur(12px);transition:opacity 0.2s,transform 0.2s;}
+  #donation-panel{position:fixed;bottom:20px;right:20px;z-index:50;width:240px;background:var(--panel);border:1px solid rgba(240,184,36,0.22);border-radius:12px;padding:12px 14px 10px;box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 0 1px rgba(240,184,36,0.06);backdrop-filter:blur(12px);transition:opacity 0.2s,transform 0.2s;visibility:hidden;}
   #donation-panel.dp-hidden{opacity:0;pointer-events:none;transform:translateY(8px);}
   #donation-panel-toggle{position:fixed;bottom:20px;right:20px;z-index:51;width:34px;height:34px;background:var(--panel);border:1px solid rgba(240,184,36,0.3);border-radius:50%;color:#f0b824;font-size:14px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,0.4);transition:all 0.2s;}
   #donation-panel-toggle:hover{background:rgba(240,184,36,0.15);border-color:rgba(240,184,36,0.6);}
@@ -3525,7 +3525,7 @@ async function enterApp(){
     if(cud.textColour) document.documentElement.style.setProperty('--text',cud.textColour);
   }
   applyAllDisplayPrefs();
-  $('chat-empty').style.display='flex';
+  $('chat-empty').style.display='flex';{const _dp=document.getElementById('donation-panel');if(_dp&&!_dp.classList.contains('dp-hidden'))_dp.style.visibility='visible';}
   $('active-chat').style.display='none';
   // Dismiss loading screen — mark entered so the safety-net timeout won't fire after us
   window._appEntered=true;
@@ -3766,7 +3766,7 @@ function openChat(cid){
     setTimeout(()=>{if(aChats[cid])openChat(cid);},800);
     return;
   }
-  $('chat-empty').style.display='none';$('active-chat').style.display='';
+  $('chat-empty').style.display='none';$('active-chat').style.display='';{const _dp=document.getElementById('donation-panel');if(_dp)_dp.style.visibility='hidden';const _dt=document.getElementById('donation-panel-toggle');if(_dt)_dt.style.display='none';}
   const ig=chat.type==='group',ouid=ig?null:chat.members?.find(m=>m!==cu.uid),ou=ouid?(uCache[ouid]||{}):{}; 
   const nm=ig?(chat.name||'Group'):(ou.displayName||'Unknown'),rank=getRank(ig?0:(ou.msgCount||0));
   const chAvEl=$('ch-avatar');
@@ -6789,7 +6789,7 @@ async function doLeaveGroup(){
     }
     acid=null;
     $('active-chat').style.display='none';
-    $('chat-empty').style.display='flex';
+    $('chat-empty').style.display='flex';{const _dp=document.getElementById('donation-panel');if(_dp&&!_dp.classList.contains('dp-hidden'))_dp.style.visibility='visible';}
     cancelWipe();
     renderSidebar();
     toast('You left the group.','success');
@@ -8472,14 +8472,16 @@ function _hideDonationPanel(){
   const p=document.getElementById('donation-panel');
   const t=document.getElementById('donation-panel-toggle');
   if(p) p.classList.add('dp-hidden');
-  if(t) t.style.display='flex';
+  // Only show toggle if we're on the empty state
+  const emptyVisible=$('chat-empty')&&$('chat-empty').style.display!=='none';
+  if(t) t.style.display=emptyVisible?'flex':'none';
   try{localStorage.setItem('nexus_don_panel_hidden','1');}catch(e){}
 }
 
 function _showDonationPanel(){
   const p=document.getElementById('donation-panel');
   const t=document.getElementById('donation-panel-toggle');
-  if(p) p.classList.remove('dp-hidden');
+  if(p){p.classList.remove('dp-hidden');p.style.visibility='visible';}
   if(t) t.style.display='none';
   try{localStorage.removeItem('nexus_don_panel_hidden');}catch(e){}
 }
@@ -11242,7 +11244,7 @@ function clearCurrentChat(){
   renderMsgs(acid);
   // Go back to empty state
   acid=null;
-  $('chat-empty').style.display='flex';
+  $('chat-empty').style.display='flex';{const _dp=document.getElementById('donation-panel');if(_dp&&!_dp.classList.contains('dp-hidden'))_dp.style.visibility='visible';}
   $('active-chat').style.display='none';
   // Clear the clearedAt marker too so if chat re-opens messages show
   renderSidebar();
