@@ -1101,6 +1101,12 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
         <div style="position:relative;">
           <button class="icon-btn" title="More" onclick="N.toggleMoreMenu()" id="more-menu-btn">•••</button>
           <div id="more-menu" style="display:none;position:absolute;top:36px;right:0;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;min-width:180px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,0.5);max-height:calc(100vh - 60px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;">
+            <button onclick="N.openVipModal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:linear-gradient(135deg,rgba(240,184,36,0.15),rgba(255,140,0,0.1));border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;font-weight:700;margin-bottom:4px;transition:all 0.15s;" onmouseover="this.style.background='rgba(240,184,36,0.25)';this.style.borderColor='rgba(240,184,36,0.7)'" onmouseout="this.style.background='linear-gradient(135deg,rgba(240,184,36,0.15),rgba(255,140,0,0.1))';this.style.borderColor='rgba(240,184,36,0.35)'">
+              <span style="font-size:14px;">👑</span>
+              <span style="flex:1;">NEXUS V.I.P</span>
+              <span style="font-size:9px;background:rgba(240,184,36,0.2);border:1px solid rgba(240,184,36,0.4);padding:1px 6px;border-radius:10px;letter-spacing:1px;">$4.99</span>
+            </button>
+            <div style="height:1px;background:var(--border);margin:2px 0 6px;"></div>
             <button onclick="N.openDailyModal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⚡ Daily Challenges</button>
             <button onclick="N.openModal('lb-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏅 Leaderboard</button>
             <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
@@ -2693,6 +2699,7 @@ const AVATAR_FRAMES={
   glitch: {b:'#00ff87',g:'rgba(0,255,135,0.9)',  tier:4,hrs:48, label:'GLITCH',  anim:'frame-glitch 2s linear infinite',         thick:3},
   holo:   {b:'#ff0080',g:'rgba(255,0,128,1)',    tier:4,hrs:48, label:'HOLO',    anim:'frame-holo 1.2s linear infinite',         thick:3},
   // Owner-only
+  vip_gold:{b:'#f0b824',g:'rgba(240,184,36,1)', tier:0,hrs:0,  label:'V.I.P',  anim:'frame-holo 1.2s linear infinite', thick:3},
   owner:  {b:'var(--accent)',g:'var(--glow)',     tier:0,hrs:0,  label:'NEXUS'},
 };
 function avatarHtml(uid, sizePx){
@@ -3281,6 +3288,7 @@ async function enterApp(){
     claimReferralRewards();
     checkReferralRole();
     checkLoginStreak();
+  checkVipStatus();
     checkDailyOpsReset();
     // Track page views (increment a shared counter in config/stats)
     setDoc(doc(db,'config','stats'),{pageViews:increment(1)},{merge:true}).catch(()=>{});
@@ -4084,6 +4092,61 @@ function scrollToMsg(msgId){
 const GIPHY_KEY='1WqC6G6zYHV22U2vS0VlezwzN5h56it5';
 let _gifPickerOpen=false;
 let _gifSearchTimer=null;
+
+const VIP_PERKS=[
+  {icon:'👑',label:'VIP Role Badge',desc:'Exclusive gold crown badge on your profile and in chat'},
+  {icon:'🎨',label:'VIP Avatar Frame',desc:'Special animated gold VIP frame for your profile picture'},
+  {icon:'💬',label:'+50,000 Messages',desc:'Instant boost of 50,000 messages to your count'},
+  {icon:'🌟',label:'VIP Name Colour',desc:'Unique gold gradient name style in chat'},
+  {icon:'🎰',label:'Daily Wheel Bonus',desc:'Spin the wheel twice per day instead of once'},
+  {icon:'⚡',label:'Double XP',desc:'Earn double message rewards from daily challenges forever'},
+  {icon:'🏆',label:'VIP Leaderboard',desc:'Appear on a special VIP leaderboard'},
+];
+
+function openVipModal(){
+  openModal('vip-modal');
+  const list=document.getElementById('vip-perks-list');
+  const already=document.getElementById('vip-already');
+  const btn=document.querySelector('#vip-modal button[onclick*="startVipCheckout"]');
+  if(list&&list.children.length===0){
+    VIP_PERKS.forEach(p=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);';
+      row.innerHTML='<span style="font-size:18px;flex-shrink:0;">'+p.icon+'</span>'
+        +'<div><div style="font-size:12px;font-weight:700;color:var(--text);font-family:var(--font-mono);">'+esc(p.label)+'</div>'
+        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:1px;">'+esc(p.desc)+'</div></div>';
+      list.appendChild(row);
+    });
+  }
+  const isVip=cud?.roles?.includes('vip');
+  if(already) already.style.display=isVip?'block':'none';
+  if(btn) btn.style.display=isVip?'none':'block';
+}
+
+function startVipCheckout(){
+  window.open('https://www.buymeacoffee.com/cameroncodesstuff/membership','_blank');
+  closeModal('vip-modal');
+  toast('Opening Buy Me a Coffee…','success');
+}
+
+async function grantVip(uid){
+  if(!uid) return toast('No uid','danger');
+  const ref=doc(db,'users',uid);
+  const snap=await getDoc(ref);
+  if(!snap.exists()) return toast('User not found','danger');
+  const roles=snap.data().roles||[];
+  if(!roles.includes('vip')) roles.push('vip');
+  await updateDoc(ref,{roles,msgCount:(snap.data().msgCount||0)+50000,vipGrantedAt:serverTimestamp()});
+  // Write to vipMembers so auto-grant works on future logins
+  await setDoc(doc(db,'vipMembers',uid),{uid,grantedAt:serverTimestamp(),active:true});
+  if(cu&&cu.uid===uid){
+    cud={...cud,roles,msgCount:(cud?.msgCount||0)+50000};
+    uCache[uid]={...uCache[uid],...cud};
+    renderProfile();
+  }
+  toast('👑 VIP granted!','success');
+}
+
 
 function openGifPicker(){
   if(_gifPickerOpen) return closeGifPicker();
@@ -9398,6 +9461,28 @@ function getDailyKey(){
   return y+'-'+m+'-'+day;
 }
 
+async function checkVipStatus(){
+  if(!cu||!cud) return;
+  if(cud?.roles?.includes('vip')) return; // already VIP
+  try{
+    const vipSnap=await getDoc(doc(db,'vipMembers',cu.uid));
+    if(vipSnap.exists()){
+      // Auto-grant VIP perks
+      const roles=Array.isArray(cud.roles)?[...cud.roles]:[];
+      if(!roles.includes('vip')) roles.push('vip');
+      await updateDoc(doc(db,'users',cu.uid),{
+        roles,
+        msgCount:(cud.msgCount||0)+50000,
+        vipGrantedAt:serverTimestamp()
+      });
+      cud={...cud,roles,msgCount:(cud.msgCount||0)+50000};
+      uCache[cu.uid]={...uCache[cu.uid],...cud};
+      toast('👑 Welcome to NEXUS V.I.P! Your perks have been activated.','success');
+      renderProfile();
+    }
+  }catch{}
+}
+
 async function checkLoginStreak(){
   if(!cu||!cud) return;
   const today=getDailyKey();
@@ -10781,6 +10866,8 @@ function getRoleBadge(uid){
     dedicated:    '<span class="role-dedicated">💫 DEDICATED</span>',
     elite:        '<span class="role-elite">★ ELITE</span>',
     wpm130:       '<span class="role-wpm130">⌨ 130WPM+</span>',
+    lucky:        '<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,184,148,0.15);border:1px solid rgba(0,184,148,0.5);color:#00b894;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">🍀 LUCKY</span>',
+    vip:          '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,rgba(240,184,36,0.2),rgba(255,140,0,0.15));border:1px solid rgba(240,184,36,0.5);color:#f0b824;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">👑 V.I.P</span>',
   };
   let _out=roles.map(r=>map[r]||'').join('');
   // Gender role
@@ -18082,7 +18169,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, startVipCheckout, grantVip, checkVipStatus, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -19065,6 +19152,36 @@ function makePollCard(poll,isOw){
     <button onclick="N.closeProjects()" style="background:none;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);font-family:var(--font-mono);font-size:10px;padding:4px 12px;border-radius:5px;cursor:pointer;letter-spacing:1px;">✕ CLOSE</button>
   </div>
   <iframe id="projects-iframe" style="flex:1;border:none;width:100%;height:100%;" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals" allow="camera; microphone"></iframe>
+</div>
+
+<div class="modal-overlay" id="vip-modal" onclick="if(event.target===this)N.closeModal('vip-modal')">
+  <div class="modal" style="width:420px;overflow:hidden;padding:0;">
+    <!-- Banner -->
+    <div style="background:linear-gradient(135deg,#1a1200,#2d1f00,#1a1200);border-bottom:1px solid rgba(240,184,36,0.3);padding:28px 24px 20px;text-align:center;position:relative;">
+      <button class="modal-close" onclick="N.closeModal('vip-modal')" style="position:absolute;top:12px;right:12px;">✕</button>
+      <div style="font-size:36px;margin-bottom:6px;">👑</div>
+      <div style="font-family:var(--font-display);font-size:20px;letter-spacing:4px;color:#f0b824;margin-bottom:4px;">NEXUS V.I.P</div>
+      <div style="font-size:11px;font-family:var(--font-mono);color:rgba(240,184,36,0.6);letter-spacing:2px;">MONTHLY SUBSCRIPTION</div>
+    </div>
+    <!-- Price -->
+    <div style="padding:20px 24px 0;text-align:center;">
+      <div style="font-family:var(--font-display);font-size:36px;color:#f0b824;letter-spacing:2px;">$4.99</div>
+      <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);margin-top:2px;">per month · cancel anytime</div>
+    </div>
+    <!-- Perks -->
+    <div style="padding:16px 24px;">
+      <div style="font-size:9px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">WHAT YOU GET</div>
+      <div id="vip-perks-list" style="display:flex;flex-direction:column;gap:7px;"></div>
+    </div>
+    <!-- CTA -->
+    <div style="padding:16px 24px 20px;">
+      <button onclick="N.startVipCheckout()" style="width:100%;padding:13px;background:linear-gradient(135deg,#f0b824,#ff8c00);border:none;border-radius:10px;font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#000;font-weight:900;cursor:pointer;box-shadow:0 4px 20px rgba(240,184,36,0.4);transition:all 0.2s;" onmouseover="this.style.transform='scale(1.02)';this.style.boxShadow='0 6px 28px rgba(240,184,36,0.6)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(240,184,36,0.4)'">
+        ✦ BECOME V.I.P ✦
+      </button>
+      <div style="text-align:center;margin-top:10px;font-size:9px;font-family:var(--font-mono);color:var(--text-dim);">Secure payment via Stripe · Cancel anytime in Stripe</div>
+      <div id="vip-already" style="display:none;text-align:center;margin-top:10px;padding:8px;background:rgba(240,184,36,0.1);border:1px solid rgba(240,184,36,0.3);border-radius:7px;font-size:11px;font-family:var(--font-mono);color:#f0b824;">👑 You are already V.I.P!</div>
+    </div>
+  </div>
 </div>
 
 </body>
