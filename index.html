@@ -3289,6 +3289,7 @@ async function enterApp(){
     checkReferralRole();
     checkLoginStreak();
   checkVipStatus();
+  grantVipDailyMsgs();
     checkDailyOpsReset();
     // Track page views (increment a shared counter in config/stats)
     setDoc(doc(db,'config','stats'),{pageViews:increment(1)},{merge:true}).catch(()=>{});
@@ -4094,33 +4095,68 @@ let _gifPickerOpen=false;
 let _gifSearchTimer=null;
 
 const VIP_PERKS=[
-  {icon:'👑',label:'VIP Role Badge',desc:'Exclusive gold crown badge on your profile and in chat'},
-  {icon:'🎨',label:'VIP Avatar Frame',desc:'Special animated gold VIP frame for your profile picture'},
-  {icon:'💬',label:'+50,000 Messages',desc:'Instant boost of 50,000 messages to your count'},
-  {icon:'🌟',label:'VIP Name Colour',desc:'Unique gold gradient name style in chat'},
-  {icon:'🎰',label:'Daily Wheel Bonus',desc:'Spin the wheel twice per day instead of once'},
-  {icon:'⚡',label:'Double XP',desc:'Earn double message rewards from daily challenges forever'},
-  {icon:'🏆',label:'VIP Leaderboard',desc:'Appear on a special VIP leaderboard'},
+  {icon:'👑',label:'VIP Role Badge',desc:'Gold crown badge next to your name everywhere'},
+  {icon:'🎨',label:'VIP Avatar Frame',desc:'Animated gold frame on your profile picture'},
+  {icon:'💬',label:'+50,000 Messages',desc:'Instant boost added to your message count'},
+  {icon:'📅',label:'+2,500 Msgs / Day',desc:'Automatically credited every day you log in'},
+  {icon:'🎰',label:'5 Wheel Spins / Day',desc:'Five spins on the daily wheel instead of one'},
+  {icon:'🏷️',label:'Custom Role Badge',desc:'Set any name and colour for your own role badge'},
 ];
 
 function openVipModal(){
   openModal('vip-modal');
   const list=document.getElementById('vip-perks-list');
   const already=document.getElementById('vip-already');
-  const btn=document.querySelector('#vip-modal button[onclick*="startVipCheckout"]');
+  const ctaBtn=document.getElementById('vip-cta-btn');
+  const customSection=document.getElementById('vip-custom-role-section');
   if(list&&list.children.length===0){
     VIP_PERKS.forEach(p=>{
       const row=document.createElement('div');
-      row.style.cssText='display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);';
-      row.innerHTML='<span style="font-size:18px;flex-shrink:0;">'+p.icon+'</span>'
-        +'<div><div style="font-size:12px;font-weight:700;color:var(--text);font-family:var(--font-mono);">'+esc(p.label)+'</div>'
-        +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin-top:1px;">'+esc(p.desc)+'</div></div>';
+      row.style.cssText='display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);';
+      row.innerHTML='<span style="font-size:15px;flex-shrink:0;width:20px;text-align:center;">'+p.icon+'</span>'
+        +'<div style="flex:1;"><div style="font-size:11px;color:var(--text);font-family:var(--font-mono);">'+esc(p.label)+'</div>'
+        +'<div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-top:1px;">'+esc(p.desc)+'</div></div>';
       list.appendChild(row);
     });
   }
-  const isVip=cud?.roles?.includes('vip');
+  const isVip=Array.isArray(cud?.roles)&&cud.roles.includes('vip');
   if(already) already.style.display=isVip?'block':'none';
-  if(btn) btn.style.display=isVip?'none':'block';
+  if(ctaBtn) ctaBtn.style.display=isVip?'none':'block';
+  if(customSection) customSection.style.display=isVip?'block':'none';
+  // Pre-fill custom role inputs if already set
+  if(isVip&&cud?.vipCustomRole){
+    const colorEl=document.getElementById('vip-role-color');
+    const labelEl=document.getElementById('vip-role-label');
+    if(colorEl) colorEl.value=cud.vipCustomRole.color||'#a78bfa';
+    if(labelEl) labelEl.value=cud.vipCustomRole.label||'';
+    _updateVipRolePreview();
+  }
+  // Attach live preview
+  document.getElementById('vip-role-color')?.addEventListener('input',_updateVipRolePreview);
+  document.getElementById('vip-role-label')?.addEventListener('input',_updateVipRolePreview);
+}
+
+function _updateVipRolePreview(){
+  const color=document.getElementById('vip-role-color')?.value||'#a78bfa';
+  const label=document.getElementById('vip-role-label')?.value||'';
+  const preview=document.getElementById('vip-role-preview');
+  if(!preview) return;
+  if(!label.trim()){preview.innerHTML='<span style="color:var(--text-dim);">Enter a name to preview</span>';return;}
+  const r=parseInt(color.slice(1,3),16),g=parseInt(color.slice(3,5),16),b=parseInt(color.slice(5,7),16);
+  preview.innerHTML='Preview: <span style="display:inline-flex;align-items:center;background:rgba('+r+','+g+','+b+',0.15);border:1px solid rgba('+r+','+g+','+b+',0.5);color:'+color+';font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">'+esc(label.toUpperCase())+'</span>';
+}
+
+async function saveVipCustomRole(){
+  if(!cu||!cud?.roles?.includes('vip')) return toast('VIP only','danger');
+  const color=document.getElementById('vip-role-color')?.value||'#a78bfa';
+  const label=(document.getElementById('vip-role-label')?.value||'').trim().toUpperCase();
+  if(!label) return toast('Enter a role name','danger');
+  const vipCustomRole={label,color};
+  await updateDoc(doc(db,'users',cu.uid),{vipCustomRole});
+  cud={...cud,vipCustomRole};
+  uCache[cu.uid]={...uCache[cu.uid],vipCustomRole};
+  toast('👑 Custom role saved!','success');
+  _updateVipRolePreview();
 }
 
 function startVipCheckout(){
@@ -9329,6 +9365,7 @@ function drawDailyWheel(canvas){
 
 async function spinDailyWheel(){
   if(_wheelSpinning) return;
+  if(_wheelSpinsLeft()<=0) return;
   const canvas=document.getElementById('daily-wheel-canvas');
   const btn=document.getElementById('wheel-spin-btn');
   const resultDiv=document.getElementById('wheel-result');
@@ -9371,7 +9408,9 @@ async function spinDailyWheel(){
 async function _grantWheelPrize(prize){
   const resultDiv=document.getElementById('wheel-result');
   try{
-    const updates={lastWheelSpin:getDailyKey()};
+    const today=getDailyKey();
+    const spinsUsed=((cud?.wheelSpinDay||'')===today?(cud?.wheelSpinsUsed||0):0)+1;
+    const updates={wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
     const newMsgs=(cud?.msgCount||0)+prize.msgs;
     updates.msgCount=newMsgs;
     // Grant Lucky role if applicable
@@ -9389,8 +9428,19 @@ async function _grantWheelPrize(prize){
     if(resultDiv) resultDiv.textContent=msg;
     toast(msg,'success');
     // Re-render the button state
+    const spinsNow=_wheelSpinsLeft();
     const btn=document.getElementById('wheel-spin-btn');
-    if(btn){btn.style.background='#222';btn.style.color='#555';btn.style.cursor='not-allowed';}
+    if(btn){
+      if(spinsNow>0){
+        btn.disabled=false;
+        btn.style.background='linear-gradient(45deg,#ffcc00,#ff6600)';
+        btn.style.color='#fff';btn.style.cursor='pointer';
+        btn.textContent='🎪 SPIN! ('+spinsNow+' left)';
+      } else {
+        btn.style.background='#222';btn.style.color='#555';btn.style.cursor='not-allowed';
+        btn.textContent='✓ ALL SPINS USED';
+      }
+    }
   }catch(e){
     if(resultDiv) resultDiv.textContent='Error granting prize :(';
     toast('Wheel error: '+e.message,'danger');
@@ -9398,24 +9448,35 @@ async function _grantWheelPrize(prize){
 }
 
 
-function renderWheelSection(container){
+function _wheelSpinsLeft(){
+  const isVip=Array.isArray(cud?.roles)&&cud.roles.includes('vip');
+  const maxSpins=isVip?5:1;
   const today=getDailyKey();
-  const lastSpin=cud?.lastWheelSpin||'';
-  const canSpin=lastSpin!==today;
+  const spinDay=cud?.wheelSpinDay||'';
+  const spinsUsed=spinDay===today?(cud?.wheelSpinsUsed||0):0;
+  return Math.max(0,maxSpins-spinsUsed);
+}
+
+function renderWheelSection(container){
+  const spinsLeft=_wheelSpinsLeft();
+  const canSpin=spinsLeft>0;
+  const isVip=Array.isArray(cud?.roles)&&cud.roles.includes('vip');
   const section=document.createElement('div');
   section.style.cssText='margin-top:16px;border-top:1px solid var(--border);padding-top:16px;';
   const btnStyle=canSpin
     ?'display:block;margin:14px auto 0;padding:10px 32px;font-size:14px;font-family:var(--font-display);letter-spacing:2px;background:linear-gradient(45deg,#ffcc00,#ff6600);border:none;border-radius:50px;color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4),0 0 16px rgba(255,204,0,0.4);transition:all 0.15s;'
     :'display:block;margin:14px auto 0;padding:10px 32px;font-size:14px;font-family:var(--font-display);letter-spacing:2px;background:#222;border:none;border-radius:50px;color:#555;cursor:not-allowed;';
+  const spinLabel=canSpin?('🎪 SPIN! ('+(spinsLeft)+' left)'):('✓ '+(isVip?'5/5':'1/1')+' SPINS USED');
+  const subtext=canSpin?(isVip?spinsLeft+' of 5 spins remaining today':'Spin once per day for a prize!'):('Come back tomorrow for your next spin');
   section.innerHTML=
     '<div style="font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:#ffcc00;margin-bottom:8px;text-align:center;">🎪 WHEEL OF FORTUNE</div>'
-    +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);text-align:center;margin-bottom:12px;">'+(canSpin?'Spin once per day for a prize!':'Come back tomorrow for your next spin')+'</div>'
+    +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);text-align:center;margin-bottom:12px;">'+subtext+'</div>'
     +'<div style="position:relative;width:260px;height:260px;margin:0 auto;display:flex;align-items:center;justify-content:center;border-radius:50%;border:10px solid #ff0055;box-shadow:0 0 24px rgba(255,0,85,0.45),inset 0 0 14px rgba(0,0,0,0.6);background:#0d1117;">'
     +'<div style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:26px solid #ffcc00;z-index:10;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.5));"></div>'
     +'<canvas id="daily-wheel-canvas" width="240" height="240" style="border-radius:50%;"></canvas>'
     +'<div style="position:absolute;width:26px;height:26px;background:radial-gradient(circle,#fff,#ffcc00);border:3px solid #0d1117;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 10px #ffcc00;z-index:5;"></div>'
     +'</div>'
-    +'<button id="wheel-spin-btn" onclick="N.spinDailyWheel()" style="'+btnStyle+'"'+(canSpin?'':' disabled')+'>'+(canSpin?'🎪 SPIN!':'✓ SPUN TODAY')+'</button>'
+    +'<button id="wheel-spin-btn" onclick="N.spinDailyWheel()" style="'+btnStyle+'"'+(canSpin?'':' disabled')+'>'+spinLabel+'</button>'
     +'<div id="wheel-result" style="text-align:center;margin-top:10px;font-size:13px;font-family:var(--font-display);letter-spacing:1px;min-height:20px;color:#ffcc00;"></div>';
   // Prize legend below wheel
   const legend=document.createElement('div');
@@ -9459,6 +9520,23 @@ function getDailyKey(){
   const m=String(d.getMonth()+1).padStart(2,'0');
   const day=String(d.getDate()).padStart(2,'0');
   return y+'-'+m+'-'+day;
+}
+
+async function grantVipDailyMsgs(){
+  if(!cu||!cud) return;
+  if(!Array.isArray(cud?.roles)||!cud.roles.includes('vip')) return;
+  const today=getDailyKey();
+  if(cud?.vipDailyMsgsDate===today) return; // already granted today
+  try{
+    const bonus=2500;
+    await updateDoc(doc(db,'users',cu.uid),{
+      vipDailyMsgsDate:today,
+      msgCount:(cud.msgCount||0)+bonus
+    });
+    cud={...cud,vipDailyMsgsDate:today,msgCount:(cud.msgCount||0)+bonus};
+    uCache[cu.uid]={...uCache[cu.uid],...cud};
+    toast('👑 VIP daily bonus: +2,500 messages!','success');
+  }catch{}
 }
 
 async function checkVipStatus(){
@@ -10870,6 +10948,13 @@ function getRoleBadge(uid){
     vip:          '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,rgba(240,184,36,0.2),rgba(255,140,0,0.15));border:1px solid rgba(240,184,36,0.5);color:#f0b824;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">👑 V.I.P</span>',
   };
   let _out=roles.map(r=>map[r]||'').join('');
+  // VIP custom role
+  const _vcr=(uid===cu?.uid&&cud)?cud.vipCustomRole:(uCache[uid]?.vipCustomRole||null);
+  if(_vcr?.label&&roles.includes('vip')){
+    const _vc=_vcr.color||'#a78bfa';
+    const _vr=parseInt(_vc.slice(1,3),16),_vg=parseInt(_vc.slice(3,5),16),_vb=parseInt(_vc.slice(5,7),16);
+    _out+='<span style="display:inline-flex;align-items:center;background:rgba('+_vr+','+_vg+','+_vb+',0.15);border:1px solid rgba('+_vr+','+_vg+','+_vb+',0.5);color:'+_vc+';font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">'+esc(_vcr.label.toUpperCase())+'</span>';
+  }
   // Gender role
   const _gr=(uid===cu?.uid&&cud)?cud.genderRole:(uCache[uid]?.genderRole||'');
   if(_gr==='male') _out+='<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.4);color:#60a5fa;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">&#x2642; MALE</span>';
@@ -18169,7 +18254,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, startVipCheckout, grantVip, checkVipStatus, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -19155,31 +19240,34 @@ function makePollCard(poll,isOw){
 </div>
 
 <div class="modal-overlay" id="vip-modal" onclick="if(event.target===this)N.closeModal('vip-modal')">
-  <div class="modal" style="width:420px;overflow:hidden;padding:0;">
-    <!-- Banner -->
-    <div style="background:linear-gradient(135deg,#1a1200,#2d1f00,#1a1200);border-bottom:1px solid rgba(240,184,36,0.3);padding:28px 24px 20px;text-align:center;position:relative;">
-      <button class="modal-close" onclick="N.closeModal('vip-modal')" style="position:absolute;top:12px;right:12px;">✕</button>
-      <div style="font-size:36px;margin-bottom:6px;">👑</div>
-      <div style="font-family:var(--font-display);font-size:20px;letter-spacing:4px;color:#f0b824;margin-bottom:4px;">NEXUS V.I.P</div>
-      <div style="font-size:11px;font-family:var(--font-mono);color:rgba(240,184,36,0.6);letter-spacing:2px;">MONTHLY SUBSCRIPTION</div>
+  <div class="modal" style="width:380px;max-height:88vh;overflow-y:auto;padding:0;scrollbar-width:thin;scrollbar-color:rgba(240,184,36,0.2) transparent;">
+    <div style="padding:20px 20px 14px;border-bottom:1px solid rgba(240,184,36,0.15);display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--panel);z-index:2;">
+      <span style="font-size:16px;">👑</span>
+      <div>
+        <div style="font-family:var(--font-display);font-size:13px;letter-spacing:2px;color:#f0b824;">NEXUS V.I.P</div>
+        <div style="font-size:9px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:1px;margin-top:1px;">NZ$5 / month · cancel anytime</div>
+      </div>
+      <button class="modal-close" onclick="N.closeModal('vip-modal')" style="margin-left:auto;">✕</button>
     </div>
-    <!-- Price -->
-    <div style="padding:20px 24px 0;text-align:center;">
-      <div style="font-family:var(--font-display);font-size:36px;color:#f0b824;letter-spacing:2px;">$4.99</div>
-      <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);margin-top:2px;">per month · cancel anytime</div>
+    <div style="padding:16px 20px;">
+      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;">Perks</div>
+      <div id="vip-perks-list" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
-    <!-- Perks -->
-    <div style="padding:16px 24px;">
-      <div style="font-size:9px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">WHAT YOU GET</div>
-      <div id="vip-perks-list" style="display:flex;flex-direction:column;gap:7px;"></div>
+    <div id="vip-custom-role-section" style="display:none;padding:0 20px 16px;">
+      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;">Your Custom Role</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input type="color" id="vip-role-color" value="#a78bfa" style="width:32px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px;padding:2px;">
+        <input type="text" id="vip-role-label" placeholder="Role name…" maxlength="16" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:7px 10px;border-radius:7px;outline:none;">
+        <button onclick="N.saveVipCustomRole()" style="background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:7px 12px;border-radius:7px;cursor:pointer;letter-spacing:1px;">SAVE</button>
+      </div>
+      <div id="vip-role-preview" style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);min-height:18px;"></div>
     </div>
-    <!-- CTA -->
-    <div style="padding:16px 24px 20px;">
-      <button onclick="N.startVipCheckout()" style="width:100%;padding:13px;background:linear-gradient(135deg,#f0b824,#ff8c00);border:none;border-radius:10px;font-family:var(--font-display);font-size:13px;letter-spacing:3px;color:#000;font-weight:900;cursor:pointer;box-shadow:0 4px 20px rgba(240,184,36,0.4);transition:all 0.2s;" onmouseover="this.style.transform='scale(1.02)';this.style.boxShadow='0 6px 28px rgba(240,184,36,0.6)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(240,184,36,0.4)'">
-        ✦ BECOME V.I.P ✦
+    <div style="padding:0 20px 20px;">
+      <button id="vip-cta-btn" onclick="N.startVipCheckout()" style="width:100%;padding:11px;background:rgba(240,184,36,0.12);border:1px solid rgba(240,184,36,0.35);border-radius:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:2px;color:#f0b824;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(240,184,36,0.2)'" onmouseout="this.style.background='rgba(240,184,36,0.12)'">
+        ✦ SUBSCRIBE — NZ$5/mo ✦
       </button>
-      <div style="text-align:center;margin-top:10px;font-size:9px;font-family:var(--font-mono);color:var(--text-dim);">Secure payment via Stripe · Cancel anytime in Stripe</div>
-      <div id="vip-already" style="display:none;text-align:center;margin-top:10px;padding:8px;background:rgba(240,184,36,0.1);border:1px solid rgba(240,184,36,0.3);border-radius:7px;font-size:11px;font-family:var(--font-mono);color:#f0b824;">👑 You are already V.I.P!</div>
+      <div style="text-align:center;margin-top:8px;font-size:9px;font-family:var(--font-mono);color:var(--text-dim);">via Buy Me a Coffee · cancel anytime</div>
+      <div id="vip-already" style="display:none;text-align:center;margin-top:10px;padding:7px;background:rgba(240,184,36,0.08);border:1px solid rgba(240,184,36,0.2);border-radius:7px;font-size:10px;font-family:var(--font-mono);color:#f0b824;">👑 You're a V.I.P member</div>
     </div>
   </div>
 </div>
