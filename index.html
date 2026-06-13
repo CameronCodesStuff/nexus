@@ -1310,10 +1310,6 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
       <div class="theme-grid" id="theme-grid"></div>
     </div>
     <div class="settings-section">
-      <div class="settings-label">BACKGROUND EFFECT</div>
-      <div id="settings-bg-effect-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;"></div>
-    </div>
-    <div class="settings-section">
       <div class="settings-label">YOUR PROGRESS</div>
       <div id="rank-progress-display"></div>
     </div>
@@ -4713,22 +4709,7 @@ function openModal(id){
   if(id==='inbox-modal')renderInbox();
   if(id==='group-modal')renderGroupUsers();
   if(id==='settings-modal'){
-    // Populate background effects grid
-    const _beg=document.getElementById('settings-bg-effect-grid');
-    if(_beg){
-      _beg.innerHTML='';
-      BG_EFFECTS.forEach(_be=>{
-        const _bc=document.createElement('div');
-        const _active=_currentBgEffect===_be.id;
-        _bc.style.cssText='padding:10px 6px;border-radius:7px;cursor:pointer;text-align:center;font-family:var(--font-mono);font-size:10px;border:1px solid '+(_active?'var(--accent)':'rgba(255,255,255,0.07)')+';background:'+(_active?'rgba(68,102,255,0.12)':'rgba(255,255,255,0.02)')+';transition:all 0.15s;';
-        const _parts=_be.label.split(' ');
-        _bc.innerHTML='<div style="font-size:16px;margin-bottom:3px;">'+(_parts[1]||(_be.id==='none'?'✖':'•'))+'</div><div style="color:'+(_active?'var(--accent)':'var(--text-dim)')+';">'+_parts[0]+'</div>';
-        _bc.onclick=()=>{applyBgEffect(_be.id);openModal('settings-modal');};
-        _bc.onmouseover=()=>{if(_currentBgEffect!==_be.id)_bc.style.background='rgba(255,255,255,0.06)';};
-        _bc.onmouseout=()=>{if(_currentBgEffect!==_be.id)_bc.style.background='rgba(255,255,255,0.02)';};
-        _beg.appendChild(_bc);
-      });
-    }renderSettings();updateNotifSettingsUI();}
+renderSettings();updateNotifSettingsUI();}
   if(id==='bg-modal')openModal_bg();
   if(id==='credits-modal')openCreditsModal();
   if(id==='owner-modal'){ownerTab('tickets');}
@@ -12193,8 +12174,8 @@ function _renderDebugPanel(panel){
         📊 Performance Panel <span style="margin-left:auto;font-size:9px;">${_perfPanelOpen?'OPEN':'CLOSED'}</span>
       </button>
 
-      <button onclick="N._maxFps()" style="display:flex;align-items:center;gap:8px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.25);color:#00ff88;padding:8px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">
-        ⚡ Max FPS Mode — strip all effects
+      <button onclick="N._maxFps()" style="display:flex;align-items:center;gap:8px;background:${_perfModeActive?'rgba(0,255,136,0.2)':'rgba(0,255,136,0.08)'};border:1px solid ${_perfModeActive?'rgba(0,255,136,0.6)':'rgba(0,255,136,0.25)'};color:#00ff88;padding:8px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">
+        ⚡ ${_perfModeActive?'Restore All Settings':'Max FPS Mode — strip all effects'}
       </button>
 
       <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">STATE</div>
@@ -12211,8 +12192,7 @@ function _renderDebugPanel(panel){
       </div>
 
       <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">ACTIONS</div>
-      <button onclick="navigator.clipboard?.writeText(JSON.stringify(cud,null,2));N._dbgToast('cud copied!')" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:7px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">📋 Copy cud as JSON</button>
-      <button onclick="navigator.clipboard?.writeText(JSON.stringify(Object.fromEntries(Object.entries(uCache||{}).map(([k,v])=>[k,v.username])),null,2));N._dbgToast('uCache copied!')" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:7px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">📋 Copy uCache usernames</button>
+
 
       <div style="font-size:9px;color:var(--text-dim);margin-top:4px;line-height:1.6;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">Firestore reads this session: <b style="color:#4466ff;">${_perfSessionReads}</b><br>Firestore writes this session: <b style="color:#4466ff;">${_perfSessionWrites}</b></div>
     </div>`;
@@ -12258,7 +12238,10 @@ function _startPerfPanel(){
   if(!el){
     el = document.createElement('div');
     el.id = '__perf-panel__';
-    el.style.cssText = 'position:fixed;bottom:16px;right:16px;width:260px;background:rgba(4,4,10,0.95);border:1px solid rgba(0,212,255,0.3);border-radius:8px;z-index:99998;font-family:var(--font-mono);font-size:10px;color:#00d4ff;padding:10px 12px;pointer-events:none;';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;width:260px;background:rgba(4,4,10,0.95);border:1px solid rgba(0,212,255,0.3);border-radius:8px;z-index:2147483647;font-family:var(--font-mono);font-size:10px;color:#00d4ff;padding:10px 12px;pointer-events:none;';
+    // FPS badge
+    let fps_el = document.getElementById('__fps-badge__');
+    if(!fps_el){fps_el=document.createElement('div');fps_el.id='__fps-badge__';fps_el.style.cssText='position:fixed;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);border:1px solid rgba(0,212,255,0.4);border-radius:20px;padding:3px 12px;font-family:monospace;font-size:11px;color:#00d4ff;z-index:2147483647;pointer-events:none;letter-spacing:1px;';document.body.appendChild(fps_el);}
     document.body.appendChild(el);
   }
   _perfLastFrame = performance.now();
@@ -12275,6 +12258,7 @@ function _startPerfPanel(){
     const animRunning = Object.keys(_animBgState||{}).length;
     const particles = Object.values(_animBgState||{}).reduce((s,v)=>s+(v.particles?.length||0),0);
     const rafCount = typeof BgEffects !== 'undefined' && BgEffects.rafId ? 1 : 0;
+    const fps_badge = document.getElementById('__fps-badge__'); if(fps_badge) fps_badge.textContent = fps + ' FPS';
     el.innerHTML =
       '<div style="font-size:9px;letter-spacing:2px;color:rgba(0,212,255,0.5);margin-bottom:6px;">◈ PERFORMANCE</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;">' +
@@ -12297,21 +12281,62 @@ function _stopPerfPanel(){
   if(_perfRaf) cancelAnimationFrame(_perfRaf);
   const el = document.getElementById('__perf-panel__');
   if(el) el.remove();
+  const fps_b = document.getElementById('__fps-badge__');
+  if(fps_b) fps_b.remove();
 }
 
 // ── MAX FPS MODE ──
+let _perfModeActive = false;
+let _perfModeSnapshot = null;
+
 function _maxFps(){
+  if(_perfModeActive){ _restoreFromPerfMode(); return; }
+  _perfModeActive = true;
+  // Snapshot current state
+  _perfModeSnapshot = {
+    bgEffect: cud?.bgEffect || BgEffects?.current || 'stars',
+    drunkMode: _drunkMode,
+    animBgKeys: Object.keys(_animBgState||{}),
+    theme: curTheme,
+    avatarAnimations: Array.from(document.querySelectorAll('.avatar-frame')).map(el=>({el,anim:el.style.animation,boxShadow:el.style.boxShadow,filter:el.style.filter})),
+    bodyFilter: document.body.style.filter,
+    appFilter: document.getElementById('app-screen')?.style.filter||'',
+  };
   // Stop all animated backgrounds
   Object.keys(_animBgState||{}).forEach(k => stopAnimBg(k));
   // Stop BgEffects loop
   if(typeof BgEffects !== 'undefined') BgEffects.stop();
   // Stop drunk mode
   if(_drunkMode){ _drunkMode=false; if(_drunkRaf) cancelAnimationFrame(_drunkRaf); const el=document.getElementById('app-screen'); if(el) el.style.transform=''; }
-  // Clear all CSS animations on avatar frames
-  document.querySelectorAll('.avatar-frame').forEach(el=>{ el.style.animation='none'; });
+  // Strip all avatar frame animations
+  document.querySelectorAll('.avatar-frame').forEach(el=>{ el.style.animation='none'; el.style.boxShadow='none'; el.style.filter='none'; });
+  // Apply grayscale + reduce colours to minimum
+  const app = document.getElementById('app-screen');
+  if(app) app.style.filter='grayscale(0.85) contrast(0.9)';
   // Disable the BG effect
-  applyBgEffect('none');
-  toast('⚡ Max FPS mode — all effects stripped','success');
+  if(typeof BgEffects !== 'undefined') BgEffects.set('none');
+  toast('⚡ Performance mode ON — click again to restore','success');
+  const p = document.getElementById('__debug-panel__');
+  if(p) _renderDebugPanel(p);
+}
+
+function _restoreFromPerfMode(){
+  if(!_perfModeActive) return;
+  _perfModeActive = false;
+  const snap = _perfModeSnapshot;
+  if(!snap) return;
+  // Restore app filter
+  const app = document.getElementById('app-screen');
+  if(app) app.style.filter = snap.appFilter;
+  document.body.style.filter = snap.bodyFilter;
+  // Restore avatar frame animations
+  snap.avatarAnimations.forEach(({el,anim,boxShadow,filter})=>{ el.style.animation=anim; el.style.boxShadow=boxShadow; el.style.filter=filter; });
+  // Restore background effect
+  if(typeof BgEffects !== 'undefined') BgEffects.set(snap.bgEffect);
+  // Restore drunk mode if it was on
+  if(snap.drunkMode){ _drunkMode=false; _toggleDrunkMode(); }
+  _perfModeSnapshot = null;
+  toast('✓ Settings restored','success');
   const p = document.getElementById('__debug-panel__');
   if(p) _renderDebugPanel(p);
 }
