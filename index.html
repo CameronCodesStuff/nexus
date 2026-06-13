@@ -1314,6 +1314,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
       <div class="theme-grid" id="theme-grid"></div>
     </div>
     <div class="settings-section">
+      <div class="settings-label">BACKGROUND EFFECT</div>
+      <div id="settings-bg-effect-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;"></div>
+    </div>
+    <div class="settings-section">
       <div class="settings-label">YOUR PROGRESS</div>
       <div id="rank-progress-display"></div>
     </div>
@@ -4560,7 +4564,23 @@ function openModal(id){
   }
   if(id==='inbox-modal')renderInbox();
   if(id==='group-modal')renderGroupUsers();
-  if(id==='settings-modal'){renderSettings();updateNotifSettingsUI();}
+  if(id==='settings-modal'){
+    // Populate background effects grid
+    const _beg=document.getElementById('settings-bg-effect-grid');
+    if(_beg){
+      _beg.innerHTML='';
+      BG_EFFECTS.forEach(_be=>{
+        const _bc=document.createElement('div');
+        const _active=_currentBgEffect===_be.id;
+        _bc.style.cssText='padding:10px 6px;border-radius:7px;cursor:pointer;text-align:center;font-family:var(--font-mono);font-size:10px;border:1px solid '+(_active?'var(--accent)':'rgba(255,255,255,0.07)')+';background:'+(_active?'rgba(68,102,255,0.12)':'rgba(255,255,255,0.02)')+';transition:all 0.15s;';
+        const _parts=_be.label.split(' ');
+        _bc.innerHTML='<div style="font-size:16px;margin-bottom:3px;">'+(_parts[1]||(_be.id==='none'?'✖':'•'))+'</div><div style="color:'+(_active?'var(--accent)':'var(--text-dim)')+';">'+_parts[0]+'</div>';
+        _bc.onclick=()=>{applyBgEffect(_be.id);openModal('settings-modal');};
+        _bc.onmouseover=()=>{if(_currentBgEffect!==_be.id)_bc.style.background='rgba(255,255,255,0.06)';};
+        _bc.onmouseout=()=>{if(_currentBgEffect!==_be.id)_bc.style.background='rgba(255,255,255,0.02)';};
+        _beg.appendChild(_bc);
+      });
+    }renderSettings();updateNotifSettingsUI();}
   if(id==='bg-modal')openModal_bg();
   if(id==='credits-modal')openCreditsModal();
   if(id==='owner-modal'){ownerTab('tickets');}
