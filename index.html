@@ -9090,11 +9090,18 @@ function updateVipVisibilitySettingsBtn(){
   }
   if(lbl) lbl.textContent=hidden?'Hidden — click SHOW to restore':'Visible in ••• menu';
   const row=document.getElementById('vip-menu-row');
-  if(row) row.style.display=hidden?'none':'flex';
+  const isVip2 = Array.isArray(cud?.roles) && cud.roles.includes('vip');
+  if(row) row.style.display=(hidden&&!isVip2)?'none':'flex';
 }
 
 function applyVipMenuVisibility(){
   updateVipVisibilitySettingsBtn();
+  // Always show VIP button for actual VIP members regardless of hide setting
+  const isVip = Array.isArray(cud?.roles) && cud.roles.includes('vip');
+  if(isVip){
+    const row = document.getElementById('vip-menu-row');
+    if(row) row.style.display = 'flex';
+  }
 }
 
 // ── DONATION LEADERBOARD ───────────────────────────
@@ -19466,7 +19473,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, saveVipProfileBg, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, saveVipProfileBg, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
