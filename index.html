@@ -1126,10 +1126,6 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
               <button onclick="N.hideVipMenuEntry()" title="Hide VIP button" style="width:26px;height:26px;flex-shrink:0;background:none;border:1px solid rgba(240,184,36,0.2);color:rgba(240,184,36,0.5);border-radius:5px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;" onmouseover="this.style.borderColor='rgba(240,184,36,0.6)';this.style.color='#f0b824'" onmouseout="this.style.borderColor='rgba(240,184,36,0.2)';this.style.color='rgba(240,184,36,0.5)'">✕</button>
             </div>
             <div style="height:1px;background:var(--border);margin:2px 0 6px;"></div>
-            <button onclick="N.openBgEffectModal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.06)'" onmouseout="this.style.background='none'">
-              <span style="font-size:14px;">✨</span>
-              <span style="flex:1;">Background Effect</span>
-            </button>
             <button onclick="N.openDailyModal();N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">⚡ Daily Challenges</button>
             <button onclick="N.openModal('lb-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏅 Leaderboard</button>
             <button onclick="N.openModal('achievements-modal');N.closeMoreMenu()" style="display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">🏆 Achievements</button>
@@ -12140,6 +12136,186 @@ function updateMyStatusDot(){
 }
 
 // ── BG EFFECT ────────────────────────────────────
+// ── RIGHT ALT DEBUG / SECRET MENU ─────────────────────────────────
+let _debugOpen = false;
+let _drunkMode = false;
+let _drunkRaf = null;
+let _perfPanelOpen = false;
+let _perfRaf = null;
+let _perfFrameTimes = [];
+let _perfLastFrame = 0;
+let _perfSessionReads = 0;
+let _perfSessionWrites = 0;
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'AltGraph' || (e.code === 'AltRight')) {
+    e.preventDefault();
+    _debugOpen ? closeDebugMenu() : openDebugMenu();
+  }
+});
+
+function openDebugMenu(){
+  _debugOpen = true;
+  let panel = document.getElementById('__debug-panel__');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = '__debug-panel__';
+    panel.style.cssText = 'position:fixed;top:60px;right:16px;width:320px;max-height:85vh;overflow-y:auto;background:rgba(8,8,14,0.97);border:1px solid rgba(68,102,255,0.4);border-radius:10px;z-index:99999;font-family:var(--font-mono);font-size:11px;color:var(--text);box-shadow:0 8px 40px rgba(0,0,0,0.8),0 0 0 1px rgba(68,102,255,0.2);scrollbar-width:thin;';
+    document.body.appendChild(panel);
+  }
+  _renderDebugPanel(panel);
+}
+
+function closeDebugMenu(){
+  _debugOpen = false;
+  const p = document.getElementById('__debug-panel__');
+  if(p) p.remove();
+  if(_perfPanelOpen) _stopPerfPanel();
+}
+
+function _renderDebugPanel(panel){
+  const isVip = cud?.roles?.includes('vip');
+  const isOwner = cud?.username === 'owner';
+  panel.innerHTML = `
+    <div style="padding:12px 14px;border-bottom:1px solid rgba(68,102,255,0.25);display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:12px;letter-spacing:2px;color:#4466ff;">⚙ DEBUG MENU</span>
+      <span style="font-size:9px;color:var(--text-dim);">RIGHT ALT to close</span>
+    </div>
+    <div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
+
+      <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:4px;">VISUAL</div>
+
+      <button onclick="N._toggleDrunkMode()" style="display:flex;align-items:center;gap:8px;background:${_drunkMode?'rgba(255,100,50,0.2)':'rgba(255,255,255,0.04)'};border:1px solid ${_drunkMode?'rgba(255,100,50,0.5)':'rgba(255,255,255,0.1)'};color:${_drunkMode?'#ff7040':'var(--text)'};padding:8px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">
+        🍺 Drunk Mode <span style="margin-left:auto;font-size:9px;color:${_drunkMode?'#ff7040':'var(--text-dim)'};">${_drunkMode?'ON':'OFF'}</span>
+      </button>
+
+      <button onclick="N._togglePerfPanel()" style="display:flex;align-items:center;gap:8px;background:${_perfPanelOpen?'rgba(0,212,255,0.15)':'rgba(255,255,255,0.04)'};border:1px solid ${_perfPanelOpen?'rgba(0,212,255,0.4)':'rgba(255,255,255,0.1)'};color:${_perfPanelOpen?'#00d4ff':'var(--text)'};padding:8px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">
+        📊 Performance Panel <span style="margin-left:auto;font-size:9px;">${_perfPanelOpen?'OPEN':'CLOSED'}</span>
+      </button>
+
+      <button onclick="N._maxFps()" style="display:flex;align-items:center;gap:8px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.25);color:#00ff88;padding:8px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">
+        ⚡ Max FPS Mode — strip all effects
+      </button>
+
+      <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">STATE</div>
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;line-height:1.7;">
+        <div>acid: <span style="color:#4466ff;">${acid||'none'}</span></div>
+        <div>uid: <span style="color:#4466ff;">${cu?.uid?.slice(0,12)||'—'}…</span></div>
+        <div>username: <span style="color:#4466ff;">${cud?.username||'—'}</span></div>
+        <div>msgCount: <span style="color:#4466ff;">${cud?.msgCount||0}</span></div>
+        <div>roles: <span style="color:#4466ff;">${(cud?.roles||[]).join(', ')||'none'}</span></div>
+        <div>bgEffect: <span style="color:#4466ff;">${cud?.bgEffect||'—'}</span></div>
+        <div>uCache size: <span style="color:#4466ff;">${Object.keys(uCache||{}).length} users</span></div>
+        <div>aChats: <span style="color:#4466ff;">${Object.keys(aChats||{}).length} active</span></div>
+        <div>animBg running: <span style="color:#4466ff;">${Object.keys(_animBgState||{}).length}</span></div>
+      </div>
+
+      <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">ACTIONS</div>
+      <button onclick="navigator.clipboard?.writeText(JSON.stringify(cud,null,2));N._dbgToast('cud copied!')" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:7px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">📋 Copy cud as JSON</button>
+      <button onclick="navigator.clipboard?.writeText(JSON.stringify(Object.fromEntries(Object.entries(uCache||{}).map(([k,v])=>[k,v.username])),null,2));N._dbgToast('uCache copied!')" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);color:var(--text);padding:7px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;width:100%;text-align:left;">📋 Copy uCache usernames</button>
+
+      <div style="font-size:9px;color:var(--text-dim);margin-top:4px;line-height:1.6;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">Firestore reads this session: <b style="color:#4466ff;">${_perfSessionReads}</b><br>Firestore writes this session: <b style="color:#4466ff;">${_perfSessionWrites}</b></div>
+    </div>`;
+}
+
+function _dbgToast(msg){ toast(msg, 'success'); }
+
+// ── DRUNK MODE ──
+function _toggleDrunkMode(){
+  _drunkMode = !_drunkMode;
+  if(_drunkMode){
+    let _dt = 0;
+    const _dEl = document.getElementById('app-screen');
+    const _dLoop = () => {
+      if(!_drunkMode){ if(_dEl) _dEl.style.transform=''; return; }
+      _dt += 0.025;
+      const wx = Math.sin(_dt*0.7)*2.5, wy = Math.cos(_dt*0.5)*1.5, rot = Math.sin(_dt*0.4)*0.6;
+      if(_dEl) _dEl.style.transform = `translate(${wx}px,${wy}px) rotate(${rot}deg)`;
+      _drunkRaf = requestAnimationFrame(_dLoop);
+    };
+    _drunkRaf = requestAnimationFrame(_dLoop);
+    toast('🍺 Drunk mode ON','success');
+  } else {
+    if(_drunkRaf) cancelAnimationFrame(_drunkRaf);
+    const _dEl = document.getElementById('app-screen');
+    if(_dEl) _dEl.style.transform = '';
+    toast('Drunk mode OFF','success');
+  }
+  const p = document.getElementById('__debug-panel__');
+  if(p) _renderDebugPanel(p);
+}
+
+// ── PERFORMANCE PANEL ──
+function _togglePerfPanel(){
+  _perfPanelOpen ? _stopPerfPanel() : _startPerfPanel();
+  const p = document.getElementById('__debug-panel__');
+  if(p) _renderDebugPanel(p);
+}
+
+function _startPerfPanel(){
+  _perfPanelOpen = true;
+  let el = document.getElementById('__perf-panel__');
+  if(!el){
+    el = document.createElement('div');
+    el.id = '__perf-panel__';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;width:260px;background:rgba(4,4,10,0.95);border:1px solid rgba(0,212,255,0.3);border-radius:8px;z-index:99998;font-family:var(--font-mono);font-size:10px;color:#00d4ff;padding:10px 12px;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  _perfLastFrame = performance.now();
+  _perfFrameTimes = [];
+  const loop = (now) => {
+    if(!_perfPanelOpen) return;
+    const dt = now - _perfLastFrame; _perfLastFrame = now;
+    _perfFrameTimes.push(dt);
+    if(_perfFrameTimes.length > 60) _perfFrameTimes.shift();
+    const fps = Math.round(1000 / (_perfFrameTimes.reduce((a,b)=>a+b,0) / _perfFrameTimes.length));
+    const maxDt = Math.round(Math.max(..._perfFrameTimes));
+    const mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize/1048576) : '?';
+    const memMax = performance.memory ? Math.round(performance.memory.jsHeapSizeLimit/1048576) : '?';
+    const animRunning = Object.keys(_animBgState||{}).length;
+    const particles = Object.values(_animBgState||{}).reduce((s,v)=>s+(v.particles?.length||0),0);
+    const rafCount = typeof BgEffects !== 'undefined' && BgEffects.rafId ? 1 : 0;
+    el.innerHTML =
+      '<div style="font-size:9px;letter-spacing:2px;color:rgba(0,212,255,0.5);margin-bottom:6px;">◈ PERFORMANCE</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;">' +
+      '<div>FPS <span style="float:right;color:'+(fps>=55?'#00ff88':fps>=30?'#ffaa00':'#ff4444')+';">'+fps+'</span></div>' +
+      '<div>Worst frame <span style="float:right;color:'+(maxDt<20?'#00ff88':maxDt<33?'#ffaa00':'#ff4444')+';">'+maxDt+'ms</span></div>' +
+      '<div>JS Heap <span style="float:right;">'+mem+'MB</span></div>' +
+      '<div>Heap limit <span style="float:right;">'+memMax+'MB</span></div>' +
+      '<div>Anim BGs <span style="float:right;">'+animRunning+'</span></div>' +
+      '<div>Particles <span style="float:right;">'+particles+'</span></div>' +
+      '<div>BgEffect RAF <span style="float:right;">'+rafCount+'</span></div>' +
+      '<div>uCache <span style="float:right;">'+Object.keys(uCache||{}).length+'</span></div>' +
+      '</div>';
+    _perfRaf = requestAnimationFrame(loop);
+  };
+  _perfRaf = requestAnimationFrame(loop);
+}
+
+function _stopPerfPanel(){
+  _perfPanelOpen = false;
+  if(_perfRaf) cancelAnimationFrame(_perfRaf);
+  const el = document.getElementById('__perf-panel__');
+  if(el) el.remove();
+}
+
+// ── MAX FPS MODE ──
+function _maxFps(){
+  // Stop all animated backgrounds
+  Object.keys(_animBgState||{}).forEach(k => stopAnimBg(k));
+  // Stop BgEffects loop
+  if(typeof BgEffects !== 'undefined') BgEffects.stop();
+  // Stop drunk mode
+  if(_drunkMode){ _drunkMode=false; if(_drunkRaf) cancelAnimationFrame(_drunkRaf); const el=document.getElementById('app-screen'); if(el) el.style.transform=''; }
+  // Clear all CSS animations on avatar frames
+  document.querySelectorAll('.avatar-frame').forEach(el=>{ el.style.animation='none'; });
+  // Disable the BG effect
+  applyBgEffect('none');
+  toast('⚡ Max FPS mode — all effects stripped','success');
+  const p = document.getElementById('__debug-panel__');
+  if(p) _renderDebugPanel(p);
+}
+
 function setBgEffect(id){
   unlockAch('bg_effect');
   BgEffects.set(id);
@@ -19156,7 +19332,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, openBgEffectModal, applyBgEffect, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
