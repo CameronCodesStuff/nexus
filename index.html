@@ -2834,10 +2834,6 @@ const THEMES=[
   {id:'amber',  name:'AMBER',   c:['#ff9900','#ffcc44']},
   {id:'crimson',name:'CRIMSON', c:['#ff1a3c','#ff6688']},
   {id:'arctic', name:'ARCTIC',  c:['#00c8ff','#88eeff']},
-  {id:'vip_obsidian', name:'OBSIDIAN GOLD', c:['#1a1200','#f0b824'], vipOnly:true},
-  {id:'vip_blood',    name:'BLOOD MOON',    c:['#1a0005','#cc2233'], vipOnly:true},
-  {id:'vip_void',     name:'VOID NEXUS',    c:['#000010','#1a6fff'], vipOnly:true},
-  {id:'vip_emerald',  name:'DARK EMERALD',  c:['#000d0a','#00b894'], vipOnly:true},
 ];
 
 // ── UTILS ──────────────────────────────────────
@@ -4320,51 +4316,36 @@ function openVipModal(){
   const profileBgSec=document.getElementById('vip-profile-bg-section');
   if(profileBgSec) profileBgSec.style.display=isVip?'block':'none';
   if(isVip){
-    const bgGrid=document.getElementById('vip-profile-bg-grid');
-    if(bgGrid&&bgGrid.children.length===0){
-      const VIP_PROFILE_BGS=[
-        {id:'vip_gold_grad',label:'Royal Gold',css:'linear-gradient(135deg,#1a1200,#3d2c00,#1a1200)'},
-        {id:'vip_deep_space',label:'Deep Space',css:'linear-gradient(135deg,#000010,#0a0030,#000510)'},
-        {id:'vip_crimson',label:'Crimson Dark',css:'linear-gradient(135deg,#1a0005,#2d0010,#0a0000)'},
-        {id:'vip_teal',label:'Abyss Teal',css:'linear-gradient(135deg,#000d0d,#001a1a,#000808)'},
-        {id:'vip_aurora',label:'Aurora',css:'linear-gradient(135deg,#000810,#001a20,#080010)'},
-        {id:'vip_void',label:'Void Purple',css:'linear-gradient(135deg,#080010,#150025,#040008)'},
+    const bgSwatches=document.getElementById('vip-profile-bg-swatches');
+    if(bgSwatches){
+      bgSwatches.innerHTML='';
+      const PRESET_COLS=[
+        {hex:'#0a0a0a',label:'Near Black'},
+        {hex:'#1a1a2e',label:'Midnight Blue'},
+        {hex:'#0d0d1a',label:'Deep Space'},
+        {hex:'#1a0a00',label:'Dark Amber'},
+        {hex:'#0a001a',label:'Deep Violet'},
+        {hex:'#001a0a',label:'Dark Green'},
+        {hex:'#1a000a',label:'Deep Crimson'},
+        {hex:'#000d1a',label:'Navy'},
+        {hex:'#1a1400',label:'Dark Gold'},
+        {hex:'#0a0a1a',label:'Slate'},
       ];
-      VIP_PROFILE_BGS.forEach(bg=>{
+      const currentBg=cud?.vipProfileBg||'';
+      PRESET_COLS.forEach(col=>{
         const btn=document.createElement('button');
-        const active=cud?.vipProfileBg===bg.id;
-        btn.style.cssText='width:70px;height:36px;border-radius:6px;cursor:pointer;border:2px solid '+(active?'#f0b824':'rgba(255,255,255,0.15)')+';background:'+bg.css+';font-family:var(--font-mono);font-size:8px;color:rgba(255,255,255,0.6);overflow:hidden;transition:all 0.15s;';
-        btn.title=bg.label;
-        btn.onclick=()=>N.saveVipProfileBg(bg.id);
-        bgGrid.appendChild(btn);
+        const active=currentBg===col.hex;
+        btn.style.cssText='width:36px;height:36px;border-radius:8px;cursor:pointer;border:2px solid '+(active?'#f0b824':'rgba(255,255,255,0.12)')+';background:'+col.hex+';transition:all 0.15s;flex-shrink:0;';
+        btn.title=col.label;
+        btn.onclick=()=>N.saveVipProfileBg(col.hex);
+        bgSwatches.appendChild(btn);
       });
+      // Set colour picker to current value if it's a hex colour
+      const picker=document.getElementById('vip-profile-bg-picker');
+      if(picker&&currentBg.startsWith('#')&&currentBg.length===7) picker.value=currentBg;
     }
   }
-  // Themes section
-  const themesSec=document.getElementById('vip-themes-section');
-  if(themesSec) themesSec.style.display=isVip?'block':'none';
-  if(isVip){
-    const tGrid=document.getElementById('vip-themes-grid');
-    if(tGrid&&tGrid.children.length===0){
-      const VIP_THEMES=[
-        {id:'vip_obsidian',name:'OBSIDIAN GOLD',desc:'Dark obsidian with gold accents',c:['#1a1200','#f0b824']},
-        {id:'vip_blood',name:'BLOOD MOON',desc:'Deep crimson midnight',c:['#1a0005','#cc2233']},
-        {id:'vip_void',name:'VOID NEXUS',desc:'Pure void with electric blue',c:['#000010','#1a6fff']},
-        {id:'vip_emerald',name:'DARK EMERALD',desc:'Rich emerald depths',c:['#000d0a','#00b894']},
-      ];
-      VIP_THEMES.forEach(t=>{
-        const row=document.createElement('div');
-        const active=curTheme===t.id;
-        row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;background:rgba(255,255,255,0.03);border:1px solid '+(active?'rgba(240,184,36,0.5)':'rgba(255,255,255,0.06)')+';cursor:pointer;transition:all 0.15s;';
-        row.innerHTML='<div style="width:28px;height:28px;border-radius:4px;background:linear-gradient(135deg,'+t.c[0]+','+t.c[1]+');flex-shrink:0;"></div>'
-          +'<div><div style="font-size:11px;font-family:var(--font-mono);color:'+(active?'#f0b824':'var(--text)')+';">'+t.name+'</div>'
-          +'<div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">'+t.desc+'</div></div>'
-          +(active?'<span style="margin-left:auto;font-size:9px;color:#f0b824;">✓</span>':'');
-        row.onclick=()=>{if(!cud?.roles?.includes('vip'))return;applyTheme(t.id);openVipModal();};
-        tGrid.appendChild(row);
-      });
-    }
-  }
+
   // Pre-fill custom role inputs if already set
   if(isVip&&cud?.vipCustomRole){
     const colorEl=document.getElementById('vip-role-color');
@@ -4394,7 +4375,7 @@ async function saveVipProfileBg(val){
   await updateDoc(doc(db,'users',cu.uid),{vipProfileBg:val});
   cud={...cud,vipProfileBg:val};
   uCache[cu.uid]={...uCache[cu.uid],vipProfileBg:val};
-  toast('🖼️ Profile background set!','success');
+  toast('🎨 Profile background updated!','success');
   openVipModal();
 }
 
@@ -7056,18 +7037,8 @@ function openProfileModal(uid){
     candy:'linear-gradient(135deg,#f953c6,#b91d73)',
     aurora:'linear-gradient(135deg,#00c9ff,#92fe9d)',
     lava:'linear-gradient(135deg,#200122,#6f0000)',
-    neon:'linear-gradient(135deg,#00ff87,#60efff)',
-    vip_gold_grad:'linear-gradient(135deg,#1a1200,#3d2c00,#1a1200)',
-    vip_deep_space:'linear-gradient(135deg,#000010,#0a0030,#000510)',
-    vip_crimson:'linear-gradient(135deg,#1a0005,#2d0010,#0a0000)',
-    vip_teal:'linear-gradient(135deg,#000d0d,#001a1a,#000808)',
-    vip_aurora:'linear-gradient(135deg,#000810,#001a20,#080010)',
-    vip_void:'linear-gradient(135deg,#080010,#150025,#040008)',
-  };
-  // VIPs can override banner with their vipProfileBg selection
-  const bType=(u.roles?.includes('vip')&&u.vipProfileBg&&u.vipProfileBg!=='none')
-    ? (BANNER_STYLES[u.vipProfileBg] ? u.vipProfileBg : (u.banner||'default'))
-    : (u.banner||'default');
+    neon:'linear-gradient(135deg,#00ff87,#60efff)'  };
+  const bType=u.banner||'default';
   let bannerBg='',bannerImgSrc='';
   if(bType==='data'&&u.bannerData) bannerImgSrc=u.bannerData;
   else if(bType==='url'&&u.bannerUrl) bannerImgSrc=u.bannerUrl;
@@ -7075,6 +7046,15 @@ function openProfileModal(uid){
   const bannerInner=bannerImgSrc?`<img src="${esc(bannerImgSrc)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px 10px 0 0;" alt="" onerror="this.style.display='none'">`:'' ;
   const bannerStyle=bannerBg?`background:${bannerBg}`:'background:#111';
   const container=$('profile-modal-content');
+  // Apply VIP profile bg colour to the modal body
+  const _vipBg = u.roles?.includes('vip') && u.vipProfileBg ? u.vipProfileBg : '';
+  if(_vipBg) {
+    const _modalDiv = container?.parentElement;
+    if(_modalDiv) _modalDiv.style.background = _vipBg;
+  } else {
+    const _modalDiv = container?.parentElement;
+    if(_modalDiv) _modalDiv.style.background = '';
+  }
   const isBlocked=(cud?.blocked||[]).includes(uid);
   const deviceEmoji=u.device==='mobile'?'📱':'💻';
   const _profFr=AVATAR_FRAMES[u.avatarFrame||'none'];
@@ -20565,17 +20545,15 @@ function makePollCard(poll,isOw){
       <div id="vip-role-preview" style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);min-height:18px;"></div>
     </div>
     <div id="vip-profile-bg-section" style="display:none;padding:0 20px 16px;">
-      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;">Profile Card Background</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="vip-profile-bg-grid"></div>
-      <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
-        <input type="text" id="vip-profile-bg-url" placeholder="Or paste image URL…" style="flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:10px;padding:6px 10px;border-radius:7px;outline:none;">
-        <button onclick="N.saveVipProfileBg(document.getElementById('vip-profile-bg-url').value)" style="background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:6px 10px;border-radius:7px;cursor:pointer;">SET</button>
+      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;">Profile Background Colour</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="vip-profile-bg-swatches"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="color" id="vip-profile-bg-picker" value="#1a1a2e" style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:2px;flex-shrink:0;">
+        <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);">Custom colour</span>
+        <button onclick="N.saveVipProfileBg(document.getElementById('vip-profile-bg-picker').value)" style="margin-left:auto;background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:6px 12px;border-radius:7px;cursor:pointer;">SET</button>
       </div>
     </div>
-    <div id="vip-themes-section" style="display:none;padding:0 20px 16px;">
-      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;">Exclusive VIP Themes</div>
-      <div style="display:flex;flex-direction:column;gap:6px;" id="vip-themes-grid"></div>
-    </div>
+
     <div style="padding:0 20px 20px;">
       <button id="vip-cta-btn"
  onclick="N.startVipCheckout()" style="width:100%;padding:11px;background:rgba(240,184,36,0.12);border:1px solid rgba(240,184,36,0.35);border-radius:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:2px;color:#f0b824;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(240,184,36,0.2)'" onmouseout="this.style.background='rgba(240,184,36,0.12)'">
