@@ -1339,7 +1339,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
           <div style="font-size:13px;font-family:var(--font-mono);color:var(--text);margin-bottom:3px;">Show V.I.P in ••• Menu</div>
           <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);" id="vip-visibility-label">Visible</div>
         </div>
-        <button id="vip-visibility-btn" onclick="N.toggleVipMenuVisibility()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-display);font-size:9px;letter-spacing:2px;padding:7px 14px;border-radius:7px;cursor:pointer;transition:all 0.2s;min-width:64px;">SHOW</button>
+        <button id="vip-visibility-btn" onclick="N.toggleVipMenuVisibility()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-display);font-size:9px;letter-spacing:2px;padding:7px 14px;border-radius:7px;cursor:pointer;transition:all 0.2s;min-width:64px;">HIDE</button>
       </div>
     </div>
     <div class="settings-section" id="settings-notif-section">
@@ -7057,8 +7057,17 @@ function openProfileModal(uid){
     aurora:'linear-gradient(135deg,#00c9ff,#92fe9d)',
     lava:'linear-gradient(135deg,#200122,#6f0000)',
     neon:'linear-gradient(135deg,#00ff87,#60efff)',
+    vip_gold_grad:'linear-gradient(135deg,#1a1200,#3d2c00,#1a1200)',
+    vip_deep_space:'linear-gradient(135deg,#000010,#0a0030,#000510)',
+    vip_crimson:'linear-gradient(135deg,#1a0005,#2d0010,#0a0000)',
+    vip_teal:'linear-gradient(135deg,#000d0d,#001a1a,#000808)',
+    vip_aurora:'linear-gradient(135deg,#000810,#001a20,#080010)',
+    vip_void:'linear-gradient(135deg,#080010,#150025,#040008)',
   };
-  const bType=u.banner||'default';
+  // VIPs can override banner with their vipProfileBg selection
+  const bType=(u.roles?.includes('vip')&&u.vipProfileBg&&u.vipProfileBg!=='none')
+    ? (BANNER_STYLES[u.vipProfileBg] ? u.vipProfileBg : (u.banner||'default'))
+    : (u.banner||'default');
   let bannerBg='',bannerImgSrc='';
   if(bType==='data'&&u.bannerData) bannerImgSrc=u.bannerData;
   else if(bType==='url'&&u.bannerUrl) bannerImgSrc=u.bannerUrl;
@@ -8552,6 +8561,22 @@ async function loadOwnerUsers(){
       const mkBtn=(label,danger,fn)=>{const b=document.createElement('button');b.className='btn-small';b.style.cssText='font-size:10px;'+(danger?'border-color:var(--danger);color:var(--danger);':'');b.textContent=label;b.onclick=fn;return b;};
       acts.appendChild(mkBtn('🔑 LOGIN AS',false,()=>adminQuickLogin(u.id,u.username||'',u.displayName||'User')));
       acts.appendChild(mkBtn('🗑 DELETE',true,()=>adminDeleteAccount(u.id,esc(u.displayName||u.id))));
+      // VIP grant/revoke
+      const hasVip=(u.roles||[]).includes('vip');
+      const vipBtn=mkBtn(hasVip?'👑 REVOKE VIP':'👑 GRANT VIP',false,async()=>{
+        if(hasVip){
+          const newRoles=(u.roles||[]).filter(r=>r!=='vip');
+          await updateDoc(doc(db,'users',u.id),{roles:newRoles});
+          await deleteDoc(doc(db,'vipMembers',u.id)).catch(()=>{});
+          toast('VIP revoked from '+esc(u.displayName||u.id),'success');
+        } else {
+          await grantVip(u.id);
+          toast('👑 VIP granted to '+esc(u.displayName||u.id),'success');
+        }
+        loadOwnerUsers();
+      });
+      vipBtn.style.cssText+='border-color:#f0b824;color:#f0b824;';
+      acts.appendChild(vipBtn);
       card.appendChild(acts);
       panel.appendChild(card);
     });
@@ -10253,7 +10278,11 @@ function drawDailyWheel(canvas){
 
 async function spinDailyWheel(){
   if(_wheelSpinning) return;
-  if(_wheelSpinsLeft()<=0) return;
+  const _spinsLeft = _wheelSpinsLeft();
+  if(_spinsLeft<=0){
+    toast('No spins left today! Come back tomorrow.','danger');
+    return;
+  }
   const canvas=document.getElementById('daily-wheel-canvas');
   const btn=document.getElementById('wheel-spin-btn');
   const resultDiv=document.getElementById('wheel-result');
@@ -10299,6 +10328,9 @@ async function _grantWheelPrize(prize){
     const today=getDailyKey();
     const spinsUsed=((cud?.wheelSpinDay||'')===today?(cud?.wheelSpinsUsed||0):0)+1;
     const updates={wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
+    // Update cud immediately so _wheelSpinsLeft() is accurate for the button re-render
+    cud={...cud,wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
+    if(cu&&uCache[cu.uid]) uCache[cu.uid]={...uCache[cu.uid],wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
     const newMsgs=(cud?.msgCount||0)+prize.msgs;
     updates.msgCount=newMsgs;
     // Grant Lucky role if applicable
@@ -12416,21 +12448,44 @@ function _maxFps(){
     theme: curTheme,
     avatarAnimations: Array.from(document.querySelectorAll('.avatar-frame')).map(el=>({el,anim:el.style.animation,boxShadow:el.style.boxShadow,filter:el.style.filter})),
     bodyFilter: document.body.style.filter,
+    sfDisplay: document.getElementById('starfield')?.style.display||'',
     appFilter: document.getElementById('app-screen')?.style.filter||'',
   };
-  // Stop all animated backgrounds
+  // 1. Stop ALL animated canvas backgrounds
   Object.keys(_animBgState||{}).forEach(k => stopAnimBg(k));
-  // Stop BgEffects loop
   if(typeof BgEffects !== 'undefined') BgEffects.stop();
-  // Stop drunk mode
-  if(_drunkMode){ _drunkMode=false; if(_drunkRaf) cancelAnimationFrame(_drunkRaf); const el=document.getElementById('app-screen'); if(el) el.style.transform=''; }
-  // Strip all avatar frame animations
-  document.querySelectorAll('.avatar-frame').forEach(el=>{ el.style.animation='none'; el.style.boxShadow='none'; el.style.filter='none'; });
-  // Apply grayscale + reduce colours to minimum
+
+  // 2. Stop drunk mode
+  if(_drunkMode){ _drunkMode=false; if(_drunkRaf) cancelAnimationFrame(_drunkRaf); const _app2=document.getElementById('app-screen');if(_app2){_app2.style.transform='';_app2.style.filter='';} }
+
+  // 3. Strip ALL CSS animations/transitions app-wide
+  const _perfStyle = document.createElement('style');
+  _perfStyle.id = '__perf-mode-style__';
+  _perfStyle.textContent = `
+    *,*::before,*::after {
+      animation: none !important;
+      transition: none !important;
+      box-shadow: none !important;
+    }
+    .avatar-frame { animation: none !important; box-shadow: none !important; filter: none !important; }
+    canvas#starfield { display: none !important; }
+  `;
+  document.head.appendChild(_perfStyle);
+
+  // 4. Hide the starfield canvas entirely
+  const sf = document.getElementById('starfield');
+  if(sf) sf.style.display='none';
+
+  // 5. Force GPU compositing layer reset — kills most paint cost
   const app = document.getElementById('app-screen');
-  if(app) app.style.filter='grayscale(0.85) contrast(0.9)';
-  // Disable the BG effect
-  if(typeof BgEffects !== 'undefined') BgEffects.set('none');
+  if(app){ app.style.filter='grayscale(0.7)'; app.style.willChange='auto'; }
+
+  // 6. Throttle message rendering (suppress re-renders)
+  window.__perfModeThrottle = true;
+
+  // 7. Remove all particle canvases injected by animations
+  document.querySelectorAll('[id^="__bg-effect"]').forEach(el=>el.remove());
+
   toast('⚡ Performance mode ON — click again to restore','success');
   const p = document.getElementById('__debug-panel__');
   if(p) _renderDebugPanel(p);
@@ -12441,12 +12496,20 @@ function _restoreFromPerfMode(){
   _perfModeActive = false;
   const snap = _perfModeSnapshot;
   if(!snap) return;
+  // Remove the perf-mode style injection
+  const _ps = document.getElementById('__perf-mode-style__');
+  if(_ps) _ps.remove();
+  // Restore starfield
+  const sf2 = document.getElementById('starfield');
+  if(sf2) sf2.style.display='';
   // Restore app filter
   const app = document.getElementById('app-screen');
-  if(app) app.style.filter = snap.appFilter;
+  if(app){ app.style.filter=snap.appFilter; app.style.willChange=''; }
   document.body.style.filter = snap.bodyFilter;
   // Restore avatar frame animations
   snap.avatarAnimations.forEach(({el,anim,boxShadow,filter})=>{ el.style.animation=anim; el.style.boxShadow=boxShadow; el.style.filter=filter; });
+  // Clear throttle
+  delete window.__perfModeThrottle;
   // Restore background effect
   if(typeof BgEffects !== 'undefined') BgEffects.set(snap.bgEffect);
   // Restore drunk mode if it was on
