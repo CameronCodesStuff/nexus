@@ -12534,31 +12534,62 @@ function _applyPerfModeDOM(){
     const s=document.createElement('style');
     s.id='__perf-mode-style__';
     s.textContent=`
-      *,*::before,*::after {
+      /* ── PERF MODE — clean minimal UI ── */
+
+      /* Kill all animations and transitions globally */
+      *, *::before, *::after {
         animation: none !important;
         transition: none !important;
+      }
+
+      /* Remove glows and shadows (these cost GPU paint) */
+      .avatar-frame, .msg-avatar, .user-item,
+      .sidebar-footer, .modal, .modal-overlay {
+        box-shadow: none !important;
+      }
+
+      /* Hide avatar frames and VIP effects */
+      .avatar-frame { display: none !important; }
+      .vip-sparkle, .name-particle, .__vip-particle__ { display: none !important; }
+
+      /* Hide the starfield background canvas */
+      canvas#starfield { display: none !important; }
+
+      /* Sidebar — hide profile pictures, show only names */
+      .sidebar-footer .msg-avatar,
+      .sidebar-footer img,
+      .user-item .msg-avatar,
+      .user-item img { display: none !important; }
+
+      /* Hide sidebar banners and decorative images */
+      .profile-banner { display: none !important; }
+      .banner-card { display: none !important; }
+
+      /* Hide message avatars (replace with minimal layout) */
+      .msg-avatar { visibility: hidden !important; width: 4px !important; min-width: 4px !important; }
+
+      /* No gradient glow on sidebar logo — just use plain text */
+      .sidebar-logo {
+        background: none !important;
+        -webkit-text-fill-color: var(--text) !important;
+        color: var(--text) !important;
+      }
+
+      /* Strip role badge glows */
+      [class^="role-"], [class*=" role-"] {
+        animation: none !important;
         box-shadow: none !important;
         text-shadow: none !important;
-        filter: none !important;
       }
-      /* Strip avatar frames completely */
-      .avatar-frame { display: none !important; }
-      /* Strip VIP sparkles */
-      .vip-sparkle { display: none !important; }
-      /* Strip name particles */
-      .name-particle, .__vip-particle__, [class*="sparkle"], [class*="particle"] { display: none !important; }
-      /* Hide starfield + all animation canvases */
-      canvas#starfield, canvas.anim-bg-canvas { display: none !important; }
-      /* Strip profile backgrounds */
-      .profile-banner { background: #111 !important; }
-      /* Flatten all gradients to solid backgrounds */
-      .msg-bubble, .message, [class*="bubble"] { background: var(--bg2) !important; }
-      /* No glow on avatars */
-      .avatar, [class*="avatar"] { box-shadow: none !important; filter: none !important; }
-      /* No emoji animations */
-      .emoji-reaction, [class*="reaction"] { animation: none !important; transform: none !important; }
-      /* Disable image rendering hints */
-      img { image-rendering: pixelated; }
+
+      /* Clean flat backgrounds — no gradients hurting paint */
+      .user-item:hover { background: rgba(255,255,255,0.04) !important; }
+
+      /* Hide decorative images in chat */
+      .msg-image-wrap img { opacity: 0.6 !important; }
+
+      /* No emoji reaction animations */
+      .reaction-btn, [class*="react"] { animation: none !important; transform: none !important; }
     `;
     document.head.appendChild(s);
   }
@@ -12575,8 +12606,9 @@ function _applyPerfModeDOM(){
   // Hide starfield
   const sf=document.getElementById('starfield');if(sf)sf.style.display='none';
   // Light grayscale on app-screen only (not blocking anything)
+  // No filter on app-screen — avoids black block issues from stacking filters
   const app=document.getElementById('app-screen');
-  if(app){app.style.filter='grayscale(0.6)';app.style.willChange='auto';}
+  if(app){app.style.filter='';app.style.willChange='auto';}
   // Trim uCache to only active users
   try{
     const activeUids=new Set();
@@ -12614,7 +12646,7 @@ function _restoreFromPerfMode(){
   const ps=document.getElementById('__perf-mode-style__');if(ps)ps.remove();
   const sf=document.getElementById('starfield');if(sf)sf.style.display=snap?.sfDisplay||'';
   const app=document.getElementById('app-screen');
-  if(app){app.style.filter=snap?.appFilter||'';app.style.willChange=snap?.appWillChange||'';}
+  if(app){app.style.filter='';app.style.willChange='';}
   document.body.style.filter=snap?.bodyFilter||'';
   delete window.__perfModeThrottle;
   if(typeof BgEffects!=='undefined'&&snap?.bgEffect) BgEffects.set(snap.bgEffect);
