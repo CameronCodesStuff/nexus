@@ -4326,21 +4326,18 @@ let _gifPickerOpen=false;
 let _gifSearchTimer=null;
 
 const VIP_PERKS=[
-  {icon:'👑',label:'VIP Role Badge',desc:'Gold crown badge next to your name everywhere'},
-  {icon:'🎰',label:'10 Wheel Spins / Day',desc:'Ten daily spins instead of one'},
-  {icon:'🎨',label:'Custom Bubble Colour',desc:'Your messages glow in any colour you choose'},
-  {icon:'✍️',label:'500-char Bio + Markdown',desc:'Longer bio with *bold* and _italic_ support'},
-  {icon:'🎵',label:'Profile Music',desc:'Spotify or YouTube link on your profile card'},
-  {icon:'⭐',label:'Priority User List',desc:'Always near the top of the online users list'},
-  {icon:'🟡',label:'Gold Typing Indicator',desc:'Your typing shows in gold for all to see'},
-  {icon:'⚡',label:'×2 Message Multiplier',desc:'Every message earns 2 points instead of 1'},
-  {icon:'🎨',label:'VIP Avatar Frame',desc:'Exclusive animated gold frame — far beyond any earnable tier'},
-  {icon:'💬',label:'+50,000 Messages',desc:'Instant boost added to your message count'},
-  {icon:'📅',label:'+2,500 Msgs / Day',desc:'Automatically credited every day you log in'},
-  {icon:'🎰',label:'5 Wheel Spins / Day',desc:'Five spins on the daily wheel instead of one'},
-  {icon:'🏷️',label:'Custom Role Badge',desc:'Set any name and colour for your own role badge'},
-  {icon:'🖼️',label:'Profile Card Background',desc:'Custom gradient or image behind your profile'},
-  {icon:'🎨',label:'Exclusive Themes',desc:'VIP-only colour themes not available to others'},
+  {icon:'👑',label:'VIP Role Badge',desc:'Gold crown badge shown next to your name everywhere'},
+  {icon:'🖼️',label:'VIP Avatar Frame',desc:'Exclusive animated gold frame — unique to VIP members'},
+  {icon:'💬',label:'+50,000 Messages',desc:'Instant boost added to your message count on activation'},
+  {icon:'⚡',label:'×2 Message Multiplier',desc:'Every message you send earns 2 points instead of 1'},
+  {icon:'🎰',label:'10 Wheel Spins / Day',desc:'Ten daily wheel spins instead of one'},
+  {icon:'🎨',label:'Custom Bubble Colour',desc:'Pick any colour for your message bubbles'},
+  {icon:'✍️',label:'500-char Bio + Markdown',desc:'Extended bio with *bold*, _italic_ and `code` formatting'},
+  {icon:'🎵',label:'Profile Music',desc:'Link a Spotify or YouTube track to your profile card'},
+  {icon:'🎨',label:'Profile Background',desc:'Set a custom background colour behind your profile'},
+  {icon:'🏷️',label:'Custom Role Badge',desc:'Create your own role badge with any name and colour'},
+  {icon:'⭐',label:'Priority in User List',desc:'Always appear near the top of the online users list'},
+  {icon:'🟡',label:'Gold Typing Indicator',desc:'Your typing indicator appears in gold for everyone'},
 ];
 
 function openVipModal(){
@@ -10480,7 +10477,7 @@ function renderWheelSection(container){
     ?'display:block;margin:14px auto 0;padding:10px 32px;font-size:14px;font-family:var(--font-display);letter-spacing:2px;background:linear-gradient(45deg,#ffcc00,#ff6600);border:none;border-radius:50px;color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.4),0 0 16px rgba(255,204,0,0.4);transition:all 0.15s;'
     :'display:block;margin:14px auto 0;padding:10px 32px;font-size:14px;font-family:var(--font-display);letter-spacing:2px;background:#222;border:none;border-radius:50px;color:#555;cursor:not-allowed;';
   const spinLabel=canSpin?('🎪 SPIN! ('+(spinsLeft)+' left)'):('✓ '+(isVip?'5/5':'1/1')+' SPINS USED');
-  const subtext=canSpin?(isVip?spinsLeft+' of 5 spins remaining today':'Spin once per day for a prize!'):('Come back tomorrow for your next spin');
+  const subtext=canSpin?(isVip?spinsLeft+' of 10 spins remaining today':'Spin once per day for a prize!'):('Come back tomorrow for your next spin');
   section.innerHTML=
     '<div style="font-family:var(--font-display);font-size:11px;letter-spacing:2px;color:#ffcc00;margin-bottom:8px;text-align:center;">🎪 WHEEL OF FORTUNE</div>'
     +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);text-align:center;margin-bottom:12px;">'+subtext+'</div>'
