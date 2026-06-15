@@ -3957,6 +3957,7 @@ function oName(chat){const uid=chat.members?.find(m=>m!==cu.uid);return uCache[u
 
 // ── OPEN CHAT ──────────────────────────────────
 function openChat(cid){
+  if(_perfModeActive) setTimeout(_applyPerfModeDOM, 150);
   acid=cid;
   if(cu) updateDoc(doc(db,'users',cu.uid),{activeChatId:cid,activeChatTs:serverTimestamp()}).catch(()=>{});
   const chat=aChats[cid];
@@ -12357,6 +12358,11 @@ function _renderDebugPanel(panel){
         🍺 Drunk Mode <span style="margin-left:auto;font-size:9px;color:${_drunkMode?'#ff7040':'var(--text-dim)'};">${_drunkMode?'ON':'OFF'}</span>
       </button>
 
+      <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:4px;">FUN MODES</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+        ${_FUN_MODES.map(m=>`<button onclick="N._toggleFunMode('${m.id}')" title="${m.desc}" style="background:${_activeFunMode===m.id?'rgba(255,200,0,0.18)':'rgba(255,255,255,0.04)'};border:1px solid ${_activeFunMode===m.id?'rgba(255,200,0,0.5)':'rgba(255,255,255,0.08)'};color:${_activeFunMode===m.id?'#ffd700':'var(--text-dim)'};padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;text-align:left;">${m.label}</button>`).join('')}
+      </div>
+
       <div style="display:flex;gap:6px;">
         <button onclick="N._togglePerfPanel()" style="display:flex;align-items:center;gap:8px;background:${_perfPanelOpen?'rgba(0,212,255,0.15)':'rgba(255,255,255,0.04)'};border:1px solid ${_perfPanelOpen?'rgba(0,212,255,0.4)':'rgba(255,255,255,0.1)'};color:${_perfPanelOpen?'#00d4ff':'var(--text)'};padding:8px 10px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:11px;flex:1;text-align:left;">
           📊 Perf Panel <span style="margin-left:auto;font-size:9px;">${_perfPanelOpen?'OPEN':'CLOSED'}</span>
@@ -12400,26 +12406,28 @@ function _toggleDrunkMode(){
     const _dEl = document.getElementById('app-screen');
     const _dLoop = () => {
       if(!_drunkMode){ if(_dEl){_dEl.style.transform='';_dEl.style.filter='';} return; }
-      _dt += 0.018;
-      // Big wobbly translation + rotation + hue shift
-      const wx = Math.sin(_dt*0.9)*12 + Math.sin(_dt*2.3)*5;
-      const wy = Math.cos(_dt*0.6)*8 + Math.cos(_dt*1.8)*3;
-      const rot = Math.sin(_dt*0.5)*4 + Math.sin(_dt*1.2)*1.5;
-      const sc = 1 + Math.sin(_dt*0.7)*0.03;
-      const hue = Math.sin(_dt*0.3)*20;
+      _dt += 0.014;
+      const wx = Math.sin(_dt*0.7)*18 + Math.sin(_dt*2.1)*7 + Math.sin(_dt*3.7)*3;
+      const wy = Math.cos(_dt*0.5)*12 + Math.cos(_dt*1.6)*5 + Math.cos(_dt*4.1)*2;
+      const rot = Math.sin(_dt*0.4)*6 + Math.sin(_dt*1.1)*2.5;
+      const sc  = 1 + Math.sin(_dt*0.6)*0.04;
+      const blurAmt = Math.max(0, Math.sin(_dt*0.8)*3 + Math.sin(_dt*2.2)*1.5);
+      const hue = Math.sin(_dt*0.25)*35;
+      const sat = 1.3 + Math.sin(_dt*0.9)*0.5;
+      const bri = 0.95 + Math.sin(_dt*1.3)*0.08;
       if(_dEl){
         _dEl.style.transform = `translate(${wx}px,${wy}px) rotate(${rot}deg) scale(${sc})`;
-        _dEl.style.filter = `hue-rotate(${hue}deg) saturate(${1.2+Math.sin(_dt)*0.3})`;
+        _dEl.style.filter = `hue-rotate(${hue}deg) saturate(${sat}) brightness(${bri}) blur(${blurAmt}px)`;
       }
       _drunkRaf = requestAnimationFrame(_dLoop);
     };
     _drunkRaf = requestAnimationFrame(_dLoop);
-    toast('🍺 Drunk mode ON','success');
+    toast('🍺 Drunk mode ON — try walking in a straight line','success');
   } else {
     if(_drunkRaf) cancelAnimationFrame(_drunkRaf);
     const _dEl = document.getElementById('app-screen');
     if(_dEl){_dEl.style.transform='';_dEl.style.filter='';}
-    toast('Drunk mode OFF 🫡','success');
+    toast('Sober now 🫡','success');
   }
   const p = document.getElementById('__debug-panel__');
   if(p) _renderDebugPanel(p);
@@ -12512,6 +12520,8 @@ function _toggleFpsPin(){
 // ── MAX FPS MODE ──
 let _perfModeActive = false;
 let _perfModeSnapshot = null;
+let _activeFunMode = null;
+const _funModeRafs = {};
 
 function _maxFps(){
   if(_perfModeActive){ _restoreFromPerfMode(); return; }
@@ -12595,6 +12605,116 @@ function _restoreFromPerfMode(){
   const p = document.getElementById('__debug-panel__');
   if(p) _renderDebugPanel(p);
 }
+
+// ── FUN MODES ─────────────────────────────────────────────────────
+const _FUN_MODES = [
+  {id:'earthquake', label:'🌍 Earthquake',   desc:'Violent shake'},
+  {id:'mirror',     label:'🪞 Mirror',        desc:'Flip the whole UI'},
+  {id:'zoomout',    label:'🔭 Zoomed Out',    desc:'Tiny UI'},
+  {id:'vhs',        label:'📼 VHS',           desc:'Scanlines + glitch'},
+  {id:'nightvision',label:'🟢 Night Vision',  desc:'Grainy green tint'},
+  {id:'fisheye',    label:'🐟 Fisheye',       desc:'Warped perspective'},
+  {id:'matrix_ui',  label:'💀 Matrix UI',     desc:'Green on black'},
+];
+
+function _toggleFunMode(id){
+  const app = document.getElementById('app-screen');
+  if(!app) return;
+  if(_activeFunMode===id){
+    _activeFunMode=null;
+    Object.keys(_funModeRafs).forEach(k=>{cancelAnimationFrame(_funModeRafs[k]);delete _funModeRafs[k];});
+    document.querySelectorAll('.__fun-overlay__').forEach(el=>el.remove());
+    app.style.filter=''; app.style.transform=''; app.style.borderRadius=''; app.style.transition='';
+    const p=document.getElementById('__debug-panel__');if(p)_renderDebugPanel(p);
+    return;
+  }
+  // Clear previous
+  Object.keys(_funModeRafs).forEach(k=>{cancelAnimationFrame(_funModeRafs[k]);delete _funModeRafs[k];});
+  document.querySelectorAll('.__fun-overlay__').forEach(el=>el.remove());
+  app.style.filter=''; app.style.transform=''; app.style.borderRadius=''; app.style.transition='';
+  _activeFunMode=id;
+
+  if(id==='earthquake'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='earthquake') return;
+      _t+=0.06;
+      const mag=10+Math.sin(_t*3)*5;
+      app.style.transform=`translate(${(Math.random()-0.5)*mag*2}px,${(Math.random()-0.5)*mag}px) rotate(${(Math.random()-0.5)*2}deg)`;
+      _funModeRafs.earthquake=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='mirror'){
+    app.style.transform='scaleX(-1)';
+  }
+  else if(id==='zoomout'){
+    app.style.transform='scale(0.45) translateY(-55%)';
+    app.style.transformOrigin='top center';
+  }
+  else if(id==='vhs'){
+    app.style.filter='saturate(1.4) contrast(1.1)';
+    const ov=document.createElement('div');ov.className='__fun-overlay__';
+    ov.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483644;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.1) 2px,rgba(0,0,0,0.1) 4px);';
+    document.body.appendChild(ov);
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='vhs') return;
+      _t+=0.03;
+      const glitch=Math.sin(_t*7)*0.5+0.5>0.9;
+      app.style.transform=glitch?`translate(${(Math.random()-0.5)*18}px,0) skewX(${(Math.random()-0.5)*2}deg)`:'';
+      app.style.filter=`saturate(1.4) contrast(1.1) hue-rotate(${Math.sin(_t)*6}deg)`;
+      _funModeRafs.vhs=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='nightvision'){
+    app.style.filter='grayscale(1) brightness(0.65) sepia(1) hue-rotate(80deg) saturate(5) contrast(1.5)';
+    const ov=document.createElement('div');ov.className='__fun-overlay__';
+    ov.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483644;background:radial-gradient(ellipse at 50% 50%,transparent 50%,rgba(0,0,0,0.65) 100%);';
+    document.body.appendChild(ov);
+    const grain=document.createElement('canvas');grain.className='__fun-overlay__';
+    grain.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483643;opacity:0.2;width:100%;height:100%;';
+    grain.width=300;grain.height=200;document.body.appendChild(grain);
+    const gctx=grain.getContext('2d');
+    const _gl=()=>{
+      if(_activeFunMode!=='nightvision') return;
+      const id2=gctx.createImageData(300,200);
+      for(let i=0;i<id2.data.length;i+=4){const v=Math.random()*255|0;id2.data[i]=0;id2.data[i+1]=v;id2.data[i+2]=0;id2.data[i+3]=100;}
+      gctx.putImageData(id2,0,0);
+      _funModeRafs.nightvision=requestAnimationFrame(_gl);
+    };_gl();
+  }
+  else if(id==='fisheye'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='fisheye') return;
+      _t+=0.008;
+      app.style.transform=`perspective(280px) rotateX(${Math.sin(_t)*4}deg) rotateY(${Math.cos(_t*0.7)*3}deg) scale(1.06)`;
+      _funModeRafs.fisheye=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='matrix_ui'){
+    app.style.filter='saturate(0) sepia(1) hue-rotate(80deg) brightness(0.65) saturate(8) contrast(1.3)';
+    const ov=document.createElement('canvas');ov.className='__fun-overlay__';
+    ov.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483643;opacity:0.15;';
+    ov.width=window.innerWidth||800;ov.height=window.innerHeight||600;
+    document.body.appendChild(ov);
+    const mctx=ov.getContext('2d');
+    const cols=Math.floor((ov.width||800)/14);
+    const drops=Array.from({length:cols},()=>Math.random()*-60);
+    const chars='アイウエオ01ABCDEF#!';
+    const _ml=()=>{
+      if(_activeFunMode!=='matrix_ui') return;
+      mctx.fillStyle='rgba(0,0,0,0.07)';mctx.fillRect(0,0,ov.width,ov.height);
+      mctx.fillStyle='#00ff44';mctx.font='12px monospace';
+      drops.forEach((y,i)=>{mctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*14,y);if(y>ov.height+80)drops[i]=0;drops[i]+=14;});
+      _funModeRafs.matrix_ui=requestAnimationFrame(_ml);
+    };_ml();
+  }
+
+  const p=document.getElementById('__debug-panel__');if(p)_renderDebugPanel(p);
+  toast((_FUN_MODES.find(m=>m.id===id)||{label:id}).label+' ON','success');
+}
+
 
 function setBgEffect(id){
   unlockAch('bg_effect');
@@ -19734,7 +19854,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, saveVipProfileBg, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, saveVipProfileBg, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
