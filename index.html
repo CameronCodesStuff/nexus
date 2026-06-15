@@ -12523,98 +12523,126 @@ let _perfModeSnapshot = null;
 let _activeFunMode = null;
 const _funModeRafs = {};
 
+// Called on activation AND after every chat/modal re-render
+function _applyPerfModeDOM(){
+  if(!_perfModeActive) return;
+  // Stop all animated backgrounds
+  Object.keys(_animBgState||{}).forEach(k=>stopAnimBg(k));
+  if(typeof BgEffects!=='undefined') BgEffects.stop();
+  // Ensure style tag with aggressive stripping
+  if(!document.getElementById('__perf-mode-style__')){
+    const s=document.createElement('style');
+    s.id='__perf-mode-style__';
+    s.textContent=`
+      *,*::before,*::after {
+        animation: none !important;
+        transition: none !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+      }
+      /* Strip avatar frames completely */
+      .avatar-frame { display: none !important; }
+      /* Strip VIP sparkles */
+      .vip-sparkle { display: none !important; }
+      /* Strip name particles */
+      .name-particle, .__vip-particle__, [class*="sparkle"], [class*="particle"] { display: none !important; }
+      /* Hide starfield + all animation canvases */
+      canvas#starfield, canvas.anim-bg-canvas { display: none !important; }
+      /* Strip profile backgrounds */
+      .profile-banner { background: #111 !important; }
+      /* Flatten all gradients to solid backgrounds */
+      .msg-bubble, .message, [class*="bubble"] { background: var(--bg2) !important; }
+      /* No glow on avatars */
+      .avatar, [class*="avatar"] { box-shadow: none !important; filter: none !important; }
+      /* No emoji animations */
+      .emoji-reaction, [class*="reaction"] { animation: none !important; transform: none !important; }
+      /* Disable image rendering hints */
+      img { image-rendering: pixelated; }
+    `;
+    document.head.appendChild(s);
+  }
+  // Remove all dynamic canvases and overlays
+  document.querySelectorAll('canvas:not(#c):not(#starfield), .__fun-overlay__').forEach(el=>{
+    if(el.id&&(el.id.startsWith('__bg')||el.id.startsWith('__perf'))) return;
+    el.remove();
+  });
+  document.querySelectorAll('.vip-sparkle, .name-particle, .__vip-particle__').forEach(el=>el.remove());
+  // Kill all interval-based sparkle effects
+  document.querySelectorAll('[data-sparkle]').forEach(el=>{
+    if(el._vipSparkleInterval){clearInterval(el._vipSparkleInterval);el._vipSparkleInterval=null;}
+  });
+  // Hide starfield
+  const sf=document.getElementById('starfield');if(sf)sf.style.display='none';
+  // Light grayscale on app-screen only (not blocking anything)
+  const app=document.getElementById('app-screen');
+  if(app){app.style.filter='grayscale(0.6)';app.style.willChange='auto';}
+  // Trim uCache to only active users
+  try{
+    const activeUids=new Set();
+    if(cu?.uid) activeUids.add(cu.uid);
+    Object.values(aChats||{}).forEach(ch=>(ch.members||[]).forEach(u=>activeUids.add(u)));
+    Object.keys(uCache||{}).forEach(uid=>{if(!activeUids.has(uid)) delete uCache[uid];});
+  }catch(_e){}
+  window.__perfModeThrottle=true;
+}
+
 function _maxFps(){
   if(_perfModeActive){ _restoreFromPerfMode(); return; }
   _perfModeActive = true;
-  // Snapshot current state
+  // Snapshot
   _perfModeSnapshot = {
-    bgEffect: cud?.bgEffect || BgEffects?.current || 'stars',
+    bgEffect: cud?.bgEffect||BgEffects?.current||'stars',
     drunkMode: _drunkMode,
-    animBgKeys: Object.keys(_animBgState||{}),
-    theme: curTheme,
-    avatarAnimations: Array.from(document.querySelectorAll('.avatar-frame')).map(el=>({el,anim:el.style.animation,boxShadow:el.style.boxShadow,filter:el.style.filter})),
-    bodyFilter: document.body.style.filter,
+    bodyFilter: document.body.style.filter||'',
     sfDisplay: document.getElementById('starfield')?.style.display||'',
     appFilter: document.getElementById('app-screen')?.style.filter||'',
+    appWillChange: document.getElementById('app-screen')?.style.willChange||'',
   };
-  // 1. Stop ALL animated canvas backgrounds
-  Object.keys(_animBgState||{}).forEach(k => stopAnimBg(k));
-  if(typeof BgEffects !== 'undefined') BgEffects.stop();
-
-  // 2. Stop drunk mode
-  if(_drunkMode){ _drunkMode=false; if(_drunkRaf) cancelAnimationFrame(_drunkRaf); const _app2=document.getElementById('app-screen');if(_app2){_app2.style.transform='';_app2.style.filter='';} }
-
-  // 3. Strip ALL CSS animations/transitions app-wide
-  const _perfStyle = document.createElement('style');
-  _perfStyle.id = '__perf-mode-style__';
-  _perfStyle.textContent = `
-    *,*::before,*::after {
-      animation: none !important;
-      transition: none !important;
-      box-shadow: none !important;
-    }
-    .avatar-frame { animation: none !important; box-shadow: none !important; filter: none !important; }
-    canvas#starfield { display: none !important; }
-  `;
-  document.head.appendChild(_perfStyle);
-
-  // 4. Hide the starfield canvas entirely
-  const sf = document.getElementById('starfield');
-  if(sf) sf.style.display='none';
-
-  // 5. Force GPU compositing layer reset — kills most paint cost
-  const app = document.getElementById('app-screen');
-  if(app){ app.style.filter='grayscale(0.7)'; app.style.willChange='auto'; }
-
-  // 6. Throttle message rendering (suppress re-renders)
-  window.__perfModeThrottle = true;
-
-  // 7. Remove all particle canvases injected by animations
-  document.querySelectorAll('[id^="__bg-effect"]').forEach(el=>el.remove());
-
-  toast('⚡ Performance mode ON — click again to restore','success');
-  const p = document.getElementById('__debug-panel__');
-  if(p) _renderDebugPanel(p);
+  // Stop fun modes
+  if(_drunkMode){_drunkMode=false;if(_drunkRaf)cancelAnimationFrame(_drunkRaf);const a=document.getElementById('app-screen');if(a){a.style.transform='';a.style.filter='';}}
+  if(_activeFunMode){_toggleFunMode(_activeFunMode);}
+  _applyPerfModeDOM();
+  toast('⚡ Performance mode ON — all effects stripped','success');
+  const p=document.getElementById('__debug-panel__');if(p)_renderDebugPanel(p);
 }
 
 function _restoreFromPerfMode(){
   if(!_perfModeActive) return;
-  _perfModeActive = false;
-  const snap = _perfModeSnapshot;
-  if(!snap) return;
-  // Remove the perf-mode style injection
-  const _ps = document.getElementById('__perf-mode-style__');
-  if(_ps) _ps.remove();
-  // Restore starfield
-  const sf2 = document.getElementById('starfield');
-  if(sf2) sf2.style.display='';
-  // Restore app filter
-  const app = document.getElementById('app-screen');
-  if(app){ app.style.filter=snap.appFilter; app.style.willChange=''; }
-  document.body.style.filter = snap.bodyFilter;
-  // Restore avatar frame animations
-  snap.avatarAnimations.forEach(({el,anim,boxShadow,filter})=>{ el.style.animation=anim; el.style.boxShadow=boxShadow; el.style.filter=filter; });
-  // Clear throttle
+  _perfModeActive=false;
+  const snap=_perfModeSnapshot;
+  const ps=document.getElementById('__perf-mode-style__');if(ps)ps.remove();
+  const sf=document.getElementById('starfield');if(sf)sf.style.display=snap?.sfDisplay||'';
+  const app=document.getElementById('app-screen');
+  if(app){app.style.filter=snap?.appFilter||'';app.style.willChange=snap?.appWillChange||'';}
+  document.body.style.filter=snap?.bodyFilter||'';
   delete window.__perfModeThrottle;
-  // Restore background effect
-  if(typeof BgEffects !== 'undefined') BgEffects.set(snap.bgEffect);
-  // Restore drunk mode if it was on
-  if(snap.drunkMode){ _drunkMode=false; _toggleDrunkMode(); }
-  _perfModeSnapshot = null;
-  toast('✓ Settings restored','success');
-  const p = document.getElementById('__debug-panel__');
-  if(p) _renderDebugPanel(p);
+  if(typeof BgEffects!=='undefined'&&snap?.bgEffect) BgEffects.set(snap.bgEffect);
+  if(snap?.drunkMode){_drunkMode=false;_toggleDrunkMode();}
+  _perfModeSnapshot=null;
+  toast('✓ All effects restored','success');
+  const p=document.getElementById('__debug-panel__');if(p)_renderDebugPanel(p);
 }
 
 // ── FUN MODES ─────────────────────────────────────────────────────
 const _FUN_MODES = [
-  {id:'earthquake', label:'🌍 Earthquake',   desc:'Violent shake'},
-  {id:'mirror',     label:'🪞 Mirror',        desc:'Flip the whole UI'},
-  {id:'zoomout',    label:'🔭 Zoomed Out',    desc:'Tiny UI'},
-  {id:'vhs',        label:'📼 VHS',           desc:'Scanlines + glitch'},
-  {id:'nightvision',label:'🟢 Night Vision',  desc:'Grainy green tint'},
-  {id:'fisheye',    label:'🐟 Fisheye',       desc:'Warped perspective'},
-  {id:'matrix_ui',  label:'💀 Matrix UI',     desc:'Green on black'},
+  {id:'earthquake',  label:'🌍 Earthquake',    desc:'Violent shake'},
+  {id:'mirror',      label:'🪞 Mirror',         desc:'Flip the whole UI'},
+  {id:'zoomout',     label:'🔭 Zoomed Out',     desc:'Tiny UI'},
+  {id:'vhs',         label:'📼 VHS',            desc:'Scanlines + glitch'},
+  {id:'nightvision', label:'🟢 Night Vision',   desc:'Grainy green tint'},
+  {id:'fisheye',     label:'🐟 Fisheye',        desc:'Warped perspective'},
+  {id:'matrix_ui',   label:'💀 Matrix UI',      desc:'Green on black'},
+  {id:'underwater',  label:'🌊 Underwater',     desc:'Slow rippling waves'},
+  {id:'static',      label:'📡 Static',         desc:'TV static noise'},
+  {id:'spin',        label:'🌀 Spin',           desc:'Slowly rotates'},
+  {id:'glitchout',   label:'⚡ Glitch Out',     desc:'Heavy RGB tear'},
+  {id:'xray',        label:'🦴 X-Ray',          desc:'Inverted + bone tone'},
+  {id:'infrared',    label:'🔴 Infrared',       desc:'Heat vision colours'},
+  {id:'zoom_pulse',  label:'🔍 Zoom Pulse',     desc:'Heartbeat zoom'},
+  {id:'neon_burn',   label:'💜 Neon Burn',      desc:'Hyper saturated neon'},
+  {id:'oldfilm',     label:'🎞 Old Film',       desc:'Sepia + scratches'},
+  {id:'portal',      label:'🌀 Portal',         desc:'Spinning colour vortex'},
 ];
 
 function _toggleFunMode(id){
@@ -12709,6 +12737,135 @@ function _toggleFunMode(id){
       drops.forEach((y,i)=>{mctx.fillText(chars[Math.floor(Math.random()*chars.length)],i*14,y);if(y>ov.height+80)drops[i]=0;drops[i]+=14;});
       _funModeRafs.matrix_ui=requestAnimationFrame(_ml);
     };_ml();
+  }
+
+  else if(id==='underwater'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='underwater')return;
+      _t+=0.012;
+      const wx=Math.sin(_t*0.8)*6,wy=Math.cos(_t*0.5)*4;
+      app.style.transform=`translate(${wx}px,${wy}px)`;
+      app.style.filter=`hue-rotate(${180+Math.sin(_t*0.3)*20}deg) saturate(1.6) brightness(0.8) blur(${Math.sin(_t*0.9)*0.8+0.8}px)`;
+      _funModeRafs.underwater=requestAnimationFrame(_loop);
+    };_loop();
+    const ov=document.createElement('div');ov.className='__fun-overlay__';
+    ov.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483644;background:rgba(0,80,180,0.15);';
+    document.body.appendChild(ov);
+  }
+  else if(id==='static'){
+    const cv=document.createElement('canvas');cv.className='__fun-overlay__';
+    cv.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483644;opacity:0.55;';
+    cv.width=320;cv.height=240;document.body.appendChild(cv);
+    const sctx=cv.getContext('2d');
+    const _sl=()=>{
+      if(_activeFunMode!=='static')return;
+      const id2=sctx.createImageData(320,240);
+      for(let i=0;i<id2.data.length;i+=4){const v=Math.random()*255|0;id2.data[i]=id2.data[i+1]=id2.data[i+2]=v;id2.data[i+3]=200;}
+      sctx.putImageData(id2,0,0);
+      _funModeRafs.static=requestAnimationFrame(_sl);
+    };_sl();
+  }
+  else if(id==='spin'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='spin')return;
+      _t+=0.003;
+      app.style.transform=`rotate(${_t*180/Math.PI}deg) scale(0.7)`;
+      _funModeRafs.spin=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='glitchout'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='glitchout')return;
+      _t++;
+      if(_t%2===0){
+        const slices=6+Math.floor(Math.random()*8);
+        for(let i=0;i<slices;i++){
+          const sy=Math.random()*window.innerHeight;
+          const sh=Math.random()*50+5;
+          const ox=(Math.random()-0.5)*60;
+          app.style.transform=`translate(${ox}px,${(Math.random()-0.5)*10}px) skewX(${(Math.random()-0.5)*4}deg)`;
+        }
+        app.style.filter=`hue-rotate(${Math.random()*360}deg) saturate(3) contrast(2)`;
+      } else {
+        app.style.transform='';
+        app.style.filter=`hue-rotate(${Math.random()*30}deg) saturate(1.2)`;
+      }
+      _funModeRafs.glitchout=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='xray'){
+    app.style.filter='invert(1) sepia(0.4) hue-rotate(170deg) brightness(1.3) contrast(1.5)';
+  }
+  else if(id==='infrared'){
+    app.style.filter='sepia(1) hue-rotate(300deg) saturate(4) brightness(0.9) contrast(1.3)';
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='infrared')return;
+      _t+=0.02;
+      app.style.filter=`sepia(1) hue-rotate(${300+Math.sin(_t)*15}deg) saturate(${4+Math.sin(_t*0.7)*0.8}) brightness(0.9) contrast(1.3)`;
+      _funModeRafs.infrared=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='zoom_pulse'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='zoom_pulse')return;
+      _t+=0.05;
+      const sc=1+Math.abs(Math.sin(_t))*0.12;
+      app.style.transform=`scale(${sc})`;
+      _funModeRafs.zoom_pulse=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='neon_burn'){
+    let _t=0;
+    const _loop=()=>{
+      if(_activeFunMode!=='neon_burn')return;
+      _t+=0.015;
+      const hue=(_t*60)%360;
+      app.style.filter=`hue-rotate(${hue}deg) saturate(8) brightness(1.1) contrast(1.3)`;
+      _funModeRafs.neon_burn=requestAnimationFrame(_loop);
+    };_loop();
+  }
+  else if(id==='oldfilm'){
+    app.style.filter='sepia(0.9) brightness(0.85) contrast(1.1) saturate(0.6)';
+    const ov=document.createElement('canvas');ov.className='__fun-overlay__';
+    ov.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483644;opacity:0.25;';
+    ov.width=400;ov.height=300;document.body.appendChild(ov);
+    const octx=ov.getContext('2d');
+    const _ol=()=>{
+      if(_activeFunMode!=='oldfilm')return;
+      octx.clearRect(0,0,400,300);
+      // Grain
+      const id2=octx.createImageData(400,300);
+      for(let i=0;i<id2.data.length;i+=4){const v=Math.random()*200|0;id2.data[i]=id2.data[i+1]=id2.data[i+2]=v;id2.data[i+3]=Math.random()<0.15?180:0;}
+      octx.putImageData(id2,0,0);
+      // Scratch lines
+      if(Math.random()<0.06){octx.strokeStyle='rgba(255,240,200,0.7)';octx.lineWidth=1;octx.beginPath();const sx=Math.random()*400;octx.moveTo(sx,0);octx.lineTo(sx+Math.random()*4-2,300);octx.stroke();}
+      _funModeRafs.oldfilm=requestAnimationFrame(_ol);
+    };_ol();
+  }
+  else if(id==='portal'){
+    const ov=document.createElement('canvas');ov.className='__fun-overlay__';
+    ov.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483644;opacity:0.35;';
+    ov.width=window.innerWidth||800;ov.height=window.innerHeight||600;
+    document.body.appendChild(ov);
+    const pctx=ov.getContext('2d');
+    let _t=0;
+    const cx2=ov.width/2,cy2=ov.height/2,maxR=Math.max(cx2,cy2)*1.1;
+    const _pl=()=>{
+      if(_activeFunMode!=='portal')return;
+      _t+=0.025;
+      pctx.clearRect(0,0,ov.width,ov.height);
+      for(let r=maxR;r>0;r-=18){
+        const hue=(_t*100+r)%360;
+        pctx.beginPath();pctx.arc(cx2,cy2,r,0,Math.PI*2);
+        pctx.strokeStyle=`hsla(${hue},100%,60%,0.5)`;pctx.lineWidth=9;pctx.stroke();
+      }
+      _funModeRafs.portal=requestAnimationFrame(_pl);
+    };_pl();
   }
 
   const p=document.getElementById('__debug-panel__');if(p)_renderDebugPanel(p);
@@ -19854,7 +20011,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, saveVipProfileBg, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
