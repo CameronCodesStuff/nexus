@@ -13291,7 +13291,7 @@ let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
   main:  [{id:'overall',label:'★ OVERALL'},{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
-  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'towerdefense',label:'🏰 Tower Defense'},{id:'eternalrift',label:'🌀 Eternal Rift'}],
+  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'towerdefense',label:'🏰 Tower Defense'},{id:'eternalrift',label:'🌀 Eternal Rift'},{id:'blockdodge',label:'🟦 Block Dodge'},{id:'stackbuilder',label:'🟪 Stack Builder'},{id:'cosmorunner',label:'🚀 Cosmo Runner'},{id:'wavesurvival',label:'🌊 Wave Survival'}],
 };
 let lbCurrentSection='main';
 
@@ -13412,7 +13412,35 @@ async function renderLeaderboard(tab){
   const el=document.getElementById('lb-content');
   if(!el) return;
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
-  if(tab==='whg'||tab==='gauntlet'||tab==='towerdefense'||tab==='eternalrift'){const _isTime=tab==='gauntlet';try{const _snap=await getDocs(query(collection(db,'communityGameScores',tab,'scores'),orderBy('score','desc'),limit(20)));const _rows=_snap.docs.map(d=>d.data());if(!_rows.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:11px;">No scores yet!</div>';return;}let _h='<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-bottom:10px;">'+(  _isTime?'Best Survival Times':'Top Levels Reached')+'</div><div style="display:flex;flex-direction:column;gap:4px;">';_rows.forEach((r,i)=>{const m=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);_h+='<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);"><span style="font-size:13px;width:28px;">'+m+'</span><span style="flex:1;color:var(--text);">'+esc(r.displayName||r.username||'?')+'</span><span style="color:var(--accent);font-weight:700;">'+r.score+(_isTime?'s':' lvl')+'</span></div>';});_h+='</div>';el.innerHTML=_h;}catch(_e){el.innerHTML='<div style="padding:20px;color:var(--text-dim);font-size:11px;">Error loading scores.</div>';}return;}
+  const _ALL_GAME_IDS=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival'];
+  if(_ALL_GAME_IDS.includes(tab)){
+    const _GM={
+      whg:{t:'Top Levels Reached',s:' lvl'},
+      gauntlet:{t:'Best Survival Times',s:'s'},
+      towerdefense:{t:'Top Waves Survived',s:' waves'},
+      eternalrift:{t:'Top Levels Reached',s:' lvl'},
+      blockdodge:{t:'Most Blocks Dodged',s:' dodged'},
+      stackbuilder:{t:'Tallest Towers Built',s:' high'},
+      cosmorunner:{t:'Farthest Distance Run',s:' m'},
+      wavesurvival:{t:'Top Scores',s:' pts'},
+    };
+    const _m=_GM[tab]||{t:'Top Scores',s:''};
+    try{
+      const _snap=await getDocs(query(collection(db,'communityGameScores',tab,'scores'),orderBy('score','desc'),limit(20)));
+      const _rows=_snap.docs.map(d=>d.data());
+      if(!_rows.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-size:11px;">No scores yet — be the first!</div>';return;}
+      let _h='<div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-bottom:10px;">'+_m.t+'</div><div style="display:flex;flex-direction:column;gap:4px;">';
+      _rows.forEach((r,i)=>{
+        const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1);
+        _h+='<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);">'
+          +'<span style="font-size:13px;width:28px;">'+medal+'</span>'
+          +'<span style="flex:1;color:var(--text);">'+esc(r.displayName||r.username||'?')+'</span>'
+          +'<span style="color:var(--accent);font-weight:700;">'+r.score+_m.s+'</span></div>';
+      });
+      _h+='</div>';el.innerHTML=_h;
+    }catch(_e){el.innerHTML='<div style="padding:20px;color:var(--text-dim);font-size:11px;">Error loading scores.</div>';}
+    return;
+  }
   try{
     const snap=await getDocs(collection(db,'users'));
     let users=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -20013,6 +20041,26 @@ function makePollCard(poll,isOw){
         <span style="font-size:16px;width:22px;text-align:center;">🌀</span>
         <span style="flex:1;">Eternal Rift</span>
         <span style="font-size:9px;font-family:var(--font-mono);color:#00d4ff;letter-spacing:1px;">SURVIVE</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openBlockDodge()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(56,189,248,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🟦</span>
+        <span style="flex:1;">Block Dodge</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#38bdf8;letter-spacing:1px;">DODGE</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openStackBuilder()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(167,139,250,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🟪</span>
+        <span style="flex:1;">Stack Builder</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#a78bfa;letter-spacing:1px;">BUILD</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openCosmoRunner()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(34,211,238,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🚀</span>
+        <span style="flex:1;">Cosmo Runner</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#22d3ee;letter-spacing:1px;">RUN</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openWaveSurvival()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(255,59,107,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🌊</span>
+        <span style="flex:1;">Wave Survival</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#ff3b6b;letter-spacing:1px;">SURVIVE</span>
       </button>
 
     </div>
