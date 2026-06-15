@@ -13431,8 +13431,8 @@ async function renderLeaderboard(tab){
       if(!_rows.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No scores yet — be the first!</div>';return;}
       el.innerHTML='';
       // Grant game_champion role to #1
-      if(_rows[0]&&_rows[0].uid&&isOwner){
-        _assignGameChampion(tab,_rows[0].uid,_rows.map(r=>r.uid).filter(Boolean)).catch(()=>{});
+      if(_rows[0]&&_rows[0].uid){
+        _assignGameChampion(tab,_rows[0].uid).catch(()=>{});
       }
       _rows.forEach((r,i)=>{
         const uid=r.uid||'';
@@ -16547,8 +16547,15 @@ window.addEventListener('message',function(e){
         score:score,
         detail:detail,
         ts:serverTimestamp()
-      },{merge:true}).then(()=>{
-        toast('🏆 Score posted: '+score.toLocaleString(),'success');
+      },{merge:true}).then(async ()=>{
+        toast('🏆 New best: '+score.toLocaleString(),'success');
+        // Check if we're now #1 and grant game_champion if so
+        try{
+          const topSnap=await getDocs(query(collection(db,'communityGameScores',gameId,'scores'),orderBy('score','desc'),limit(1)));
+          if(topSnap.docs.length&&topSnap.docs[0].data().uid===cu.uid){
+            _assignGameChampion(gameId,cu.uid).catch(()=>{});
+          }
+        }catch(_e){}
       }).catch(()=>{});
     } else {
       toast('Score not a new personal best (current best: '+prev.toLocaleString()+').','danger');
@@ -16556,33 +16563,41 @@ window.addEventListener('message',function(e){
   }).catch(()=>{});
 });
 
-async function _assignGameChampion(gameId, winnerUid, allUids){
-  if(!isOwner||!cu||!winnerUid) return;
+async function _assignGameChampion(gameId, winnerUid){
+  if(!cu||!winnerUid) return;
   const roleId='game_champion';
   try{
-    // Strip game_champion from anyone who has it but shouldn't be #1 for this game
     const configRef=doc(db,'config','gameChampion_'+gameId);
     const cfgSnap=await getDoc(configRef).catch(()=>null);
-    const prevUid=cfgSnap?.exists?.()&&cfgSnap.data().uid||'';
-    // Grant to winner
-    const winSnap=await getDoc(doc(db,'users',winnerUid)).catch(()=>null);
-    if(winSnap?.exists?.()){
-      const roles=winSnap.data().roles||[];
+    const prevUid=(cfgSnap?.exists?.()&&cfgSnap.data().uid)||'';
+    if(prevUid===winnerUid) return; // no change needed
+
+    // Grant role to winner (only writes their own doc — allowed by rules)
+    if(winnerUid===cu.uid&&cud){
+      const roles=Array.isArray(cud.roles)?[...cud.roles]:[];
       if(!roles.includes(roleId)){
-        await updateDoc(doc(db,'users',winnerUid),{roles:[...roles,roleId]}).catch(()=>{});
-        if(winnerUid===cu.uid&&cud){cud={...cud,roles:[...cud.roles||[],roleId]};uCache[cu.uid]={...uCache[cu.uid],roles:cud.roles};toast('🏆 You are the '+gameId+' champion!','success');}
+        roles.push(roleId);
+        await updateDoc(doc(db,'users',cu.uid),{roles}).catch(()=>{});
+        cud={...cud,roles};uCache[cu.uid]={...uCache[cu.uid],roles};
+        toast('🏆 You are #1 on '+gameId+'!','success');
       }
     }
-    // Revoke from previous if different
-    if(prevUid&&prevUid!==winnerUid){
-      const prevSnap=await getDoc(doc(db,'users',prevUid)).catch(()=>null);
-      if(prevSnap?.exists?.()){
-        const cleaned=(prevSnap.data().roles||[]).filter(r=>r!==roleId);
-        await updateDoc(doc(db,'users',prevUid),{roles:cleaned}).catch(()=>{});
+
+    // Owner also strips the previous holder and updates config
+    if(isOwner){
+      if(prevUid&&prevUid!==winnerUid){
+        const prevSnap=await getDoc(doc(db,'users',prevUid)).catch(()=>null);
+        if(prevSnap?.exists?.()){
+          const cleaned=(prevSnap.data().roles||[]).filter(r=>r!==roleId);
+          await updateDoc(doc(db,'users',prevUid),{roles:cleaned}).catch(()=>{});
+        }
       }
+      await setDoc(configRef,{uid:winnerUid,gameId,ts:serverTimestamp()},{merge:true}).catch(()=>{});
+    } else {
+      // Non-owners write config too (for tracking) — rules must allow this
+      await setDoc(configRef,{uid:winnerUid,gameId,ts:serverTimestamp()},{merge:true}).catch(()=>{});
     }
-    await setDoc(configRef,{uid:winnerUid,gameId,ts:serverTimestamp()},{merge:true}).catch(()=>{});
-  }catch(e){}
+  }catch(_e){}
 }
 
 async function openGameLeaderboard(gameId,gameTitle){
