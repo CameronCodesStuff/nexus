@@ -13725,6 +13725,15 @@ async function syncLeaderboardRoles(){
       const pos=sorted.findIndex(u=>u.id===cu?.uid)+1;
       if(pos>0&&pos<_best) _best=pos;
     }
+    // Also check game subcollections for personal best position
+    const _GAME_IDS=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival'];
+    for(const gid of _GAME_IDS){
+      try{
+        const gs=await getDocs(query(collection(db,'communityGameScores',gid,'scores'),orderBy('score','desc'),limit(20)));
+        const gpos=gs.docs.findIndex(d=>d.data().uid===cu?.uid)+1;
+        if(gpos>0&&gpos<_best) _best=gpos;
+      }catch(_ge){}
+    }
     if(_best<99&&_best<(cud?.bestLbPos||99)){
       updateDoc(doc(db,'users',cu.uid),{bestLbPos:_best}).catch(()=>{});
       cud={...cud,bestLbPos:_best};uCache[cu.uid]={...uCache[cu.uid],bestLbPos:_best};
@@ -13735,19 +13744,30 @@ async function syncLeaderboardRoles(){
   try{
     const snap=await getDocs(collection(db,'users'));
     const allUsers=snap.docs.map(d=>({id:d.id,...d.data()}));
-    // Find which uid is #1 on each board
+    // Find which uid is #1 on each standard field board
     const topUids=new Set();
     LB_FIELDS_FOR_ROLE.forEach(field=>{
       const sorted=allUsers.filter(u=>(u[field]||0)>0).sort((a,b)=>(b[field]||0)-(a[field]||0));
       if(sorted.length) topUids.add(sorted[0].id);
     });
-    // Grant or revoke role for every user that changed
+    // Also find #1 on each game leaderboard subcollection
+    const _GAME_IDS2=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival'];
+    await Promise.all(_GAME_IDS2.map(async gid=>{
+      try{
+        const gs=await getDocs(query(collection(db,'communityGameScores',gid,'scores'),orderBy('score','desc'),limit(1)));
+        if(gs.docs.length){
+          const uid=gs.docs[0].data().uid;
+          if(uid) topUids.add(uid);
+        }
+      }catch(_ge){}
+    }));
+    // Grant or revoke #1 role for every user that changed
     const updates=[];
     allUsers.forEach(u=>{
       const currentRoles=Array.isArray(u.roles)?u.roles:(u.role?[u.role]:[]);
       const hasRole=currentRoles.includes(NUMBER_ONE_ROLE);
       const shouldHave=topUids.has(u.id);
-      if(shouldHave===hasRole) return; // no change needed
+      if(shouldHave===hasRole) return;
       const newRoles=shouldHave
         ?[NUMBER_ONE_ROLE,...currentRoles.filter(r=>r!==NUMBER_ONE_ROLE)]
         :currentRoles.filter(r=>r!==NUMBER_ONE_ROLE);
@@ -13785,10 +13805,6 @@ async function renderLeaderboard(tab){
       const _rows=_snap.docs.map(d=>d.data());
       if(!_rows.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);">No scores yet — be the first!</div>';return;}
       el.innerHTML='';
-      // Grant game_champion role to #1
-      if(_rows[0]&&_rows[0].uid){
-        _assignGameChampion(tab,_rows[0].uid).catch(()=>{});
-      }
       _rows.forEach((r,i)=>{
         const uid=r.uid||'';
         const cachedU=uCache[uid]||{};
@@ -16904,13 +16920,8 @@ window.addEventListener('message',function(e){
         ts:serverTimestamp()
       },{merge:true}).then(async ()=>{
         toast('🏆 New best: '+score.toLocaleString(),'success');
-        // Check if we're now #1 and grant game_champion if so
-        try{
-          const topSnap=await getDocs(query(collection(db,'communityGameScores',gameId,'scores'),orderBy('score','desc'),limit(1)));
-          if(topSnap.docs.length&&topSnap.docs[0].data().uid===cu.uid){
-            _assignGameChampion(gameId,cu.uid).catch(()=>{});
-          }
-        }catch(_e){}
+        // Trigger full leaderboard role sync so #1 is always accurate
+        syncLeaderboardRoles().catch(()=>{});
       }).catch(()=>{});
     } else {
       toast('Score not a new personal best (current best: '+prev.toLocaleString()+').','danger');
