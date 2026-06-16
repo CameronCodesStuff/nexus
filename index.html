@@ -7259,8 +7259,22 @@ function openProfileModal(uid){
     </div>
     <div style="padding:0 20px 20px;">
       ${u.vipMusic&&u.roles?.includes('vip')?`<a href="${esc(u.vipMusic)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);font-size:10px;font-family:var(--font-mono);color:var(--text-dim);text-decoration:none;">${u.vipMusic.includes('spotify')?'<span style="color:#1db954;">♫ Spotify</span>':u.vipMusic.includes('youtu')?'<span style="color:#ff4444;">▶ YouTube</span>':'🎵'} Now Playing</a>`:''}
-      ${u.equippedPetName?(()=>{const _prc={'common':'#9aa7c7','uncommon':'#3ee87a','rare':'#3aa0ff','epic':'#c061ff','legendary':'#ff9d2e','mythic':'#ff2d6f','secret':'#00f0ff','divine':'#ffe24a','celestial':'#b9f2ff','omega':'#ff3bd0'};const _pc=_prc[u.equippedPetRar]||'#aaa';const _rn=(u.equippedPetRar||'').charAt(0).toUpperCase()+(u.equippedPetRar||'').slice(1);return `<div style="display:inline-flex;align-items:center;gap:5px;margin-bottom:6px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${_pc}44;font-size:10px;font-family:var(--font-mono);">🥚 <span style="color:${_pc};font-weight:700;">${esc(u.equippedPetName)}</span>${u.equippedPetShiny?'<span style="color:#ffe24a;">✦</span>':''} <span style="color:var(--text-dim);">${_rn}</span>${u.equippedPetIncome?`<span style="color:var(--text-dim);margin-left:4px;">·+${u.equippedPetIncome}/s</span>`:''}</div>`;})():''}
-      ${isMe?`<div style="margin-bottom:4px;"><button onclick="N.openEggverse()" style="background:rgba(255,224,100,0.1);border:1px solid rgba(255,224,100,0.3);color:#ffe064;font-family:var(--font-mono);font-size:9px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;">${u.equippedPetName?'🔄 CHANGE PET':'🥚 EQUIP A PET'}</button></div>`:''}
+      ${(()=>{
+        const _prc={'common':'#9aa7c7','uncommon':'#3ee87a','rare':'#3aa0ff','epic':'#c061ff','legendary':'#ff9d2e','mythic':'#ff2d6f','secret':'#00f0ff','divine':'#ffe24a','celestial':'#b9f2ff','omega':'#ff3bd0'};
+        const _pc=u.equippedPetRarColor||_prc[u.equippedPetRar]||'#aaa';
+        const _rn=(u.equippedPetRar||'').charAt(0).toUpperCase()+(u.equippedPetRar||'').slice(1);
+        const _cvId='pet-cv-'+uid;
+        if(!u.equippedPetName) return isMe?`<button onclick="N.openEggverse()" style="margin-bottom:6px;background:rgba(255,224,100,0.08);border:1px solid rgba(255,224,100,0.25);color:#ffe064;font-family:var(--font-mono);font-size:9px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;">🥚 EQUIP A PET IN EGGVERSE</button>`:'';
+        return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,0.18);border:1px solid ${_pc}33;">
+          ${(!isMe&&u.equippedPetImage)?`<img src="${u.equippedPetImage}" width="90" height="90" style="border-radius:10px;background:rgba(0,0,0,0.28);border:2px solid ${_pc}55;flex-shrink:0;image-rendering:pixelated;" alt="${esc(u.equippedPetName)}">`:`<canvas id="${_cvId}" width="90" height="90" style="border-radius:10px;background:rgba(0,0,0,0.28);border:2px solid ${_pc}55;flex-shrink:0;"></canvas>`}
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:${_pc};">${esc(u.equippedPetName)}</div>
+            ${u.equippedPetShiny?'<div style="font-family:var(--font-mono);font-size:10px;color:#ffe24a;margin-top:1px;">✦ SHINY</div>':''}
+            <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-dim);margin-top:2px;">${_rn}${u.equippedPetIncome?' · +'+u.equippedPetIncome+' coins/sec':''}</div>
+            ${isMe?`<button onclick="N.openEggverse()" style="margin-top:6px;background:rgba(255,224,100,0.08);border:1px solid rgba(255,224,100,0.25);color:#ffe064;font-family:var(--font-mono);font-size:9px;padding:3px 8px;border-radius:5px;cursor:pointer;letter-spacing:1px;">🔄 CHANGE</button>`:''}
+          </div>
+        </div>`;
+      })()}
       ${bio?`<div class="profile-bio">${esc(bio).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<strong>$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:11px;">$1</code>').replace(/\n/g,'<br>')}</div>`:`<div class="profile-bio-empty">${isMe?'You haven\'t set a bio yet. Add one in Settings.':'No bio set.'}</div>`}
       ${getRoleBadge(uid)?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${getRoleBadge(uid)}</div>`:''}
 
@@ -7390,6 +7404,25 @@ function openProfileModal(uid){
     </div>`;
   if(!isMe&&uid) updateDoc(doc(db,'users',uid),{profileViews:increment(1)}).catch(()=>{});
   openModal('profile-modal');
+  // Start pet animation using cached frames
+  requestAnimationFrame(()=>{
+    const _pf=(uCache[uid]||{})._petFrames;
+    const _cv=document.getElementById('pet-cv-'+uid);
+    if(!_cv) return; // others see <img> tag, not canvas
+    const _pctx=_cv.getContext('2d');
+    const _si=(uCache[uid]||{}).equippedPetImage;
+    if(_pf&&_pf.length){
+      // Own profile with frames — animate
+      const _img=new Image(); let _fi=0;
+      const _tick=()=>{_img.onload=()=>{_pctx.clearRect(0,0,90,90);_pctx.drawImage(_img,0,0,90,90);};_img.src=_pf[_fi];_fi=(_fi+1)%_pf.length;};
+      _tick();_cv.__petTimer=setInterval(_tick,120);
+    } else if(_si){
+      // No frames but static image saved — show it
+      const _simg=new Image();_simg.onload=()=>{_pctx.clearRect(0,0,90,90);_pctx.drawImage(_simg,0,0,90,90);};_simg.src=_si;
+    } else if((uCache[uid]||{}).equippedPetName){
+      _pctx.font='42px serif';_pctx.textAlign='center';_pctx.textBaseline='middle';_pctx.fillText('🥚',45,45);
+    }
+  });
 }
 // ── CHAT BACKGROUND ────────────────────────────
 const BG_PRESETS=[
@@ -17023,13 +17056,19 @@ window.addEventListener('message',async function(e){
   }
   if(e.data.type==='eggverseSave'){
     if(!cu||!cud) return;
-    const {gameState,hatched,rar,shiny,petName,rarestRar,rarestShiny,rarestName}=e.data;
+    const {gameState,hatched,rar,shiny,petName,rarestRar,rarestShiny,rarestName,petRarColor,petStaticFrame}=e.data;
     if(gameState) updateDoc(doc(db,'users',cu.uid),{eggverseState:gameState}).catch(()=>{});
     const _EIS={common:0.5,uncommon:1,rare:2,epic:5,legendary:12,mythic:30,secret:80,divine:200,celestial:500,omega:2000};
     const _r=rar?(_EIS[rar]||0):0;
-    const _pu={equippedPetRar:rar||null,equippedPetShiny:shiny||false,equippedPetName:petName||'',equippedPetIncome:_r};
+    const _pu={equippedPetRar:rar||null,equippedPetShiny:shiny||false,equippedPetName:petName||'',equippedPetIncome:_r,equippedPetRarColor:petRarColor||''};
+    if(petStaticFrame) _pu.equippedPetImage=petStaticFrame;
     updateDoc(doc(db,'users',cu.uid),_pu).catch(()=>{});
     Object.assign(cud,_pu);if(uCache[cu.uid])Object.assign(uCache[cu.uid],_pu);
+    // Store animated frames in memory for own profile view
+    if(e.data.petFrames&&e.data.petFrames.length){
+      cud._petFrames=e.data.petFrames;
+      if(uCache[cu.uid]) uCache[cu.uid]._petFrames=e.data.petFrames;
+    }
     const _es=e.source;if(_es&&_es.__eggId&&_eggIncomeRates[_es.__eggId])_eggIncomeRates[_es.__eggId].rate=_r;
     const _RO=['common','uncommon','rare','epic','legendary','mythic','secret','divine','celestial','omega'];
     const _RC={common:'#9aa7c7',uncommon:'#3ee87a',rare:'#3aa0ff',epic:'#c061ff',legendary:'#ff9d2e',mythic:'#ff2d6f',secret:'#00f0ff',divine:'#ffe24a',celestial:'#b9f2ff',omega:'#ff3bd0'};
