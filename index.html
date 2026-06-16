@@ -9147,6 +9147,8 @@ const OLB_TABS=[
   {id:'stackbuilder',label:'Stack',      cgGame:true, fmt:v=>v+' high'},
   {id:'cosmorunner', label:'Cosmo',      cgGame:true, fmt:v=>v+'m'},
   {id:'wavesurvival',label:'Wave',       cgGame:true, fmt:v=>v+' pts'},
+  {id:'eggverse_hatched',label:'Egg Hatched', cgGame:true, fmt:v=>v+' hatched'},
+  {id:'eggverse_rarest', label:'Egg Rarest',  cgGame:true, fmt:v=>(['common','uncommon','rare','epic','legendary','mythic','secret','divine','celestial','omega'][v]||String(v))},
 ];
 let olbCurrentTab='msgs';
 
@@ -13717,7 +13719,7 @@ let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
   main:  [{id:'overall',label:'★ OVERALL'},{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
-  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'towerdefense',label:'🏰 Tower Defense'},{id:'eternalrift',label:'🌀 Eternal Rift'},{id:'blockdodge',label:'🟦 Block Dodge'},{id:'stackbuilder',label:'🟪 Stack Builder'},{id:'cosmorunner',label:'🚀 Cosmo Runner'},{id:'wavesurvival',label:'🌊 Wave Survival'}],
+  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'towerdefense',label:'🏰 Tower Defense'},{id:'eternalrift',label:'🌀 Eternal Rift'},{id:'blockdodge',label:'🟦 Block Dodge'},{id:'stackbuilder',label:'🟪 Stack Builder'},{id:'cosmorunner',label:'🚀 Cosmo Runner'},{id:'wavesurvival',label:'🌊 Wave Survival'},{id:'eggverse_hatched',label:'🥚 Most Hatched'},{id:'eggverse_rarest',label:'💎 Rarest Pet'}],
 };
 let lbCurrentSection='main';
 
@@ -13822,7 +13824,7 @@ async function syncLeaderboardRoles(){
       if(sorted.length) topUids.add(sorted[0].id);
     });
     // Also find #1 on each game leaderboard subcollection
-    const _GAME_IDS2=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival'];
+    const _GAME_IDS2=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival','eggverse_hatched','eggverse_rarest'];
     await Promise.all(_GAME_IDS2.map(async gid=>{
       try{
         const gs=await getDocs(query(collection(db,'communityGameScores',gid,'scores'),orderBy('score','desc'),limit(1)));
@@ -13858,7 +13860,7 @@ async function renderLeaderboard(tab){
   const el=document.getElementById('lb-content');
   if(!el) return;
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
-  const _ALL_GAME_IDS=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival'];
+  const _ALL_GAME_IDS=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival','eggverse_hatched','eggverse_rarest'];
   if(_ALL_GAME_IDS.includes(tab)){
     const _GM={
       whg:        {t:'Top Levels Reached',    s:' lvl',    icon:'🟥', col:'#44dd44'},
@@ -13869,6 +13871,8 @@ async function renderLeaderboard(tab){
       stackbuilder:{t:'Tallest Towers Built', s:' high',   icon:'🟪', col:'#a78bfa'},
       cosmorunner:{t:'Farthest Distance Run', s:'m',       icon:'🚀', col:'#22d3ee'},
       wavesurvival:{t:'Top Scores',           s:' pts',    icon:'🌊', col:'#ff3b6b'},
+      eggverse_hatched:{t:'Most Eggs Hatched', s:' hatched', icon:'🥚', col:'#ffe064'},
+      eggverse_rarest:{t:'Rarest Pet Owned',   s:'',         icon:'💎', col:'#c061ff'},
     };
     const _m=_GM[tab]||{t:'Top Scores',s:'',icon:'🎮',col:'var(--accent)'};
     try{
@@ -13899,13 +13903,17 @@ async function renderLeaderboard(tab){
         row.appendChild(avEl);
         // Info
         const info=document.createElement('div');info.className='lb-info';
-        info.innerHTML='<div class="lb-name '+(uid?rank.c:'')+'" style="'+(uid?getUserFontStyle(uid):'')+'">'+esc(dispName)+(isMe?' <span style="font-size:9px;color:var(--accent);font-family:var(--font-mono);">(you)</span>':'')+(pos===1?' <span style="font-size:9px;color:'+_m.col+';font-family:var(--font-mono);">♛</span>':'')+'</div>'
-          +'<div class="lb-stat">'+r.score+_m.s+'</div>';
+        const _isEggRarest=tab==='eggverse_rarest';
+        const _statDisp=_isEggRarest?(r.rarName||String(r.score)):r.score+_m.s;
+        const _statCol=_isEggRarest?(r.rarColor||_m.col):_m.col;
+        const _petExtra=_isEggRarest&&r.petName?(' <span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">'+esc(r.petName)+'</span>'+(r.shiny?'<span style="color:#ffe24a;margin-left:2px;">✦</span>':'')):''
+        info.innerHTML='<div class="lb-name '+(uid?rank.c:'')+'" style="'+(uid?getUserFontStyle(uid):'')+'">'+esc(dispName)+_petExtra+(isMe?' <span style="font-size:9px;color:var(--accent);font-family:var(--font-mono);">(you)</span>':'')+(pos===1?' <span style="font-size:9px;color:'+_statCol+';font-family:var(--font-mono);">♛</span>':'')+'</div>'
+          +'<div class="lb-stat" style="color:'+_statCol+';">'+_statDisp+'</div>';
         row.appendChild(info);
         // Score badge
         const badge=document.createElement('div');
-        badge.style.cssText='font-family:var(--font-display);font-size:12px;font-weight:700;color:'+_m.col+';letter-spacing:1px;white-space:nowrap;';
-        badge.textContent=_m.icon+' '+r.score+_m.s;
+        badge.style.cssText='font-family:var(--font-display);font-size:12px;font-weight:700;color:'+_statCol+';letter-spacing:1px;white-space:nowrap;';
+        badge.textContent=_m.icon+' '+_statDisp;
         row.appendChild(badge);
         el.appendChild(row);
       });
@@ -20138,7 +20146,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
