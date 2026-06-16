@@ -7259,6 +7259,8 @@ function openProfileModal(uid){
     </div>
     <div style="padding:0 20px 20px;">
       ${u.vipMusic&&u.roles?.includes('vip')?`<a href="${esc(u.vipMusic)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);font-size:10px;font-family:var(--font-mono);color:var(--text-dim);text-decoration:none;">${u.vipMusic.includes('spotify')?'<span style="color:#1db954;">♫ Spotify</span>':u.vipMusic.includes('youtu')?'<span style="color:#ff4444;">▶ YouTube</span>':'🎵'} Now Playing</a>`:''}
+      ${u.equippedPetName?(()=>{const _prc={'common':'#9aa7c7','uncommon':'#3ee87a','rare':'#3aa0ff','epic':'#c061ff','legendary':'#ff9d2e','mythic':'#ff2d6f','secret':'#00f0ff','divine':'#ffe24a','celestial':'#b9f2ff','omega':'#ff3bd0'};const _pc=_prc[u.equippedPetRar]||'#aaa';const _rn=(u.equippedPetRar||'').charAt(0).toUpperCase()+(u.equippedPetRar||'').slice(1);return `<div style="display:inline-flex;align-items:center;gap:5px;margin-bottom:6px;padding:4px 10px;border-radius:20px;background:rgba(255,255,255,0.05);border:1px solid ${_pc}44;font-size:10px;font-family:var(--font-mono);">🥚 <span style="color:${_pc};font-weight:700;">${esc(u.equippedPetName)}</span>${u.equippedPetShiny?'<span style="color:#ffe24a;">✦</span>':''} <span style="color:var(--text-dim);">${_rn}</span>${u.equippedPetIncome?`<span style="color:var(--text-dim);margin-left:4px;">·+${u.equippedPetIncome}/s</span>`:''}</div>`;})():''}
+      ${isMe?`<div style="margin-bottom:4px;"><button onclick="N.openEggverse()" style="background:rgba(255,224,100,0.1);border:1px solid rgba(255,224,100,0.3);color:#ffe064;font-family:var(--font-mono);font-size:9px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;">${u.equippedPetName?'🔄 CHANGE PET':'🥚 EQUIP A PET'}</button></div>`:''}
       ${bio?`<div class="profile-bio">${esc(bio).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<strong>$1</strong>').replace(/_(.+?)_/g,'<em>$1</em>').replace(/`(.+?)`/g,'<code style="background:var(--bg3);padding:1px 4px;border-radius:3px;font-size:11px;">$1</code>').replace(/\n/g,'<br>')}</div>`:`<div class="profile-bio-empty">${isMe?'You haven\'t set a bio yet. Add one in Settings.':'No bio set.'}</div>`}
       ${getRoleBadge(uid)?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${getRoleBadge(uid)}</div>`:''}
 
@@ -17010,6 +17012,32 @@ function renderCommunityGames(filter){
     container.appendChild(card);
   });
 }
+
+// ── EGGVERSE MESSAGE HANDLERS ────────────────────────────────────────────────
+window.addEventListener('message',async function(e){
+  if(!e.data) return;
+  if(e.data.type==='eggverseRequestState'){
+    if(!cu||!cud) return;
+    if(cud.eggverseState) try{e.source.postMessage({type:'eggverseLoadState',gameState:cud.eggverseState},'*');}catch(_s){}
+    return;
+  }
+  if(e.data.type==='eggverseSave'){
+    if(!cu||!cud) return;
+    const {gameState,hatched,rar,shiny,petName,rarestRar,rarestShiny,rarestName}=e.data;
+    if(gameState) updateDoc(doc(db,'users',cu.uid),{eggverseState:gameState}).catch(()=>{});
+    const _EIS={common:0.5,uncommon:1,rare:2,epic:5,legendary:12,mythic:30,secret:80,divine:200,celestial:500,omega:2000};
+    const _r=rar?(_EIS[rar]||0):0;
+    const _pu={equippedPetRar:rar||null,equippedPetShiny:shiny||false,equippedPetName:petName||'',equippedPetIncome:_r};
+    updateDoc(doc(db,'users',cu.uid),_pu).catch(()=>{});
+    Object.assign(cud,_pu);if(uCache[cu.uid])Object.assign(uCache[cu.uid],_pu);
+    const _es=e.source;if(_es&&_es.__eggId&&_eggIncomeRates[_es.__eggId])_eggIncomeRates[_es.__eggId].rate=_r;
+    const _RO=['common','uncommon','rare','epic','legendary','mythic','secret','divine','celestial','omega'];
+    const _RC={common:'#9aa7c7',uncommon:'#3ee87a',rare:'#3aa0ff',epic:'#c061ff',legendary:'#ff9d2e',mythic:'#ff2d6f',secret:'#00f0ff',divine:'#ffe24a',celestial:'#b9f2ff',omega:'#ff3bd0'};
+    if(hatched){const hR=doc(db,'communityGameScores','eggverse_hatched','scores',cu.uid);getDoc(hR).then(hs=>{if((hs.data()?.score||0)<hatched)setDoc(hR,{uid:cu.uid,username:cud.username||'',displayName:cud.displayName||'',score:hatched,ts:serverTimestamp()},{merge:true});}).catch(()=>{});}
+    if(rarestRar){const ni=_RO.indexOf(rarestRar);const rR=doc(db,'communityGameScores','eggverse_rarest','scores',cu.uid);getDoc(rR).then(rs=>{const pi=_RO.indexOf(rs.data()?.rarKey||'common');if(ni>pi||(ni===pi&&rarestShiny&&!rs.data()?.shiny))setDoc(rR,{uid:cu.uid,username:cud.username||'',displayName:cud.displayName||'',score:ni,rarKey:rarestRar,rarName:rarestRar.charAt(0).toUpperCase()+rarestRar.slice(1)+(rarestShiny?'\u2746':''),rarColor:_RC[rarestRar]||'#fff',shiny:rarestShiny||false,petName:rarestName||'',ts:serverTimestamp()},{merge:true});}).catch(()=>{});}
+    syncLeaderboardRoles().catch(()=>{});
+  }
+});
 
 // ── COMMUNITY GAME SCORE LISTENER ──────────────────────────────────────────
 window.addEventListener('message',function(e){
