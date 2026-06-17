@@ -292,6 +292,11 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   @keyframes bubbleShimmer{0%{background-position:200% center;}100%{background-position:-200% center;}}
   @keyframes bubbleGlow{0%,100%{box-shadow:0 0 6px var(--bubble-own-border,rgba(68,102,255,0.3));}50%{box-shadow:0 0 16px var(--bubble-own-border,rgba(68,102,255,0.6));}}
   .msg-bubble a{color:var(--accent2);text-decoration:underline;}
+  .msg-spoiler{background:var(--text,#cfd6e6);color:transparent;border-radius:4px;padding:0 3px;cursor:help;filter:blur(0.2px);transition:color 0.12s,background 0.12s;user-select:none;}
+  .msg-spoiler:hover{background:rgba(127,127,127,0.18);color:inherit;user-select:text;}
+  .msg-code{font-family:var(--font-mono,monospace);background:rgba(127,127,127,0.18);border:1px solid rgba(127,127,127,0.25);border-radius:5px;padding:1px 5px;font-size:0.9em;}
+  .msg-mention{color:var(--accent2,#00d4ff);background:rgba(0,212,255,0.12);border-radius:5px;padding:0 4px;font-weight:600;}
+  .msg-mention.me{color:#ffd24a;background:rgba(255,210,74,0.18);}
   .msg-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
   .reaction-pill{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:2px 8px;font-size:13px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:4px;}
   .reaction-pill:hover{border-color:var(--accent);}
@@ -309,7 +314,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .file-info .file-size{font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px;}
   .input-bar{padding:16px 24px;border-top:1px solid var(--border);background:var(--panel);display:flex;align-items:flex-end;gap:10px;flex-shrink:0;}
   .input-actions{display:flex;gap:6px;}
-  .input-field-wrap{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:12px;display:flex;align-items:flex-end;gap:8px;padding:9px 14px;transition:border-color 0.3s;}
+  .input-field-wrap{flex:1;position:relative;background:var(--bg3);border:1px solid var(--border);border-radius:12px;display:flex;align-items:flex-end;gap:8px;padding:9px 14px;transition:border-color 0.3s;}
+  .mention-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:var(--text);}
+  .mention-item.active,.mention-item:hover{background:rgba(0,212,255,0.12);}
+  .mention-item .mu{color:var(--text-dim);font-family:var(--font-mono);font-size:11px;}
   .input-field-wrap:focus-within{border-color:var(--accent);}
   .msg-input{flex:1;background:none;border:none;color:var(--text);font-family:var(--font-body);font-size:14px;resize:none;outline:none;max-height:140px;min-height:22px;line-height:1.5;}
   .msg-input::placeholder{color:var(--text-dim);}
@@ -1261,10 +1269,12 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
               </label>
               <button class="icon-btn" id="voice-btn" title="Voice note (tap to record, tap to send)" onclick="N.toggleRecording()">🎙️</button>
               <button class="icon-btn" title="Send a GIF" onclick="N.openGifPicker()" style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:#00d4ff;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">GIF</button>
+              <button class="icon-btn" id="md-help-btn" title="Formatting & shortcuts" onclick="N.openShortcutsHelp()" style="font-weight:700;font-family:var(--font-mono);color:var(--text-dim);transition:color 0.15s;" onmouseover="this.style.color='var(--accent2)'" onmouseout="this.style.color='var(--text-dim)'">Aa</button>
             </div>
             <div class="input-field-wrap">
+              <div id="mention-autocomplete" style="display:none;position:absolute;bottom:100%;left:0;margin-bottom:6px;max-height:180px;overflow-y:auto;width:240px;background:var(--bg2,#11151f);border:1px solid var(--border,#2a3140);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.5);z-index:50;"></div>
               <textarea class="msg-input" id="msg-input" placeholder="Send a message…" rows="1"
-                onkeydown="N.handleInputKey(event)" oninput="N.autoResize(this);window.sendTyping&&window.sendTyping()"></textarea>
+                onkeydown="N.handleInputKey(event)" oninput="N.autoResize(this);N.onMsgInput&&N.onMsgInput();window.sendTyping&&window.sendTyping()"></textarea>
               <button class="emoji-toggle" onclick="N.toggleEmojiPicker()">😊</button>
             </div>
             <button class="send-btn" onclick="N.sendMessage()">➤</button>
@@ -4291,7 +4301,39 @@ function renderMsgs(cid){
   }
 }
 
-const fmtMsg=t=>t?esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>'):'';
+// Renders message text: escapes HTML first (XSS-safe), then applies lightweight
+// markdown, spoiler tags, @mentions, and link detection on the escaped string.
+function fmtMsg(t){
+  if(!t) return '';
+  let s = esc(t);
+  // protect links first by tokenising them so markdown chars inside URLs aren't touched
+  const _links=[];
+  s = s.replace(/(https?:\/\/[^\s]+)/g, m=>{ _links.push(m); return '\u0000L'+(_links.length-1)+'\u0000'; });
+  // inline code `code` (protect its contents from other markdown)
+  const _codes=[];
+  s = s.replace(/`([^`\n]+)`/g, (_,c)=>{ _codes.push(c); return '\u0000C'+(_codes.length-1)+'\u0000'; });
+  // spoiler / hidden: ||text|| — blurred until hovered
+  s = s.replace(/\|\|([^\n]+?)\|\|/g, '<span class="msg-spoiler" title="Hover to reveal">$1</span>');
+  // bold + italic ***text***
+  s = s.replace(/\*\*\*([^\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  // bold **text**
+  s = s.replace(/\*\*([^\n]+?)\*\*/g, '<strong>$1</strong>');
+  // strikethrough ~~text~~
+  s = s.replace(/~~([^\n]+?)~~/g, '<del>$1</del>');
+  // italic *text* or _text_
+  s = s.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+  s = s.replace(/(^|[^_\w])_([^_\n]+?)_(?![_\w])/g, '$1<em>$2</em>');
+  // @mentions — highlight; if it's the current user, mark it specially
+  s = s.replace(/(^|[^\w@])@([a-zA-Z0-9_]{2,20})/g, (full,pre,name)=>{
+    const isMe = cud && cud.username && name.toLowerCase()===String(cud.username).toLowerCase();
+    return pre+'<span class="msg-mention'+(isMe?' me':'')+'" data-user="'+name+'">@'+name+'</span>';
+  });
+  // restore inline code
+  s = s.replace(/\u0000C(\d+)\u0000/g, (_,i)=>'<code class="msg-code">'+_codes[+i]+'</code>');
+  // restore links as anchors
+  s = s.replace(/\u0000L(\d+)\u0000/g, (_,i)=>{ const u=_links[+i]; return '<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'; });
+  return s;
+}
 
 // ── SEND ───────────────────────────────────────
 // ── REPLY SYSTEM ──────────────────────────────
@@ -4756,8 +4798,109 @@ async function sendMessage(){
   }catch(e){toast('Send failed: '+e.message,'danger');}
 }
 
-const handleInputKey=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}};
+const handleInputKey=e=>{
+  // when the mention dropdown is open, arrows/enter/tab navigate it
+  if(_mentionOpen){
+    const items=[...document.querySelectorAll('#mention-autocomplete .mention-item')];
+    if(items.length){
+      if(e.key==='ArrowDown'){e.preventDefault();_mentionIdx=(_mentionIdx+1)%items.length;_renderMentionActive();return;}
+      if(e.key==='ArrowUp'){e.preventDefault();_mentionIdx=(_mentionIdx-1+items.length)%items.length;_renderMentionActive();return;}
+      if(e.key==='Enter'||e.key==='Tab'){e.preventDefault();_pickMention(items[_mentionIdx]?.dataset.username);return;}
+      if(e.key==='Escape'){_closeMention();return;}
+    }
+  }
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}
+};
 const autoResize=el=>{el.style.height='22px';el.style.height=Math.min(el.scrollHeight,140)+'px';};
+
+// ── @MENTION AUTOCOMPLETE ───────────────────────────────
+let _mentionOpen=false,_mentionIdx=0,_mentionStart=-1;
+function onMsgInput(){
+  const inp=$('msg-input'); if(!inp){return;}
+  const val=inp.value, pos=inp.selectionStart;
+  // find an @token immediately before the caret
+  const upto=val.slice(0,pos);
+  const m=upto.match(/(^|\s)@([a-zA-Z0-9_]*)$/);
+  if(!m){ _closeMention(); return; }
+  _mentionStart=pos-m[2].length-1; // index of the '@'
+  const q=m[2].toLowerCase();
+  // candidate users: people in cache (skip self), matched by username/displayName
+  const seen=new Set();
+  let cands=Object.entries(uCache||{})
+    .map(([uid,u])=>({uid,username:u.username||'',displayName:u.displayName||u.username||''}))
+    .filter(u=>u.username && u.uid!==cu?.uid)
+    .filter(u=>!q || u.username.toLowerCase().startsWith(q) || u.displayName.toLowerCase().includes(q))
+    .filter(u=>{ if(seen.has(u.username))return false; seen.add(u.username); return true; })
+    .slice(0,8);
+  const box=$('mention-autocomplete'); if(!box) return;
+  if(!cands.length){ _closeMention(); return; }
+  box.innerHTML=cands.map((u,i)=>`<div class="mention-item${i===0?' active':''}" data-username="${esc(u.username)}" onclick="N._pickMention('${esc(u.username)}')"><span>${esc(u.displayName)}</span><span class="mu">@${esc(u.username)}</span></div>`).join('');
+  box.style.display='block';_mentionOpen=true;_mentionIdx=0;
+}
+function _renderMentionActive(){
+  const items=[...document.querySelectorAll('#mention-autocomplete .mention-item')];
+  items.forEach((it,i)=>it.classList.toggle('active',i===_mentionIdx));
+  items[_mentionIdx]?.scrollIntoView({block:'nearest'});
+}
+function _pickMention(username){
+  if(!username) return;
+  const inp=$('msg-input'); if(!inp) return;
+  const val=inp.value, pos=inp.selectionStart;
+  const before=val.slice(0,_mentionStart);
+  const after=val.slice(pos);
+  const insert='@'+username+' ';
+  inp.value=before+insert+after;
+  const caret=(before+insert).length;
+  inp.setSelectionRange(caret,caret);
+  _closeMention(); inp.focus(); autoResize(inp);
+}
+function _closeMention(){ _mentionOpen=false;_mentionIdx=0;_mentionStart=-1; const b=$('mention-autocomplete'); if(b){b.style.display='none';} }
+
+// clicking a rendered @mention opens that user's profile
+document.addEventListener('click',e=>{
+  const men=e.target.closest&&e.target.closest('.msg-mention');
+  if(!men) return;
+  const uname=(men.dataset.user||'').toLowerCase();
+  if(!uname) return;
+  const hit=Object.entries(uCache||{}).find(([uid,u])=>(u.username||'').toLowerCase()===uname);
+  if(hit&&typeof openProfileModal==='function') openProfileModal(hit[0]);
+});
+
+// ── FORMATTING / SHORTCUTS HELP ─────────────────────────
+function openShortcutsHelp(){
+  let m=document.getElementById('shortcuts-help-modal');
+  if(!m){
+    m=document.createElement('div');m.id='shortcuts-help-modal';m.className='modal-overlay';
+    m.innerHTML=`<div class="modal" style="max-width:420px;">
+      <div class="modal-title">FORMATTING & SHORTCUTS</div>
+      <button class="modal-close" onclick="N.closeModal('shortcuts-help-modal')">✕</button>
+      <div style="font-size:13px;line-height:1.5;color:var(--text);display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;">
+        ${[
+          ['Bold','**text**','<strong>text</strong>'],
+          ['Italic','*text* or _text_','<em>text</em>'],
+          ['Bold + Italic','***text***','<strong><em>text</em></strong>'],
+          ['Strikethrough','~~text~~','<del>text</del>'],
+          ['Inline code','`text`','<code class="msg-code">text</code>'],
+          ['Spoiler / hidden','||text||','<span class="msg-spoiler">text</span> <span style="font-size:10px;color:var(--text-dim);">(hover to reveal)</span>'],
+          ['Mention someone','@username','<span class="msg-mention">@username</span>'],
+          ['Link','paste a URL','<a href="#" onclick="return false">auto-linked</a>'],
+        ].map(([name,syntax,demo])=>`<div style="display:flex;flex-direction:column;gap:3px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <span style="font-weight:600;">${name}</span>
+            <code class="msg-code">${esc(syntax)}</code>
+          </div>
+          <div style="font-size:12px;color:var(--text-dim);">→ ${demo}</div>
+        </div>`).join('')}
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--text-dim);">
+          <div><b style="color:var(--text);">Enter</b> — send · <b style="color:var(--text);">Shift+Enter</b> — new line</div>
+          <div>Type <b style="color:var(--text);">@</b> to mention — pick with ↑ ↓ and Enter</div>
+        </div>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+  openModal('shortcuts-help-modal');
+}
 
 function handleFileAttach(input){
   const file=input.files[0];if(!file)return;
@@ -20965,7 +21108,7 @@ window._N = {
   switchTab, doLogin, doRegister, doLogout,
   openModal, closeModal,
   filterFeed: v=>{ffilter=v.toLowerCase();renderSidebar();},
-  openChat, sendMessage, handleInputKey, autoResize,
+  openChat, sendMessage, handleInputKey, autoResize, onMsgInput, _pickMention, openShortcutsHelp,
   handleFileAttach, toggleEmojiPicker,
   confirmWipe, doWipe, cancelWipe,
   startDM, startCall, endCall, answerCall, rejectCall,
