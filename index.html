@@ -12723,6 +12723,13 @@ function updateMyStatusDot(){
 let _debugOpen = false;
 let _drunkMode = false;
 let _drunkRaf = null;
+// ── extra (local-only, harmless) fun-mode state ──
+const _DBG_SESSION_START = Date.now();
+let _rainbowMode = false;
+let _gravityMode = false, _gravityRaf = null;
+let _bigTextMode = false;
+let _spinMode = false;
+let _discoMode = false, _discoRaf = null;
 let _perfPanelOpen = false;
 let _fpsPinned = false;
 let _perfRaf = null;
@@ -12748,8 +12755,8 @@ function openDebugMenu(){
     document.body.appendChild(panel);
   }
   _renderDebugPanel(panel);
+  _startUptimeTicker();
 }
-
 function closeDebugMenu(){
   _debugOpen = false;
   const p = document.getElementById('__debug-panel__');
@@ -12763,7 +12770,7 @@ function _renderDebugPanel(panel){
   panel.innerHTML = `
     <div style="padding:12px 14px;border-bottom:1px solid rgba(68,102,255,0.25);display:flex;align-items:center;justify-content:space-between;">
       <span style="font-size:12px;letter-spacing:2px;color:#4466ff;">⚙ DEBUG MENU</span>
-      <span style="font-size:9px;color:var(--text-dim);">RIGHT ALT to close</span>
+      <span style="font-size:9px;color:var(--text-dim);">RIGHT ALT / SHIFT to close</span>
     </div>
     <div style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;">
 
@@ -12791,6 +12798,18 @@ function _renderDebugPanel(panel){
         ⚡ ${_perfModeActive?'Restore All Settings':'Max FPS Mode — strip all effects'}
       </button>
 
+      <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">FUN EXTRAS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+        ${[
+          ['_toggleRainbow','🌈 Rainbow',_rainbowMode],
+          ['_toggleGravity','🪐 Gravity',_gravityMode],
+          ['_toggleBigText','🔠 Big Text',_bigTextMode],
+          ['_toggleSpin','🌀 Spin',_spinMode],
+          ['_toggleDisco','🪩 Disco',_discoMode],
+        ].map(([fn,label,on])=>`<button onclick="N.${fn}()" style="background:${on?'rgba(255,200,0,0.18)':'rgba(255,255,255,0.04)'};border:1px solid ${on?'rgba(255,200,0,0.5)':'rgba(255,255,255,0.08)'};color:${on?'#ffd700':'var(--text-dim)'};padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;text-align:left;">${label} <span style="float:right;font-size:8px;">${on?'ON':''}</span></button>`).join('')}
+        <button onclick="N._dbgConfetti()" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--text-dim);padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;text-align:left;">🎉 Confetti</button>
+      </div>
+
       <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">STATE</div>
       <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;line-height:1.7;">
         <div>acid: <span style="color:#4466ff;">${acid||'none'}</span></div>
@@ -12802,6 +12821,7 @@ function _renderDebugPanel(panel){
         <div>uCache size: <span style="color:#4466ff;">${Object.keys(uCache||{}).length} users</span></div>
         <div>aChats: <span style="color:#4466ff;">${Object.keys(aChats||{}).length} active</span></div>
         <div>animBg running: <span style="color:#4466ff;">${Object.keys(_animBgState||{}).length}</span></div>
+        <div>uptime: <span style="color:#4466ff;" id="__dbg-uptime__">${_dbgUptimeStr()}</span></div>
       </div>
 
       <div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-top:6px;">ACTIONS</div>
@@ -12846,6 +12866,130 @@ function _toggleDrunkMode(){
   }
   const p = document.getElementById('__debug-panel__');
   if(p) _renderDebugPanel(p);
+}
+
+// ── EXTRA FUN MODES (all local-only: inject/remove CSS or a rAF, reset on toggle off) ──
+function _dbgRerender(){const p=document.getElementById('__debug-panel__');if(p)_renderDebugPanel(p);}
+
+// 🌈 Rainbow Mode — animate text colors site-wide via an injected stylesheet
+function _toggleRainbow(){
+  _rainbowMode=!_rainbowMode;
+  let st=document.getElementById('__rainbow-style__');
+  if(_rainbowMode){
+    if(!st){
+      st=document.createElement('style');st.id='__rainbow-style__';
+      st.textContent='@keyframes _dbgRainbow{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}'
+        +'#app-screen *{animation:_dbgRainbowText 6s linear infinite!important;}'
+        +'@keyframes _dbgRainbowText{0%{color:#ff0055}14%{color:#ff9d2e}28%{color:#ffe24a}42%{color:#3ee87a}57%{color:#39d0ff}71%{color:#6c5ce7}85%{color:#c061ff}100%{color:#ff0055}}';
+      document.head.appendChild(st);
+    }
+    toast('🌈 Rainbow mode ON','success');
+  } else {
+    if(st) st.remove();
+    toast('Rainbow off','success');
+  }
+  _dbgRerender();
+}
+
+// 🪐 Gravity Mode — gently drop & bounce the main panels (transform only, resets on off)
+function _toggleGravity(){
+  _gravityMode=!_gravityMode;
+  const els=[...document.querySelectorAll('#app-screen .card, #app-screen .msg, #app-screen button')].slice(0,120);
+  if(_gravityMode){
+    const bodies=els.map(el=>({el,y:0,vy:Math.random()*-2,base:el.style.transform||''}));
+    const floorJitter=()=>{
+      if(!_gravityMode){bodies.forEach(b=>b.el.style.transform=b.base);return;}
+      bodies.forEach(b=>{
+        b.vy+=0.6;b.y+=b.vy;
+        if(b.y>60){b.y=60;b.vy*=-0.55;}
+        b.el.style.transform=b.base+` translateY(${b.y}px)`;
+      });
+      _gravityRaf=requestAnimationFrame(floorJitter);
+    };
+    _gravityRaf=requestAnimationFrame(floorJitter);
+    toast('🪐 Gravity ON','success');
+  } else {
+    if(_gravityRaf)cancelAnimationFrame(_gravityRaf);
+    els.forEach(el=>el.style.transform='');
+    toast('Gravity off','success');
+  }
+  _dbgRerender();
+}
+
+// 🔠 Big Text — bump the root font scale (local CSS, reset on off)
+function _toggleBigText(){
+  _bigTextMode=!_bigTextMode;
+  let st=document.getElementById('__bigtext-style__');
+  if(_bigTextMode){
+    if(!st){st=document.createElement('style');st.id='__bigtext-style__';
+      st.textContent='#app-screen{font-size:1.25em!important;}';document.head.appendChild(st);}
+    toast('🔠 Big text ON','success');
+  } else { if(st)st.remove(); toast('Text back to normal','success'); }
+  _dbgRerender();
+}
+
+// 🌀 Spin — slowly rotate the whole app (CSS animation, reset on off)
+function _toggleSpin(){
+  _spinMode=!_spinMode;
+  const el=document.getElementById('app-screen');
+  let st=document.getElementById('__spin-style__');
+  if(_spinMode){
+    if(!st){st=document.createElement('style');st.id='__spin-style__';
+      st.textContent='@keyframes _dbgSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}';document.head.appendChild(st);}
+    if(el)el.style.animation='_dbgSpin 12s linear infinite';
+    toast('🌀 Wheee','success');
+  } else { if(el)el.style.animation=''; if(st)st.remove(); toast('Stopped spinning','success'); }
+  _dbgRerender();
+}
+
+// 🪩 Disco — cycle the page background hue
+function _toggleDisco(){
+  _discoMode=!_discoMode;
+  const el=document.getElementById('app-screen');
+  if(_discoMode){
+    let h=0;
+    const loop=()=>{ if(!_discoMode){if(el)el.style.backgroundColor='';return;}
+      h=(h+2)%360; if(el)el.style.backgroundColor='hsl('+h+',60%,8%)';
+      _discoRaf=requestAnimationFrame(loop); };
+    _discoRaf=requestAnimationFrame(loop);
+    toast('🪩 Disco!','success');
+  } else { if(_discoRaf)cancelAnimationFrame(_discoRaf); if(el)el.style.backgroundColor=''; toast('Lights up','success'); }
+  _dbgRerender();
+}
+
+// 🎉 Confetti — one-shot burst, cleans itself up
+function _dbgConfetti(){
+  const cols=['#ff0055','#ff9d2e','#ffe24a','#3ee87a','#39d0ff','#6c5ce7','#c061ff'];
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:2147483646;overflow:hidden;';
+  document.body.appendChild(wrap);
+  for(let i=0;i<120;i++){
+    const p=document.createElement('div');
+    const sz=6+Math.random()*8;
+    p.style.cssText='position:absolute;width:'+sz+'px;height:'+(sz*0.5)+'px;background:'+cols[i%cols.length]
+      +';left:'+(Math.random()*100)+'%;top:-20px;opacity:0.9;border-radius:1px;';
+    wrap.appendChild(p);
+    const dx=(Math.random()-0.5)*240, fall=window.innerHeight+40, rot=Math.random()*720-360, dur=1400+Math.random()*1400;
+    p.animate([{transform:'translate(0,0) rotate(0)'},{transform:'translate('+dx+'px,'+fall+'px) rotate('+rot+'deg)'}],
+      {duration:dur,easing:'cubic-bezier(.2,.6,.4,1)',fill:'forwards'});
+  }
+  setTimeout(()=>wrap.remove(),3000);
+}
+
+// 🕒 Uptime — live "this tab has been open for…" in the debug panel
+function _dbgUptimeStr(){
+  let s=Math.floor((Date.now()-_DBG_SESSION_START)/1000);
+  const h=Math.floor(s/3600);s-=h*3600;const m=Math.floor(s/60);s-=m*60;
+  return (h?h+'h ':'')+(m||h?m+'m ':'')+s+'s';
+}
+let _dbgUptimeTimer=null;
+function _startUptimeTicker(){
+  if(_dbgUptimeTimer) return;
+  _dbgUptimeTimer=setInterval(()=>{
+    const el=document.getElementById('__dbg-uptime__');
+    if(el) el.textContent=_dbgUptimeStr();
+    else { clearInterval(_dbgUptimeTimer); _dbgUptimeTimer=null; } // panel closed
+  },1000);
 }
 
 // ── PERFORMANCE PANEL ──
@@ -20615,7 +20759,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
