@@ -12730,6 +12730,17 @@ let _gravityMode = false, _gravityRaf = null, _gravityBodies = null;
 let _bigTextMode = false;
 let _spinMode = false;
 let _discoMode = false, _discoRaf = null;
+// ── 10 more unique fun extras (all local-only) ──
+let _gooMode=false, _gooRaf=null, _gooBodies=null;       // elements wobble like jelly
+let _quakeMode=false, _quakeRaf=null;                    // screen earthquake
+let _matrixMode=false, _matrixRaf=null;                  // matrix rain overlay
+let _fisheyeMode=false, _fisheyeMove=null;               // magnifier lens that follows cursor
+let _ghostMode=false;                                    // UI phases like a ghost
+let _lowGravFloatMode=false, _lowGravRaf=null, _lowGravBodies=null; // everything floats up
+let _crtMode=false;                                      // retro CRT scanlines + flicker
+let _magnetMode=false, _magnetRaf=null, _magnetMove=null, _magnetBodies=null; // elements lean toward the cursor
+let _snowMode=false, _snowRaf=null;                      // snowfall overlay
+let _heartbeatMode=false;                                // whole UI pulses like a heartbeat
 let _perfPanelOpen = false;
 let _fpsPinned = false;
 let _perfRaf = null;
@@ -12806,6 +12817,16 @@ function _renderDebugPanel(panel){
           ['_toggleBigText','🔠 Big Text',_bigTextMode],
           ['_toggleSpin','🌀 Spin',_spinMode],
           ['_toggleDisco','🪩 Disco',_discoMode],
+          ['_toggleGoo','🫧 Jelly',_gooMode],
+          ['_toggleQuake','🌋 Quake',_quakeMode],
+          ['_toggleMatrix','🟩 Matrix',_matrixMode],
+          ['_toggleFisheye','🔍 Magnifier',_fisheyeMode],
+          ['_toggleLowGrav','🎈 Float',_lowGravFloatMode],
+          ['_toggleCRT','📺 CRT',_crtMode],
+          ['_toggleMagnet','🧲 Magnet',_magnetMode],
+          ['_toggleSnow','❄️ Snow',_snowMode],
+          ['_toggleHeartbeat','💓 Heartbeat',_heartbeatMode],
+          ['_toggleGhost','👻 Ghost',_ghostMode],
         ].map(([fn,label,on])=>`<button onclick="N.${fn}()" style="background:${on?'rgba(255,200,0,0.18)':'rgba(255,255,255,0.04)'};border:1px solid ${on?'rgba(255,200,0,0.5)':'rgba(255,255,255,0.08)'};color:${on?'#ffd700':'var(--text-dim)'};padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;text-align:left;">${label} <span style="float:right;font-size:8px;">${on?'ON':''}</span></button>`).join('')}
         <button onclick="N._dbgConfetti()" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--text-dim);padding:6px 8px;border-radius:6px;cursor:pointer;font-family:var(--font-mono);font-size:10px;text-align:left;">🎉 Confetti</button>
       </div>
@@ -13022,6 +13043,195 @@ function _toggleDisco(){
     if(overlay)overlay.remove();
     toast('Lights up','success');
   }
+  _dbgRerender();
+}
+
+// 🫧 Goo Mode — every element wobbles like jelly, springy and squishy
+function _toggleGoo(){
+  _gooMode=!_gooMode;
+  const root=document.getElementById('app-screen');
+  if(_gooMode){
+    const els=root?[...root.querySelectorAll('.card,.msg,button,input,.tab')].slice(0,200):[];
+    const bodies=els.map((el,i)=>({el,ph:Math.random()*6.28,sp:0.06+Math.random()*0.05,base:el.style.transform||'',baseT:el.style.transition||''}));
+    bodies.forEach(b=>b.el.style.transition='none');
+    let t=0;
+    const loop=()=>{ if(!_gooMode){bodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.baseT;});return;}
+      t+=1;
+      bodies.forEach(b=>{const a=t*b.sp+b.ph;const sx=1+Math.sin(a)*0.08;const sy=1+Math.cos(a*1.3)*0.08;const sk=Math.sin(a*0.7)*4;
+        b.el.style.transform=b.base+` scale(${sx},${sy}) skewX(${sk}deg)`;});
+      _gooRaf=requestAnimationFrame(loop); };
+    _gooRaf=requestAnimationFrame(loop);_gooBodies=bodies;
+    toast('🫧 Everything is jelly','success');
+  } else { if(_gooRaf)cancelAnimationFrame(_gooRaf); if(_gooBodies){_gooBodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.baseT;});_gooBodies=null;} toast('Un-jellied','success'); }
+  _dbgRerender();
+}
+
+// 🌋 Earthquake — the whole screen violently shakes
+function _toggleQuake(){
+  _quakeMode=!_quakeMode;
+  const el=document.getElementById('app-screen');
+  if(_quakeMode){
+    const loop=()=>{ if(!_quakeMode){if(el)el.style.transform='';return;}
+      const x=(Math.random()-0.5)*16,y=(Math.random()-0.5)*16,r=(Math.random()-0.5)*1.5;
+      if(el)el.style.transform=`translate(${x}px,${y}px) rotate(${r}deg)`;
+      _quakeRaf=requestAnimationFrame(loop); };
+    _quakeRaf=requestAnimationFrame(loop);
+    toast('🌋 EARTHQUAKE','success');
+  } else { if(_quakeRaf)cancelAnimationFrame(_quakeRaf); if(el)el.style.transform=''; toast('Tremors stopped','success'); }
+  _dbgRerender();
+}
+
+// 🟩 Matrix Rain — cascading green code overlay behind a translucent screen
+function _toggleMatrix(){
+  _matrixMode=!_matrixMode;
+  let cv=document.getElementById('__matrix-cv__');
+  if(_matrixMode){
+    if(!cv){cv=document.createElement('canvas');cv.id='__matrix-cv__';
+      cv.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:99997;opacity:0.45;';
+      document.body.appendChild(cv);}
+    const ctx=cv.getContext('2d');
+    const resize=()=>{cv.width=innerWidth;cv.height=innerHeight;};resize();
+    const chars='アイウエオカキクケコｱﾝ01010#$%&'.split('');
+    const fs=16,cols=Math.floor(innerWidth/fs);const drops=Array(cols).fill(0).map(()=>Math.random()*-50);
+    const loop=()=>{ if(!_matrixMode){const c=document.getElementById('__matrix-cv__');if(c)c.remove();return;}
+      ctx.fillStyle='rgba(0,10,0,0.12)';ctx.fillRect(0,0,cv.width,cv.height);
+      ctx.fillStyle='#39ff77';ctx.font=fs+'px monospace';
+      for(let i=0;i<drops.length;i++){const ch=chars[Math.floor(Math.random()*chars.length)];
+        ctx.fillText(ch,i*fs,drops[i]*fs);
+        if(drops[i]*fs>cv.height&&Math.random()>0.975)drops[i]=0;drops[i]++;}
+      _matrixRaf=requestAnimationFrame(loop); };
+    _matrixRaf=requestAnimationFrame(loop);
+    toast('🟩 Wake up…','success');
+  } else { if(_matrixRaf)cancelAnimationFrame(_matrixRaf); if(cv)cv.remove(); toast('Unplugged','success'); }
+  _dbgRerender();
+}
+
+// 🔍 Magnifier — a glass lens bubble follows your cursor, magnifying & brightening under it
+function _toggleFisheye(){
+  _fisheyeMode=!_fisheyeMode;
+  let lens=document.getElementById('__fisheye-lens__');
+  const move=e=>{ if(lens){lens.style.left=(e.clientX-80)+'px';lens.style.top=(e.clientY-80)+'px';} };
+  if(_fisheyeMode){
+    if(!lens){lens=document.createElement('div');lens.id='__fisheye-lens__';
+      lens.style.cssText='position:fixed;width:160px;height:160px;border-radius:50%;pointer-events:none;z-index:99996;left:-999px;top:-999px;'
+        +'backdrop-filter:brightness(1.35) saturate(1.4) contrast(1.05);-webkit-backdrop-filter:brightness(1.35) saturate(1.4) contrast(1.05);'
+        +'box-shadow:inset 0 0 30px rgba(255,255,255,0.35),inset 0 0 0 2px rgba(255,255,255,0.4),0 6px 24px rgba(0,0,0,0.4);'
+        +'background:radial-gradient(circle at 38% 32%, rgba(255,255,255,0.22), transparent 55%);';
+      document.body.appendChild(lens);
+    }
+    window.addEventListener('mousemove',move);_fisheyeMove=move;
+    toast('🔍 Magnifier on','success');
+  } else { if(lens)lens.remove(); if(_fisheyeMove){window.removeEventListener('mousemove',_fisheyeMove);_fisheyeMove=null;} toast('Lens off','success'); }
+  _dbgRerender();
+}
+
+// 🎈 Low Gravity — everything slowly floats upward & drifts, bumping the ceiling
+function _toggleLowGrav(){
+  _lowGravFloatMode=!_lowGravFloatMode;
+  const root=document.getElementById('app-screen');
+  if(_lowGravFloatMode){
+    const els=root?[...root.querySelectorAll('.card,.msg,button,.tab,img')].slice(0,200):[];
+    const bodies=els.map(el=>({el,y:0,x:0,vy:-0.4-Math.random()*0.6,vx:(Math.random()-0.5)*0.6,r:0,vr:(Math.random()-0.5)*1.5,base:el.style.transform||'',baseT:el.style.transition||''}));
+    bodies.forEach(b=>b.el.style.transition='none');
+    const loop=()=>{ if(!_lowGravFloatMode){bodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.baseT;});return;}
+      bodies.forEach(b=>{b.y+=b.vy;b.x+=b.vx;b.r+=b.vr;
+        if(b.y<-260){b.y=-260;b.vy*=-0.4;} b.vx*=0.998;
+        b.el.style.transform=b.base+` translate(${b.x}px,${b.y}px) rotate(${b.r}deg)`;});
+      _lowGravRaf=requestAnimationFrame(loop); };
+    _lowGravRaf=requestAnimationFrame(loop);_lowGravBodies=bodies;
+    toast('🎈 Low gravity','success');
+  } else { if(_lowGravRaf)cancelAnimationFrame(_lowGravRaf); if(_lowGravBodies){_lowGravBodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.baseT;});_lowGravBodies=null;} toast('Gravity restored','success'); }
+  _dbgRerender();
+}
+
+// 📺 CRT Mode — retro scanlines, vignette, subtle flicker & chromatic edges
+function _toggleCRT(){
+  _crtMode=!_crtMode;
+  let st=document.getElementById('__crt-style__'),ov=document.getElementById('__crt-ov__');
+  if(_crtMode){
+    if(!st){st=document.createElement('style');st.id='__crt-style__';
+      st.textContent='@keyframes _crtFlicker{0%{opacity:0.92}50%{opacity:1}100%{opacity:0.94}}'
+        +'#__crt-ov__{position:fixed;inset:0;pointer-events:none;z-index:99995;'
+        +'background:repeating-linear-gradient(0deg,rgba(0,0,0,0.18) 0px,rgba(0,0,0,0.18) 1px,transparent 2px,transparent 3px);'
+        +'box-shadow:inset 0 0 160px rgba(0,0,0,0.7);animation:_crtFlicker 0.12s infinite;}'
+        +'#app-screen{filter:saturate(1.3) contrast(1.1);text-shadow:0.6px 0 rgba(255,0,80,0.4),-0.6px 0 rgba(0,200,255,0.4);}';
+      document.head.appendChild(st);}
+    if(!ov){ov=document.createElement('div');ov.id='__crt-ov__';document.body.appendChild(ov);}
+    toast('📺 CRT engaged','success');
+  } else { if(st)st.remove(); if(ov)ov.remove(); const a=document.getElementById('app-screen'); if(a){a.style.filter='';a.style.textShadow='';} toast('CRT off','success'); }
+  _dbgRerender();
+}
+
+// 🧲 Magnet — every element leans toward your cursor like it's being pulled
+function _toggleMagnet(){
+  _magnetMode=!_magnetMode;
+  const root=document.getElementById('app-screen');
+  let mx=innerWidth/2,my=innerHeight/2;
+  const move=e=>{mx=e.clientX;my=e.clientY;};
+  if(_magnetMode){
+    window.addEventListener('mousemove',move);_magnetMove=move;
+    const els=root?[...root.querySelectorAll('.card,.msg,button,.tab')].slice(0,200):[];
+    const bodies=els.map(el=>({el,base:el.style.transform||'',baseT:el.style.transition||''}));
+    bodies.forEach(b=>b.el.style.transition='transform 0.12s ease-out');
+    const loop=()=>{ if(!_magnetMode){bodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.baseT;});return;}
+      bodies.forEach(b=>{const r=b.el.getBoundingClientRect();const cx=r.left+r.width/2,cy=r.top+r.height/2;
+        let dx=mx-cx,dy=my-cy;const d=Math.hypot(dx,dy)||1;const pull=Math.min(28,2200/d);
+        b.el.style.transform=b.base+` translate(${dx/d*pull}px,${dy/d*pull}px)`;});
+      _magnetRaf=requestAnimationFrame(loop); };
+    _magnetRaf=requestAnimationFrame(loop);_magnetBodies=bodies;
+    toast('🧲 Magnetic pull on','success');
+  } else { if(_magnetRaf)cancelAnimationFrame(_magnetRaf); if(_magnetMove){window.removeEventListener('mousemove',_magnetMove);_magnetMove=null;} if(_magnetBodies){_magnetBodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.baseT;});_magnetBodies=null;} toast('Demagnetized','success'); }
+  _dbgRerender();
+}
+
+// ❄️ Snow — gentle snowfall drifting down over everything
+function _toggleSnow(){
+  _snowMode=!_snowMode;
+  let cv=document.getElementById('__snow-cv__');
+  if(_snowMode){
+    if(!cv){cv=document.createElement('canvas');cv.id='__snow-cv__';
+      cv.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:99994;';document.body.appendChild(cv);}
+    const ctx=cv.getContext('2d');cv.width=innerWidth;cv.height=innerHeight;
+    const flakes=Array.from({length:140},()=>({x:Math.random()*cv.width,y:Math.random()*cv.height,r:1+Math.random()*3,sp:0.4+Math.random()*1.4,sw:Math.random()*6}));
+    const loop=()=>{ if(!_snowMode){const c=document.getElementById('__snow-cv__');if(c)c.remove();return;}
+      ctx.clearRect(0,0,cv.width,cv.height);ctx.fillStyle='rgba(255,255,255,0.85)';
+      flakes.forEach(f=>{f.sw+=0.02;f.y+=f.sp;f.x+=Math.sin(f.sw)*0.6;
+        if(f.y>cv.height){f.y=-5;f.x=Math.random()*cv.width;}
+        ctx.beginPath();ctx.arc(f.x,f.y,f.r,0,7);ctx.fill();});
+      _snowRaf=requestAnimationFrame(loop); };
+    _snowRaf=requestAnimationFrame(loop);
+    toast('❄️ Let it snow','success');
+  } else { if(_snowRaf)cancelAnimationFrame(_snowRaf); if(cv)cv.remove(); toast('Snow cleared','success'); }
+  _dbgRerender();
+}
+
+// 💓 Heartbeat — the entire UI pulses with a double-thump heartbeat rhythm
+function _toggleHeartbeat(){
+  _heartbeatMode=!_heartbeatMode;
+  const el=document.getElementById('app-screen');
+  let st=document.getElementById('__heartbeat-style__');
+  if(_heartbeatMode){
+    if(!st){st=document.createElement('style');st.id='__heartbeat-style__';
+      st.textContent='@keyframes _dbgHeartbeat{0%{transform:scale(1)}8%{transform:scale(1.025)}16%{transform:scale(1)}24%{transform:scale(1.04)}34%{transform:scale(1)}100%{transform:scale(1)}}';
+      document.head.appendChild(st);}
+    if(el){el.style.transformOrigin='center center';el.style.animation='_dbgHeartbeat 1.1s ease-in-out infinite';}
+    toast('💓 Ba-dum… ba-dum…','success');
+  } else { if(el)el.style.animation=''; if(st)st.remove(); toast('Heartbeat stopped','success'); }
+  _dbgRerender();
+}
+
+// 👻 Ghost — the whole UI slowly fades in and out, phasing like a spirit
+function _toggleGhost(){
+  _ghostMode=!_ghostMode;
+  const el=document.getElementById('app-screen');
+  let st=document.getElementById('__ghost-style__');
+  if(_ghostMode){
+    if(!st){st=document.createElement('style');st.id='__ghost-style__';
+      st.textContent='@keyframes _dbgGhost{0%{opacity:1;filter:blur(0)}50%{opacity:0.25;filter:blur(1.5px)}100%{opacity:1;filter:blur(0)}}';
+      document.head.appendChild(st);}
+    if(el)el.style.animation='_dbgGhost 3.5s ease-in-out infinite';
+    toast('👻 Boo','success');
+  } else { if(el)el.style.animation=''; if(st)st.remove(); toast('Back to the living','success'); }
   _dbgRerender();
 }
 
@@ -20827,7 +21037,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
