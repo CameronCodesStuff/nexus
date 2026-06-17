@@ -12732,7 +12732,7 @@ let _perfSessionReads = 0;
 let _perfSessionWrites = 0;
 
 document.addEventListener('keydown', e => {
-  if(e.key === 'AltGraph' || (e.code === 'AltRight')) {
+  if(e.key === 'AltGraph' || (e.code === 'AltRight') || (e.code === 'ShiftRight')) {
     e.preventDefault();
     _debugOpen ? closeDebugMenu() : openDebugMenu();
   }
