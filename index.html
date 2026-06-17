@@ -8997,6 +8997,24 @@ async function loadOwnerUsers(){
       });
       vipBtn.style.cssText+='border-color:#f0b824;color:#f0b824;';
       acts.appendChild(vipBtn);
+      // Give wheel spins
+      const curBonus=u.bonusSpins||0;
+      const spinBtn=mkBtn('🎪 GIVE SPINS'+(curBonus>0?' ('+curBonus+')':''),false,async()=>{
+        const raw=prompt('🎪 Give wheel spins to '+(u.displayName||u.username||'user')+'\n\nHow many spins to ADD? (current bonus: '+curBonus+')','1');
+        if(raw===null) return;
+        const add=parseInt(raw,10);
+        if(!isFinite(add)||add===0){toast('Enter a non-zero number.','danger');return;}
+        const next=Math.max(0,curBonus+add);
+        try{
+          await updateDoc(doc(db,'users',u.id),{bonusSpins:next});
+          if(uCache[u.id]) uCache[u.id]={...uCache[u.id],bonusSpins:next};
+          if(cu&&u.id===cu.uid){cud={...cud,bonusSpins:next};}
+          toast((add>0?'➕ Gave ':'➖ Removed ')+Math.abs(add)+' spin'+(Math.abs(add)===1?'':'s')+' — total bonus: '+next,'success');
+          loadOwnerUsers();
+        }catch(e){toast('Error: '+e.message,'danger');}
+      });
+      spinBtn.style.cssText+='border-color:#ffcc00;color:#ffcc00;';
+      acts.appendChild(spinBtn);
       card.appendChild(acts);
       panel.appendChild(card);
     });
@@ -10665,7 +10683,7 @@ const WHEEL_PRIZES=[
   {label:'🌟 +5K MSGS',     msgs:5000,  color:'#1abc9c', weight:3},
   {label:'😢 +25 MSGS',     msgs:25,    color:'#7f8c8d', weight:20},
   {label:'👑 +10K MSGS',    msgs:10000, color:'#f39c12', weight:1,  rare:true},
-  {label:'🍀 LUCKY ROLE',   msgs:500,   color:'#00b894', weight:1,  rare:true, role:'lucky'},
+  {label:'🍀 LUCKY ROLE',   msgs:500,   color:'#00b894', weight:5,  rare:true, role:'lucky'},
   {label:'🎪 +3K MSGS',     msgs:3000,  color:'#e17055', weight:5},
   {label:'🤩 +1.5K MSGS',   msgs:1500,  color:'#6c5ce7', weight:7},
 ];
@@ -10752,42 +10770,54 @@ async function spinDailyWheel(){
   const total=WHEEL_PRIZES.reduce((s,p)=>s+p.weight,0);
   let rand=Math.random()*total,winner=WHEEL_PRIZES[0],cumulative=0;
   for(const p of WHEEL_PRIZES){cumulative+=p.weight;if(rand<=cumulative){winner=p;break;}}
-  // Calculate angle to land on winner
-  const totalWeight=total;
-  let startAngle=0;
+  // Find the winning segment's mid-angle (degrees, clockwise from 0 = +x axis)
+  let startAngle=0, midAngle=0;
   for(const p of WHEEL_PRIZES){
-    if(p===winner){
-      const arcFraction=(p.weight/totalWeight);
-      const midAngle=startAngle+(arcFraction/2)*360;
-      // The pointer is at top (270° in standard coords)
-      // We need midAngle to be at 270° after rotation
-      const targetAngle=(270-midAngle+360)%360;
-      const extraSpins=5+Math.floor(Math.random()*3);
-      const finalRotation=_wheelRotation+(extraSpins*360)+targetAngle;
-      canvas.style.transition='transform 4s cubic-bezier(0.1,0.8,0.1,1)';
-      canvas.style.transform='rotate('+finalRotation+'deg)';
-      _wheelRotation=finalRotation%360;
-      break;
-    }
-    startAngle+=(p.weight/totalWeight)*360;
+    const arcDeg=(p.weight/total)*360;
+    if(p===winner){ midAngle=startAngle+arcDeg/2; break; }
+    startAngle+=arcDeg;
   }
+  // The pointer sits at the top (=270° in canvas coords). We want the winner's
+  // mid-angle to end up under the pointer. Always rotate FORWARD by whole turns
+  // plus the delta needed, so the wheel never jumps backward between spins.
+  const extraSpins=5+Math.floor(Math.random()*3);
+  const desired=(270-midAngle); // target absolute orientation (mod 360)
+  const current=_wheelRotation%360;
+  let delta=(desired-current)%360; if(delta<0) delta+=360; // smallest forward delta
+  const finalRotation=_wheelRotation+extraSpins*360+delta;
+  canvas.style.transition='transform 4s cubic-bezier(0.1,0.8,0.1,1)';
+  canvas.style.transform='rotate('+finalRotation+'deg)';
+  _wheelRotation=finalRotation; // keep accumulating; never reset to mod 360
   // Wait for spin to finish
   await new Promise(r=>setTimeout(r,4200));
   _wheelSpinning=false;
-  // Grant prize
+  // Grant prize (this re-renders the button to reflect remaining spins, incl. bonus)
   await _grantWheelPrize(winner);
-  btn.textContent='✓ SPUN TODAY';
 }
 
 async function _grantWheelPrize(prize){
   const resultDiv=document.getElementById('wheel-result');
   try{
     const today=getDailyKey();
-    const spinsUsed=((cud?.wheelSpinDay||'')===today?(cud?.wheelSpinsUsed||0):0)+1;
-    const updates={wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
+    const isVip=Array.isArray(cud?.roles)&&cud.roles.includes('vip');
+    const maxDaily=isVip?10:1;
+    const dayMatches=(cud?.wheelSpinDay||'')===today;
+    const usedToday=dayMatches?(cud?.wheelSpinsUsed||0):0;
+    const updates={};
+    // Spend a daily spin if any remain; otherwise spend an owner-granted bonus spin.
+    if(usedToday<maxDaily){
+      updates.wheelSpinDay=today;
+      updates.wheelSpinsUsed=usedToday+1;
+    } else if((cud?.bonusSpins||0)>0){
+      updates.bonusSpins=Math.max(0,(cud.bonusSpins||0)-1);
+    } else {
+      // safety: nothing to spend (shouldn't happen — spinDailyWheel guards this)
+      updates.wheelSpinDay=today;
+      updates.wheelSpinsUsed=usedToday+1;
+    }
     // Update cud immediately so _wheelSpinsLeft() is accurate for the button re-render
-    cud={...cud,wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
-    if(cu&&uCache[cu.uid]) uCache[cu.uid]={...uCache[cu.uid],wheelSpinDay:today,wheelSpinsUsed:spinsUsed};
+    cud={...cud,...updates};
+    if(cu&&uCache[cu.uid]) uCache[cu.uid]={...uCache[cu.uid],...updates};
     const newMsgs=(cud?.msgCount||0)+prize.msgs;
     updates.msgCount=newMsgs;
     // Grant Lucky role if applicable
@@ -10831,7 +10861,9 @@ function _wheelSpinsLeft(){
   const today=getDailyKey();
   const spinDay=cud?.wheelSpinDay||'';
   const spinsUsed=spinDay===today?(cud?.wheelSpinsUsed||0):0;
-  return Math.max(0,maxSpins-spinsUsed);
+  const dailyLeft=Math.max(0,maxSpins-spinsUsed);
+  const bonus=Math.max(0,cud?.bonusSpins||0); // owner-granted extra spins (never expire)
+  return dailyLeft+bonus;
 }
 
 function renderWheelSection(container){
