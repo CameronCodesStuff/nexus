@@ -12726,7 +12726,7 @@ let _drunkRaf = null;
 // ── extra (local-only, harmless) fun-mode state ──
 const _DBG_SESSION_START = Date.now();
 let _rainbowMode = false;
-let _gravityMode = false, _gravityRaf = null;
+let _gravityMode = false, _gravityRaf = null, _gravityBodies = null;
 let _bigTextMode = false;
 let _spinMode = false;
 let _discoMode = false, _discoRaf = null;
@@ -12878,9 +12878,18 @@ function _toggleRainbow(){
   if(_rainbowMode){
     if(!st){
       st=document.createElement('style');st.id='__rainbow-style__';
-      st.textContent='@keyframes _dbgRainbow{0%{filter:hue-rotate(0deg)}100%{filter:hue-rotate(360deg)}}'
-        +'#app-screen *{animation:_dbgRainbowText 6s linear infinite!important;}'
-        +'@keyframes _dbgRainbowText{0%{color:#ff0055}14%{color:#ff9d2e}28%{color:#ffe24a}42%{color:#3ee87a}57%{color:#39d0ff}71%{color:#6c5ce7}85%{color:#c061ff}100%{color:#ff0055}}';
+      // Flowing rainbow: a wide animated gradient clipped to the text. The gradient
+      // scrolls horizontally, so colors smoothly sweep across every character.
+      st.textContent=
+        '@keyframes _dbgRainbowFlow{0%{background-position:0% 50%}100%{background-position:200% 50%}}'
+        +'#app-screen, #app-screen *{'
+        +'background-image:linear-gradient(90deg,#ff0040,#ff8000,#ffe000,#40ff00,#00ffd0,#0080ff,#8000ff,#ff00c0,#ff0040)!important;'
+        +'background-size:200% 100%!important;'
+        +'-webkit-background-clip:text!important;background-clip:text!important;'
+        +'-webkit-text-fill-color:transparent!important;color:transparent!important;'
+        +'animation:_dbgRainbowFlow 4s linear infinite!important;}'
+        // keep inputs/icons readable-ish: re-show emoji & svg by not clipping them
+        +'#app-screen img,#app-screen svg,#app-screen canvas{-webkit-text-fill-color:initial!important;}';
       document.head.appendChild(st);
     }
     toast('🌈 Rainbow mode ON','success');
@@ -12891,40 +12900,71 @@ function _toggleRainbow(){
   _dbgRerender();
 }
 
-// 🪐 Gravity Mode — gently drop & bounce the main panels (transform only, resets on off)
+// 🪐 Gravity Mode — drop & bounce EVERYTHING on screen (transform only, resets on off)
 function _toggleGravity(){
   _gravityMode=!_gravityMode;
-  const els=[...document.querySelectorAll('#app-screen .card, #app-screen .msg, #app-screen button')].slice(0,120);
   if(_gravityMode){
-    const bodies=els.map(el=>({el,y:0,vy:Math.random()*-2,base:el.style.transform||''}));
-    const floorJitter=()=>{
-      if(!_gravityMode){bodies.forEach(b=>b.el.style.transform=b.base);return;}
+    // grab every visible element in the app (skip the debug panel & its kids, and structural wrappers)
+    const root=document.getElementById('app-screen');
+    const skip=document.getElementById('__debug-panel__');
+    const all=root?[...root.querySelectorAll('*')]:[];
+    const els=all.filter(el=>{
+      if(skip&&skip.contains(el))return false;
+      if(el.id==='__debug-panel__')return false;
+      const r=el.getBoundingClientRect();
+      return r.width>0&&r.height>0&&r.width<window.innerWidth*0.98; // skip full-width wrappers
+    });
+    const bodies=els.map(el=>({
+      el,y:0,
+      vy:Math.random()*-3,
+      vr:(Math.random()-0.5)*8,   // spin as it falls
+      r:0,
+      floor:80+Math.random()*220, // staggered landing depths so it piles up
+      base:el.style.transform||'',
+      hadTransition:el.style.transition||''
+    }));
+    bodies.forEach(b=>b.el.style.transition='none');
+    const fall=()=>{
+      if(!_gravityMode){bodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.hadTransition;});return;}
       bodies.forEach(b=>{
-        b.vy+=0.6;b.y+=b.vy;
-        if(b.y>60){b.y=60;b.vy*=-0.55;}
-        b.el.style.transform=b.base+` translateY(${b.y}px)`;
+        b.vy+=0.9;b.y+=b.vy;b.r+=b.vr;
+        if(b.y>b.floor){b.y=b.floor;b.vy*=-0.5;b.vr*=0.7;}
+        b.el.style.transform=b.base+` translateY(${b.y}px) rotate(${b.r}deg)`;
       });
-      _gravityRaf=requestAnimationFrame(floorJitter);
+      _gravityRaf=requestAnimationFrame(fall);
     };
-    _gravityRaf=requestAnimationFrame(floorJitter);
-    toast('🪐 Gravity ON','success');
+    _gravityRaf=requestAnimationFrame(fall);
+    _gravityBodies=bodies;
+    toast('🪐 Gravity ON — everything falls!','success');
   } else {
     if(_gravityRaf)cancelAnimationFrame(_gravityRaf);
-    els.forEach(el=>el.style.transform='');
+    if(_gravityBodies){_gravityBodies.forEach(b=>{b.el.style.transform=b.base;b.el.style.transition=b.hadTransition;});_gravityBodies=null;}
     toast('Gravity off','success');
   }
   _dbgRerender();
 }
 
-// 🔠 Big Text — bump the root font scale (local CSS, reset on off)
+// 🔠 Big Text — zoom the whole app up so everything is bigger (reset on off)
 function _toggleBigText(){
   _bigTextMode=!_bigTextMode;
+  const inner=document.getElementById('app-screen-inner')||document.getElementById('app-screen');
   let st=document.getElementById('__bigtext-style__');
   if(_bigTextMode){
-    if(!st){st=document.createElement('style');st.id='__bigtext-style__';
-      st.textContent='#app-screen{font-size:1.25em!important;}';document.head.appendChild(st);}
+    if(!st){
+      st=document.createElement('style');st.id='__bigtext-style__';
+      // zoom enlarges everything and still reflows; the !important font-size is a
+      // belt-and-suspenders boost for browsers that ignore zoom.
+      st.textContent='#app-screen-inner{zoom:1.4;}'
+        +'#app-screen *{font-size:1.18em!important;line-height:1.5!important;}';
+      document.head.appendChild(st);
+    }
+    if(inner) inner.style.zoom='1.4';
     toast('🔠 Big text ON','success');
-  } else { if(st)st.remove(); toast('Text back to normal','success'); }
+  } else {
+    if(st)st.remove();
+    if(inner) inner.style.zoom='';
+    toast('Text back to normal','success');
+  }
   _dbgRerender();
 }
 
@@ -12942,18 +12982,46 @@ function _toggleSpin(){
   _dbgRerender();
 }
 
-// 🪩 Disco — cycle the page background hue
+// 🪩 Disco — CRAZY mode: strobing color flashes, fast hue spin, pulsing lights
 function _toggleDisco(){
   _discoMode=!_discoMode;
   const el=document.getElementById('app-screen');
+  let overlay=document.getElementById('__disco-overlay__');
   if(_discoMode){
-    let h=0;
-    const loop=()=>{ if(!_discoMode){if(el)el.style.backgroundColor='';return;}
-      h=(h+2)%360; if(el)el.style.backgroundColor='hsl('+h+',60%,8%)';
-      _discoRaf=requestAnimationFrame(loop); };
+    if(!overlay){
+      overlay=document.createElement('div');overlay.id='__disco-overlay__';
+      overlay.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:99998;mix-blend-mode:overlay;opacity:0.55;';
+      document.body.appendChild(overlay);
+    }
+    let h=0,frame=0;
+    const loop=()=>{
+      if(!_discoMode){
+        if(el){el.style.backgroundColor='';el.style.filter='';}
+        const o=document.getElementById('__disco-overlay__');if(o)o.remove();
+        return;
+      }
+      frame++;
+      h=(h+14)%360;                                  // fast hue cycle
+      const h2=(h+180)%360;
+      // strobe: alternate two clashing radial spotlights every few frames
+      if(frame%2===0){
+        overlay.style.background='radial-gradient(circle at '+(Math.random()*100)+'% '+(Math.random()*100)+'%, hsl('+h+',100%,55%) 0%, transparent 45%),'
+          +'radial-gradient(circle at '+(Math.random()*100)+'% '+(Math.random()*100)+'%, hsl('+h2+',100%,55%) 0%, transparent 45%)';
+      }
+      if(el){
+        el.style.backgroundColor='hsl('+h+',70%,'+(6+ (frame%6===0?10:0))+'%)';
+        el.style.filter='hue-rotate('+h+'deg) saturate(1.6) contrast(1.1)';
+      }
+      _discoRaf=requestAnimationFrame(loop);
+    };
     _discoRaf=requestAnimationFrame(loop);
-    toast('🪩 Disco!','success');
-  } else { if(_discoRaf)cancelAnimationFrame(_discoRaf); if(el)el.style.backgroundColor=''; toast('Lights up','success'); }
+    toast('🪩 DISCO!! 🕺','success');
+  } else {
+    if(_discoRaf)cancelAnimationFrame(_discoRaf);
+    if(el){el.style.backgroundColor='';el.style.filter='';}
+    if(overlay)overlay.remove();
+    toast('Lights up','success');
+  }
   _dbgRerender();
 }
 
