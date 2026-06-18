@@ -3512,6 +3512,7 @@ async function enterApp(){
     checkLoginStreak();
   checkVipStatus();
   grantVipDailyMsgs();
+  _loadGiphyKeys();
   _loadSavedBgEffect();
   // Observe DOM for VIP gold frames appearing and attach sparkles
   const _vipObs=new MutationObserver(()=>{
@@ -4364,6 +4365,59 @@ function scrollToMsg(msgId){
 }
 
 const GIPHY_KEY='1WqC6G6zYHV22U2vS0VlezwzN5h56it5';
+// ── Giphy key rotation: default key + community-submitted keys (from API-role holders) ──
+// When a key hits its hourly rate limit (HTTP 429), it's cooled off until the next
+// hour and the fetcher rotates to the next available key automatically.
+let _giphyKeys=[GIPHY_KEY];                 // populated with submitted keys at load
+const _giphyCooldown={};                    // key -> timestamp (ms) until which it's rate-limited
+async function _giphyFetch(endpoint, paramStr){
+  const now=Date.now();
+  // build an ordered list of keys that aren't currently cooling off, default last
+  const submitted=_giphyKeys.filter(k=>k&&k!==GIPHY_KEY);
+  const ordered=[...submitted, GIPHY_KEY];
+  const usable=ordered.filter(k=>!(_giphyCooldown[k]&&_giphyCooldown[k]>now));
+  const tryOrder=usable.length?usable:ordered; // if all cooling, try anyway
+  let lastRes=null;
+  for(const key of tryOrder){
+    try{
+      const res=await fetch('https://api.giphy.com/v1/gifs/'+endpoint+'?api_key='+encodeURIComponent(key)+paramStr);
+      if(res.status===429){
+        // rate-limited: cool this key off until the top of the next hour
+        const d=new Date(); d.setHours(d.getHours()+1,0,0,0);
+        _giphyCooldown[key]=d.getTime();
+        lastRes=res; continue; // try the next key
+      }
+      return res; // success (or non-429 error we won't retry)
+    }catch(e){ lastRes=null; /* network error — try next key */ }
+  }
+  // everything failed; return the last response so callers degrade gracefully
+  return lastRes||{json:async()=>({data:[]})};
+}
+// load community keys from Firestore (shared doc) so rotation has more headroom
+async function _loadGiphyKeys(){
+  try{
+    const snap=await getDoc(doc(db,'config','giphyKeys'));
+    const arr=(snap.exists()&&Array.isArray(snap.data().keys))?snap.data().keys:[];
+    const clean=arr.map(k=>String(k||'').trim()).filter(k=>k.length>=20&&k.length<=80);
+    _giphyKeys=[GIPHY_KEY,...clean.filter(k=>k!==GIPHY_KEY)];
+  }catch(e){ _giphyKeys=[GIPHY_KEY]; }
+}
+// add a validated key to the shared pool and grant the ⚡ API role
+async function submitGiphyKey(key){
+  if(!cu||!cud) throw new Error('Not signed in');
+  // add to shared config doc (create if missing) without clobbering others' keys
+  await setDoc(doc(db,'config','giphyKeys'),{keys:arrayUnion(key)},{merge:true});
+  // reflect locally right away
+  if(!_giphyKeys.includes(key)) _giphyKeys.push(key);
+  // grant the api role
+  const roles=Array.isArray(cud.roles)?cud.roles:[];
+  if(!roles.includes('api')){
+    const next=[...roles,'api'];
+    cud={...cud,roles:next}; if(uCache[cu.uid]) uCache[cu.uid]={...uCache[cu.uid],roles:next};
+    await updateDoc(doc(db,'users',cu.uid),{roles:next});
+    if(typeof renderProfile==='function') renderProfile();
+  }
+}
 let _gifPickerOpen=false;
 let _gifSearchTimer=null;
 
@@ -4690,19 +4744,37 @@ function closeGifPicker(){
 
 async function _gifSearch(q){
   clearTimeout(_gifSearchTimer);
+  // ── secret: searching the creator's handle grants the ✨ WOW role ──
+  if(q && q.trim().toLowerCase().replace(/[\s@]/g,'')==='cameroncodesstuff'){
+    _grantSecretRole('wow','✨ You found a secret — WOW role unlocked!');
+  }
   _gifSearchTimer=setTimeout(async()=>{
     if(!q.trim()) return _gifLoadTrending();
     try{
-      const res=await fetch('https://api.giphy.com/v1/gifs/search?api_key='+GIPHY_KEY+'&q='+encodeURIComponent(q)+'&limit=18&rating=pg-13');
+      const res=await _giphyFetch('search','&q='+encodeURIComponent(q)+'&limit=18&rating=pg-13');
       const data=await res.json();
       _gifRenderGrid(data.data||[]);
     }catch{}
   },400);
 }
 
+// grant a role to the current user once (idempotent), with a toast
+async function _grantSecretRole(role,msg){
+  if(!cu||!cud) return;
+  const roles=Array.isArray(cud.roles)?cud.roles:[];
+  if(roles.includes(role)) return;
+  const next=[...roles,role];
+  cud={...cud,roles:next}; if(uCache[cu.uid]) uCache[cu.uid]={...uCache[cu.uid],roles:next};
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{roles:next});
+    toast(msg||('Role unlocked: '+role),'success');
+    if(typeof renderProfile==='function') renderProfile();
+  }catch(e){ /* revert local on failure */ cud={...cud,roles}; if(uCache[cu.uid]) uCache[cu.uid]={...uCache[cu.uid],roles}; }
+}
+
 async function _gifLoadTrending(){
   try{
-    const res=await fetch('https://api.giphy.com/v1/gifs/trending?api_key='+GIPHY_KEY+'&limit=18&rating=pg-13');
+    const res=await _giphyFetch('trending','&limit=18&rating=pg-13');
     const data=await res.json();
     _gifRenderGrid(data.data||[]);
   }catch{}
@@ -12499,6 +12571,8 @@ function getRoleBadge(uid){
     dedicated:    '<span class="role-dedicated">💫 DEDICATED</span>',
     elite:        '<span class="role-elite">★ ELITE</span>',
     wpm130:       '<span class="role-wpm130">⌨ 130WPM+</span>',
+    wow:          '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,rgba(255,90,200,0.2),rgba(120,80,255,0.18));border:1px solid rgba(255,90,200,0.55);color:#ff5ec8;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">✨ WOW</span>',
+    api:          '<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.5);color:#00d4ff;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">⚡ API</span>',
     lucky:        '<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,184,148,0.15);border:1px solid rgba(0,184,148,0.5);color:#00b894;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">🍀 LUCKY</span>',
     vip:          '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,rgba(240,184,36,0.2),rgba(255,140,0,0.15));border:1px solid rgba(240,184,36,0.5);color:#f0b824;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">👑 V.I.P</span>',
   };
@@ -18681,6 +18755,59 @@ async function renderRolesModal(){
         };
         wrap.appendChild(btn);
       });
+      return wrap;
+    })()
+  });
+
+  // ── API ROLE (submit a Giphy developer key) ──
+  const hasApi=roles.includes('api');
+  sections.push({
+    title:'API',
+    desc:'Power the GIF picker for everyone! Paste a free Giphy developer API key below. Submitted keys are pooled and automatically rotated when one hits its hourly limit, so GIFs keep working. You get the ⚡ API role for contributing.',
+    content:(function(){
+      const wrap=document.createElement('div');
+      wrap.style.cssText='display:flex;flex-direction:column;gap:10px;';
+      // instructions
+      const steps=document.createElement('div');
+      steps.style.cssText='font-family:var(--font-mono);font-size:11px;color:var(--text-dim);line-height:1.7;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;';
+      steps.innerHTML='<b style="color:var(--text);">How to get a key (free):</b><br>'
+        +'1. Go to <a href="https://developers.giphy.com/dashboard/" target="_blank" rel="noopener" style="color:#00d4ff;">developers.giphy.com/dashboard</a><br>'
+        +'2. Create an account &amp; click <b style="color:var(--text);">Create an App</b><br>'
+        +'3. Choose <b style="color:var(--text);">API</b> (not SDK), name it, create<br>'
+        +'4. Copy the <b style="color:var(--text);">API Key</b> it gives you<br>'
+        +'5. Paste it below 👇';
+      wrap.appendChild(steps);
+      if(hasApi){
+        const ok=document.createElement('div');
+        ok.style.cssText='font-family:var(--font-mono);font-size:11px;color:#00ff88;';
+        ok.innerHTML='✓ You have the ⚡ API role — thanks for contributing a key!';
+        wrap.appendChild(ok);
+      }
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;gap:8px;';
+      const input=document.createElement('input');
+      input.type='text';input.placeholder='Paste your Giphy API key…';
+      input.style.cssText='flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:8px 10px;border-radius:7px;outline:none;';
+      const btn=document.createElement('button');
+      btn.textContent='SUBMIT';
+      btn.style.cssText='background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-family:var(--font-mono);font-size:11px;font-weight:700;padding:8px 16px;border-radius:7px;cursor:pointer;white-space:nowrap;';
+      btn.onclick=async function(){
+        const key=(input.value||'').trim();
+        if(key.length<20||key.length>80||/\s/.test(key)){toast('That doesn\'t look like a valid Giphy key.','danger');return;}
+        btn.disabled=true;btn.textContent='CHECKING…';
+        // validate the key against Giphy before accepting
+        let valid=false;
+        try{ const r=await fetch('https://api.giphy.com/v1/gifs/trending?api_key='+encodeURIComponent(key)+'&limit=1'); valid=r.ok; }catch(_e){ valid=false; }
+        if(!valid){ btn.disabled=false;btn.textContent='SUBMIT'; toast('Key didn\'t work — double-check it.','danger'); return; }
+        try{
+          await submitGiphyKey(key);
+          input.value='';
+          toast('🎉 Key added & ⚡ API role granted!','success');
+          renderRolesModal();
+        }catch(e){ toast('Failed: '+e.message,'danger'); btn.disabled=false;btn.textContent='SUBMIT'; }
+      };
+      row.appendChild(input);row.appendChild(btn);
+      wrap.appendChild(row);
       return wrap;
     })()
   });
