@@ -11759,7 +11759,11 @@ function getDisplayPrefs(){
 function setDisplayPref(key,val){
   const p=getDisplayPrefs();
   p[key]=val;
-  updateDoc(doc(db,'users',cu?.uid||'x'),{displayPrefs:p}).catch(()=>{});
+  // update the in-memory copy immediately so it survives the session and is what getDisplayPrefs reads
+  if(cud) cud.displayPrefs=p;
+  if(cu&&uCache[cu.uid]) uCache[cu.uid].displayPrefs=p;
+  // persist to Firestore (whole object, so a refresh reloads the saved state)
+  if(cu) updateDoc(doc(db,'users',cu.uid),{displayPrefs:p}).catch(e=>{console.warn('[displayPrefs] save failed',e);});
 }
 
 // Call after any pref change to refresh visible names/messages
@@ -11884,7 +11888,7 @@ function renderDisplayPrefsSection(){
 
   sec.innerHTML=`
     <div class="settings-label">HOW YOU SEE OTHERS</div>
-    ${mkToggle('showRoles',        'Role Badges',         'Show VETERAN, TESTER, OG etc. badges on names.')}
+    ${mkToggle('showRoles',        'Role Badges',         'Show all role badges (VETERAN, TESTER, OG…). Off = only OWNER & TEAM MEMBER.')}
     ${mkToggle('showNameColours',  'Name Colours',        'Show rank and earned name colours.')}
     ${mkToggle('showNameEffects',  'Name Animations',     'Play fire, neon, glitch CSS effects on names.')}
     ${mkToggle('showParticles',    'Name Particles',      'Show floating sparks, snowflakes, stars.')}
@@ -11904,7 +11908,12 @@ function toggleDisplayPref(key){
   setDisplayPref(key,!p[key]);
   applyAllDisplayPrefs();
   renderDisplayPrefsSection();
-  if(key==='showAvatars'||key==='showNameColours') renderSidebar();
+  if(key==='showAvatars'||key==='showNameColours'||key==='showRoles'){
+    renderSidebar();
+    // re-render the current chat's messages + own name so badges rebuild via getRoleBadge
+    if(typeof renderProfile==='function') renderProfile();
+    if(typeof acid!=='undefined'&&acid&&typeof renderMsgs==='function'){ try{renderMsgs(acid);}catch(_){} }
+  }
 }
 function setDisplayPrefVal(key,val){
   // Force trail to reset so single-click always works
@@ -12198,6 +12207,8 @@ async function restoreAllDefaults(){
   if(cu) updateDoc(doc(db,'users',cu.uid),{bgColour:'default'}).catch(()=>{});
   if(cu) updateDoc(doc(db,'users',cu.uid),{textColour:''}).catch(()=>{});
   if(cu) updateDoc(doc(db,'users',cu.uid),{displayPrefs:{}}).catch(()=>{});
+  if(cud) cud.displayPrefs={};
+  if(cu&&uCache[cu.uid]) uCache[cu.uid].displayPrefs={};
   if(cu) updateDoc(doc(db,'users',cu.uid),{chatBgMap:{}}).catch(()=>{});
   // Apply theme reset
   curTheme='default';
@@ -12657,6 +12668,11 @@ function getRoleBadge(uid){
     vip:          '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,rgba(240,184,36,0.2),rgba(255,140,0,0.15));border:1px solid rgba(240,184,36,0.5);color:#f0b824;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">👑 V.I.P</span>',
   };
   let _out=roles.map(r=>map[r]||'').join('');
+  // "Role Badges" setting OFF → show only OWNER, TEAM MEMBER (and the #1 rank).
+  if(!getDisplayPrefs().showRoles){
+    const keep=['#1','owner','team_member'];
+    _out=roles.filter(r=>keep.includes(r)).map(r=>map[r]||'').join('');
+  }
   // VIP custom role
   const _vcr=(uid===cu?.uid&&cud)?cud.vipCustomRole:(uCache[uid]?.vipCustomRole||null);
   if(_vcr?.label&&roles.includes('vip')){
