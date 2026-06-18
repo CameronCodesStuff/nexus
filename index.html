@@ -1415,6 +1415,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
       <div class="auth-tab" id="op-tab-leaderboards" onclick="N.ownerTab('leaderboards')" style="font-size:10px;">LEADERBOARDS</div>
       <div class="auth-tab" id="op-tab-donations" onclick="N.ownerTab('donations')" style="font-size:10px;color:#f0b824;">DONATIONS</div>
       <div class="auth-tab" id="op-tab-games" onclick="N.ownerTab('games')" style="font-size:10px;color:#00ff88;">GAMES</div>
+      <div class="auth-tab" id="op-tab-apikeys" onclick="N.ownerTab('apikeys')" style="font-size:10px;color:#00d4ff;">API KEYS</div>
       <div class="auth-tab" id="op-tab-team" onclick="N.ownerTab('team')" style="font-size:10px;color:#00d4ff;">TEAM</div>
       <div class="auth-tab" id="op-tab-testing" onclick="N.ownerTab('testing')" style="font-size:10px;color:#f0b824;">TESTING</div>
     </div>
@@ -1427,6 +1428,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
     <div id="op-panel-leaderboards" style="display:none;max-height:420px;overflow-y:auto;"></div>
     <div id="op-panel-donations" style="display:none;max-height:480px;overflow-y:auto;"></div>
     <div id="op-panel-games" style="display:none;"></div>
+    <div id="op-panel-apikeys" style="display:none;max-height:480px;overflow-y:auto;"></div>
     <div id="op-panel-team" style="display:none;"></div>
     <div id="op-panel-testing" style="display:none;"></div>
   </div>
@@ -8919,7 +8921,7 @@ function openOwnerModal(){
 
 function ownerTab(tab){
   ownerCurrentTab=tab;
-  ['tickets','users','roles','streaks','admin','announce','leaderboards','games','team','testing','donations'].forEach(t=>{
+  ['tickets','users','roles','streaks','admin','announce','leaderboards','games','apikeys','team','testing','donations'].forEach(t=>{
     const btn=document.getElementById('op-tab-'+t);
     const panel=document.getElementById('op-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -8933,6 +8935,7 @@ function ownerTab(tab){
   if(tab==='announce') renderAnnouncePanel();
   if(tab==='leaderboards') loadOwnerLeaderboards();
   if(tab==='games') loadGameSubmissions();
+  if(tab==='apikeys') loadApiKeysPanel();
   if(tab==='team') loadTeamApplications();
   if(tab==='testing') loadOwnerTesting();
   if(tab==='donations') loadOwnerDonations();
@@ -8945,6 +8948,60 @@ function ownerTab(tab){
     if(infoEl) infoEl.textContent='@'+(cud.username||'')+'  •  '+((cud.msgCount||0).toLocaleString())+' msgs  •  streak: '+(cud.loginStreak||0)+'d';
     if(avEl){const avH=avatarHtml(cu.uid,'38px');if(avH.startsWith('<'))avEl.innerHTML=avH;else avEl.textContent=avH;}
   }
+}
+
+async function loadApiKeysPanel(){
+  const panel=document.getElementById('op-panel-apikeys');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:8px;">Loading keys…</div>';
+  let keys=[];
+  try{
+    const snap=await getDoc(doc(db,'config','giphyKeys'));
+    keys=(snap.exists()&&Array.isArray(snap.data().keys))?snap.data().keys:[];
+  }catch(e){ panel.innerHTML='<div style="color:#ff4d5e;font-size:12px;font-family:var(--font-mono);padding:8px;">Error loading keys: '+esc(e.message)+'</div>'; return; }
+  const mask=k=>{const s=String(k);return s.length<=8?s:s.slice(0,4)+'…'+s.slice(-4);};
+  let html='<div style="display:flex;flex-direction:column;gap:10px;">'
+    +'<div style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim);line-height:1.6;">'
+    +'Giphy API keys in the rotation pool. The built-in default key is always used as a fallback. '
+    +'Community keys are submitted by users who earn the ⚡ API role. Remove any key that\'s invalid or abused.</div>';
+  // built-in default (read from the live constant, masked)
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;">'
+    +'<div style="font-family:var(--font-mono);font-size:11px;"><span style="color:#00ff88;">● DEFAULT</span> <span style="color:var(--text);">'+esc(mask(GIPHY_KEY))+'</span></div>'
+    +'<span style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);">built-in</span></div>';
+  const submitted=keys.filter(k=>k&&k!==GIPHY_KEY);
+  if(!submitted.length){
+    html+='<div style="color:var(--text-dim);font-size:11px;font-family:var(--font-mono);padding:4px 2px;">No community keys submitted yet.</div>';
+  } else {
+    submitted.forEach((k,i)=>{
+      const cool=(_giphyCooldown[k]&&_giphyCooldown[k]>Date.now());
+      html+='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;">'
+        +'<div style="font-family:var(--font-mono);font-size:11px;min-width:0;"><span style="color:#00d4ff;">#'+(i+1)+'</span> '
+        +'<span style="color:var(--text);">'+esc(mask(k))+'</span>'
+        +(cool?' <span style="color:#f5c842;font-size:9px;">(rate-limited)</span>':' <span style="color:#00ff88;font-size:9px;">(active)</span>')+'</div>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button class="btn-small" data-copy="'+esc(k)+'" style="white-space:nowrap;">COPY</button>'
+        +'<button class="btn-small" data-remove="'+esc(k)+'" style="white-space:nowrap;color:#ff4d5e;border-color:rgba(255,77,94,0.4);">REMOVE</button>'
+        +'</div></div>';
+    });
+  }
+  html+='</div>';
+  panel.innerHTML=html;
+  // wire copy/remove
+  panel.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
+    navigator.clipboard.writeText(b.dataset.copy).then(()=>{b.textContent='COPIED';setTimeout(()=>b.textContent='COPY',1200);}).catch(()=>{});
+  });
+  panel.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{
+    const key=b.dataset.remove;
+    if(!confirm('Remove this Giphy key from the rotation pool?')) return;
+    b.disabled=true;b.textContent='…';
+    try{
+      await updateDoc(doc(db,'config','giphyKeys'),{keys:arrayRemove(key)});
+      _giphyKeys=_giphyKeys.filter(k=>k!==key);
+      delete _giphyCooldown[key];
+      toast('Key removed from pool.','success');
+      loadApiKeysPanel();
+    }catch(e){ b.disabled=false;b.textContent='REMOVE'; toast('Failed: '+e.message,'danger'); }
+  });
 }
 
 async function loadHelpTickets(){
