@@ -634,6 +634,36 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .msg-del-btn{background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0;transition:opacity 0.15s;}
   .msg-bubble-wrap:hover .msg-del-btn{opacity:1;}
   .msg-del-btn:hover{background:rgba(255,51,85,0.12);color:var(--danger);}
+  /* ── EDIT MESSAGE ── */
+  .msg-edit-btn{background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px;opacity:0;transition:opacity 0.15s;}
+  .msg-bubble-wrap:hover .msg-edit-btn{opacity:1;}
+  .msg-edit-btn:hover{background:rgba(68,102,255,0.12);color:var(--accent);}
+  .msg-edited-tag{font-size:9px;color:var(--text-dim);font-family:var(--font-mono);opacity:0.7;margin-left:5px;font-style:italic;}
+  .msg-edit-box{display:flex;flex-direction:column;gap:6px;margin:2px 0;max-width:420px;}
+  .msg-edit-input{background:var(--bg3);border:1px solid var(--accent);color:var(--text);font-family:var(--font-body);font-size:14px;padding:8px 10px;border-radius:10px;outline:none;resize:vertical;min-height:38px;width:100%;box-shadow:0 0 14px var(--glow);}
+  .msg-edit-actions{display:flex;gap:6px;align-items:center;}
+  .msg-edit-hint{font-size:9px;color:var(--text-dim);font-family:var(--font-mono);margin-left:2px;}
+  /* ── SELF-DESTRUCT MESSAGES ── */
+  #destruct-btn.active{color:var(--danger);border-color:var(--danger);background:rgba(255,51,85,0.1);}
+  .destruct-menu{position:fixed;z-index:200;background:var(--bg2,#11151f);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,0.6);padding:6px;min-width:150px;backdrop-filter:blur(20px);}
+  .destruct-menu-title{font-family:var(--font-mono);font-size:9px;letter-spacing:1px;color:var(--text-dim);padding:4px 8px 6px;border-bottom:1px solid var(--border);margin-bottom:4px;}
+  .destruct-opt{font-family:var(--font-mono);font-size:12px;color:var(--text);padding:7px 10px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
+  .destruct-opt:hover{background:rgba(255,51,85,0.1);color:var(--danger);}
+  .destruct-opt.active{background:rgba(255,51,85,0.16);color:var(--danger);font-weight:700;}
+  .msg-destruct-badge{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:10px;font-family:var(--font-mono);color:var(--danger);background:rgba(255,51,85,0.08);border:1px solid rgba(255,51,85,0.25);border-radius:20px;padding:2px 8px;width:max-content;}
+  .msg-destruct-badge.urgent{animation:destruct-pulse 0.8s ease-in-out infinite;}
+  @keyframes destruct-pulse{0%,100%{opacity:1;box-shadow:0 0 0 rgba(255,51,85,0);}50%{opacity:0.6;box-shadow:0 0 10px rgba(255,51,85,0.5);}}
+  /* ── NOW PLAYING RICH CARD ── */
+  .np-card{display:flex;align-items:center;gap:11px;margin-bottom:10px;padding:9px 12px;border-radius:12px;background:linear-gradient(135deg,rgba(0,0,0,0.28),rgba(0,0,0,0.12));border:1px solid color-mix(in srgb,var(--np-color,var(--accent)) 35%,transparent);text-decoration:none;transition:transform 0.15s,box-shadow 0.15s;position:relative;overflow:hidden;}
+  a.np-card:hover{transform:translateY(-1px);box-shadow:0 6px 22px color-mix(in srgb,var(--np-color,var(--accent)) 28%,transparent);}
+  .np-art{width:46px;height:46px;border-radius:9px;background:linear-gradient(135deg,color-mix(in srgb,var(--np-color,var(--accent)) 55%,#000),#0a0a12);display:flex;align-items:flex-end;justify-content:center;gap:3px;padding:9px 7px;flex-shrink:0;box-shadow:inset 0 0 14px rgba(0,0,0,0.4);}
+  .np-bar{width:4px;height:8px;background:#fff;border-radius:2px;opacity:0.92;animation:np-eq 0.9s ease-in-out infinite;}
+  @keyframes np-eq{0%,100%{height:5px;}50%{height:22px;}}
+  .np-meta{flex:1;min-width:0;}
+  .np-now{font-family:var(--font-mono);font-size:8px;letter-spacing:1.5px;color:var(--np-color,var(--accent));margin-bottom:2px;}
+  .np-title{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .np-artist{font-size:10px;color:var(--text-dim);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+  .np-platform{font-family:var(--font-mono);font-size:9px;font-weight:700;flex-shrink:0;align-self:flex-start;}
 
 
   /* Announcement banner */
@@ -1268,6 +1298,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
                 📎<input type="file" id="file-input" style="display:none" onchange="N.handleFileAttach(this)">
               </label>
               <button class="icon-btn" id="voice-btn" title="Voice note (tap to record, tap to send)" onclick="N.toggleRecording()">🎙️</button>
+              <button class="icon-btn" id="destruct-btn" title="Self-destruct timer" onclick="N.toggleDestructMenu(event)">💣</button>
               <button class="icon-btn" title="Send a GIF" onclick="N.openGifPicker()" style="font-size:13px;font-weight:700;font-family:var(--font-mono);color:#00d4ff;opacity:0.7;transition:opacity 0.15s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">GIF</button>
               <button class="icon-btn" id="md-help-btn" title="Formatting & shortcuts" onclick="N.openShortcutsHelp()" style="font-weight:700;font-family:var(--font-mono);color:var(--text-dim);transition:color 0.15s;" onmouseover="this.style.color='var(--accent2)'" onmouseout="this.style.color='var(--text-dim)'">Aa</button>
             </div>
@@ -4121,7 +4152,8 @@ async function loadOlderMsgs(cid){
 }
 
 function renderMsgs(cid){
-  const msgs=mCache[cid]||[],area=$('messages-area'),wipe=$('wipe-confirm-slot');
+  startDestructTicker();
+  const msgs=(mCache[cid]||[]).filter(m=>!_destructedMsgs.has(m.id)),area=$('messages-area'),wipe=$('wipe-confirm-slot');
   if(!area||!wipe) return;
   // Remember scroll position — if user was at bottom, keep them there
   const wasAtBottom=area.scrollHeight-area.scrollTop-area.clientHeight<60;
@@ -4158,7 +4190,7 @@ function renderMsgs(cid){
       requestAnimationFrame(applyAllDisplayPrefs);
       gEl.appendChild(hd);area.insertBefore(gEl,wipe);ls=msg.senderUid;
     }
-    const wr=document.createElement('div');wr.className='msg-bubble-wrap';
+    const wr=document.createElement('div');wr.className='msg-bubble-wrap';wr.dataset.mid=msg.id;
     const ab=document.createElement('button');ab.className='msg-actions-btn';ab.textContent='😊';ab.onclick=e=>showRP(e,msg.id,cid);
     const rb=document.createElement('button');rb.className='msg-reply-btn';rb.textContent='↩ Reply';rb.onclick=()=>setReply(msg,cid);
     // Show quoted reply if this message is a reply
@@ -4272,13 +4304,19 @@ function renderMsgs(cid){
           }
         }
       }
+      if(msg.edited){const ed=document.createElement('span');ed.className='msg-edited-tag';ed.textContent='(edited)';b.appendChild(ed);}
       wr.appendChild(b);
     }
     const abRow=document.createElement('div');abRow.className='msg-actions-row';
     abRow.appendChild(rb);
     if(msg.senderUid===cu.uid){
-      const db_btn=document.createElement('button');db_btn.className='msg-del-btn';db_btn.textContent='🗑';db_btn.title='Delete message';
       const _mid=msg.id;const _cid=cid;
+      if(!msg.type||msg.type==='text'){
+        const ed_btn=document.createElement('button');ed_btn.className='msg-edit-btn';ed_btn.textContent='✏️';ed_btn.title='Edit message';
+        ed_btn.onclick=()=>startEditMessage(_mid,_cid);
+        abRow.appendChild(ed_btn);
+      }
+      const db_btn=document.createElement('button');db_btn.className='msg-del-btn';db_btn.textContent='🗑';db_btn.title='Delete message';
       db_btn.onclick=()=>deleteMessage(_mid,_cid);
       abRow.appendChild(db_btn);
     }
@@ -4288,6 +4326,14 @@ function renderMsgs(cid){
       const rd=document.createElement('div');rd.className='msg-reactions';
       Object.entries(msg.reactions).forEach(([em,users])=>{const p=document.createElement('div');p.className='reaction-pill';p.innerHTML=`${em} <span>${users.length}</span>`;p.onclick=()=>addRxn(cid,msg.id,em);rd.appendChild(p);});
       wr.appendChild(rd);
+    }
+    // Self-destruct countdown badge
+    if(msg.destructAfter&&msg.ts?.seconds){
+      const badge=document.createElement('div');badge.className='msg-destruct-badge';
+      badge.dataset.expiry=(msg.ts.seconds+msg.destructAfter);
+      badge.dataset.mid=msg.id;badge.dataset.cid=cid;badge.dataset.own=(msg.senderUid===cu.uid)?'1':'0';
+      badge.innerHTML='💣 <span></span>';
+      wr.appendChild(badge);
     }
     // Read receipts (own messages in DMs and groups)
     if(msg.senderUid===cu.uid){
@@ -4841,6 +4887,7 @@ async function sendMessage(){
   try{
     const msgData={senderUid:cu.uid,senderName:cud?.displayName||'User',text,ts:serverTimestamp(),type:'text',reactions:{}};
     if(replyingTo) msgData.replyTo=replyingTo;
+    if(_selfDestructSec>0) msgData.destructAfter=_selfDestructSec;
     clearReply();
     await addDoc(collection(db,'chats',acid,'messages'),msgData);
     await updateDoc(doc(db,'chats',acid),{lastMessage:text.substring(0,80),lastTs:serverTimestamp(),lastSenderUid:cu.uid,lastSenderName:cud?.displayName||'User'});
@@ -5138,6 +5185,132 @@ async function addRxn(cid,mid,emoji){
 function toggleEmojiPicker(){
   const pk=$('emoji-picker-bar');pk.classList.toggle('open');
   if(!pk.children.length){EMOJIS.forEach(em=>{const s=document.createElement('span');s.textContent=em;s.onclick=()=>{$('msg-input').value+=em;};pk.appendChild(s);});}
+}
+
+// ── EDIT MESSAGE ───────────────────────────────
+async function startEditMessage(mid,cid){
+  const msg=(mCache[cid]||[]).find(m=>m.id===mid);
+  if(!msg||msg.senderUid!==cu.uid||(msg.type&&msg.type!=='text')) return;
+  let wrap;
+  try{ wrap=document.querySelector('.msg-bubble-wrap[data-mid="'+(window.CSS&&CSS.escape?CSS.escape(mid):mid)+'"]'); }catch{ wrap=null; }
+  if(!wrap) return;
+  const bubble=wrap.querySelector('.msg-bubble');
+  if(!bubble||wrap.querySelector('.msg-edit-box')) return;
+  bubble.style.display='none';
+  const box=document.createElement('div');box.className='msg-edit-box';
+  const ta=document.createElement('textarea');ta.className='msg-edit-input';ta.value=msg.text||'';ta.rows=Math.min(6,(msg.text||'').split('\n').length||1);
+  const row=document.createElement('div');row.className='msg-edit-actions';
+  const save=document.createElement('button');save.className='btn-small primary';save.textContent='Save';
+  const cancel=document.createElement('button');cancel.className='btn-small';cancel.textContent='Cancel';
+  const hint=document.createElement('span');hint.className='msg-edit-hint';hint.textContent='Enter to save · Esc to cancel';
+  const finish=()=>{box.remove();bubble.style.display='';};
+  cancel.onclick=finish;
+  save.onclick=async()=>{
+    const nt=ta.value.trim();
+    if(!nt||nt===(msg.text||'')){finish();return;}
+    save.disabled=true;save.textContent='…';
+    try{
+      await updateDoc(doc(db,'chats',cid,'messages',mid),{text:nt,edited:true,editedTs:serverTimestamp()});
+      const arr=mCache[cid]||[],last=arr[arr.length-1];
+      if(last&&last.id===mid) updateDoc(doc(db,'chats',cid),{lastMessage:nt.substring(0,80)}).catch(()=>{});
+    }catch(e){toast('Edit failed: '+e.message,'danger');finish();}
+  };
+  row.appendChild(save);row.appendChild(cancel);row.appendChild(hint);
+  box.appendChild(ta);box.appendChild(row);
+  bubble.parentNode.insertBefore(box,bubble.nextSibling);
+  ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
+  ta.onkeydown=e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save.onclick();} else if(e.key==='Escape'){e.preventDefault();finish();} };
+}
+
+// ── SELF-DESTRUCT MESSAGES ─────────────────────
+let _selfDestructSec=0;
+const _destructedMsgs=new Set();        // ids dissolved locally — keep them hidden across re-renders
+let _destructTicker=null;
+const DESTRUCT_OPTS=[[0,'Off'],[5,'5 seconds'],[30,'30 seconds'],[60,'1 minute'],[300,'5 minutes'],[3600,'1 hour']];
+function _destructLabel(sec){const o=DESTRUCT_OPTS.find(x=>x[0]===sec);return o?o[1]:sec+'s';}
+function toggleDestructMenu(e){
+  if(e){e.stopPropagation();e.preventDefault();}
+  const existing=document.getElementById('destruct-menu');
+  if(existing){existing.remove();return;}
+  const btn=document.getElementById('destruct-btn');if(!btn)return;
+  const m=document.createElement('div');m.id='destruct-menu';m.className='destruct-menu';
+  m.innerHTML='<div class="destruct-menu-title">💣 SELF-DESTRUCT</div>'+
+    DESTRUCT_OPTS.map(([s,l])=>'<div class="destruct-opt'+(s===_selfDestructSec?' active':'')+'" data-s="'+s+'">'+l+'</div>').join('');
+  document.body.appendChild(m);
+  const r=btn.getBoundingClientRect();
+  m.style.left=Math.max(8,r.left)+'px';
+  m.style.top=(r.top-m.offsetHeight-8)+'px';
+  m.querySelectorAll('.destruct-opt').forEach(o=>o.onclick=ev=>{ev.stopPropagation();setSelfDestruct(+o.dataset.s);m.remove();});
+  setTimeout(()=>document.addEventListener('click',function _h(ev){const mm=document.getElementById('destruct-menu');if(mm&&!mm.contains(ev.target)){mm.remove();}document.removeEventListener('click',_h);}),10);
+}
+function setSelfDestruct(sec){
+  _selfDestructSec=sec;
+  const btn=document.getElementById('destruct-btn');
+  if(btn){btn.classList.toggle('active',sec>0);btn.title=sec>0?('Self-destruct: '+_destructLabel(sec)):'Self-destruct timer';}
+  if(sec>0) toast('💣 New messages vanish after '+_destructLabel(sec),'');
+}
+function _fmtDestruct(sec){
+  sec=Math.ceil(sec);
+  if(sec>=3600) return Math.ceil(sec/3600)+'h';
+  if(sec>=60){const mn=Math.floor(sec/60),s=sec%60;return mn+':'+String(s).padStart(2,'0');}
+  return sec+'s';
+}
+function startDestructTicker(){
+  if(_destructTicker) return;
+  _destructTicker=setInterval(()=>{
+    const now=Date.now()/1000;
+    document.querySelectorAll('.msg-destruct-badge').forEach(badge=>{
+      if(badge.dataset.destructing) return;
+      const exp=+badge.dataset.expiry, rem=exp-now, span=badge.querySelector('span');
+      if(rem>0){
+        if(span) span.textContent=_fmtDestruct(rem);
+        if(rem<=5) badge.classList.add('urgent');
+      }else{
+        badge.dataset.destructing='1';
+        const mid=badge.dataset.mid, cid=badge.dataset.cid, own=badge.dataset.own==='1';
+        _destructedMsgs.add(mid);
+        const wrap=badge.closest('.msg-bubble-wrap');
+        if(wrap) dissolveElement(wrap,()=>{ if(typeof acid!=='undefined'&&acid===cid){ try{renderMsgs(cid);}catch(_){} } });
+        if(own) deleteDoc(doc(db,'chats',cid,'messages',mid)).catch(()=>{});
+      }
+    });
+  },500);
+}
+// Particle dissolve — self-contained canvas burst overlaid on the element, then removes it.
+function dissolveElement(el,done){
+  if(!el||el.dataset.dissolving){if(el)try{el.remove();}catch(_){}if(done)done();return;}
+  el.dataset.dissolving='1';
+  const rect=el.getBoundingClientRect();
+  if(rect.width<2||rect.height<2){try{el.remove();}catch(_){}if(done)done();return;}
+  let accent=(getDisplayPrefs().profileAccent||'').trim();
+  if(!accent){try{accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();}catch(_){}}
+  if(!accent) accent='#4466ff';
+  const cv=document.createElement('canvas');
+  cv.width=Math.ceil(rect.width);cv.height=Math.ceil(rect.height);
+  cv.style.cssText='position:fixed;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;height:'+rect.height+'px;pointer-events:none;z-index:9998;';
+  document.body.appendChild(cv);
+  const ctx=cv.getContext('2d');
+  const N=Math.max(40,Math.min(160,Math.floor(rect.width*rect.height/110))),parts=[];
+  for(let i=0;i<N;i++) parts.push({x:Math.random()*rect.width,y:Math.random()*rect.height,vx:(Math.random()-0.5)*1.4,vy:-Math.random()*1.6-0.2,life:0.7+Math.random()*0.4,r:1+Math.random()*2.4});
+  el.style.transition='opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease';
+  el.style.transformOrigin='left center';
+  requestAnimationFrame(()=>{el.style.opacity='0';el.style.filter='blur(3px)';el.style.transform='scale(0.95)';});
+  let t=0;
+  (function frame(){
+    t++;ctx.clearRect(0,0,cv.width,cv.height);
+    let alive=false;
+    for(const p of parts){
+      if(p.life<=0) continue;
+      p.x+=p.vx;p.y+=p.vy;p.vy+=0.045;p.vx*=0.99;p.life-=0.018;
+      if(p.life<=0) continue;
+      alive=true;
+      ctx.globalAlpha=Math.max(0,Math.min(1,p.life));
+      ctx.fillStyle=accent;
+      ctx.beginPath();ctx.arc(p.x,p.y,Math.max(0.4,p.r*p.life),0,Math.PI*2);ctx.fill();
+    }
+    if(alive&&t<80) requestAnimationFrame(frame);
+    else{try{cv.remove();}catch(_){}try{el.remove();}catch(_){}if(done)done();}
+  })();
 }
 
 // ── WIPE ───────────────────────────────────────
@@ -7532,6 +7705,7 @@ function openProfileModal(uid){
       </div>
     </div>
     <div style="padding:0 20px 20px;position:relative;z-index:1;">
+      ${nowPlayingCardHtml(u)}
       ${u.vipMusic&&u.roles?.includes('vip')?`<a href="${esc(u.vipMusic)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);font-size:10px;font-family:var(--font-mono);color:var(--text-dim);text-decoration:none;">${u.vipMusic.includes('spotify')?'<span style="color:#1db954;">♫ Spotify</span>':u.vipMusic.includes('youtu')?'<span style="color:#ff4444;">▶ YouTube</span>':'🎵'} Now Playing</a>`:''}
       ${(()=>{
         const _prc={'common':'#9aa7c7','uncommon':'#3ee87a','rare':'#3aa0ff','epic':'#c061ff','legendary':'#ff9d2e','mythic':'#ff2d6f','ancient':'#d4a24a','secret':'#00f0ff','arcane':'#7b5cff','divine':'#ffe24a','celestial':'#b9f2ff','astral':'#5ad1ff','cosmic':'#8a6bff','galactic':'#c44bff','eternal':'#ffb347','void':'#6c4bd6','primordial':'#ff7a59','transcendent':'#4dffd0','ethereal':'#c8f0ff','mythical':'#ff5ec4','infinite':'#9dff5e','godlike':'#ffd24a','singularity':'#ff3bd0','omniscient':'#7afcff','omega':'#ff3bd0'};
@@ -11886,6 +12060,18 @@ function renderDisplayPrefsSection(){
   const nowPlayingVal=esc(p.nowPlayingText||'');
   const nowPlayingInput=`<input type="text" value="${nowPlayingVal}" maxlength="40" placeholder="Auto" onchange="N.setDisplayPrefVal('nowPlayingText',this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:6px;width:130px;">`;
 
+  const _np=cud?.nowPlaying||{};
+  const _npInp=(id,ph,val)=>`<input id="${id}" type="text" value="${esc(val||'')}" placeholder="${ph}" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:6px 9px;border-radius:6px;width:100%;outline:none;">`;
+  const npEditor=`<div style="display:flex;flex-direction:column;gap:7px;width:100%;margin-top:6px;">
+    ${_npInp('np-title-input','Song title',_np.title)}
+    ${_npInp('np-artist-input','Artist (optional)',_np.artist)}
+    ${_npInp('np-url-input','Spotify / YouTube / Apple Music link (optional)',_np.url)}
+    <div style="display:flex;gap:6px;">
+      <button onclick="N.saveNowPlaying()" class="btn-small primary" style="flex:1;">SAVE</button>
+      <button onclick="N.clearNowPlaying()" class="btn-small" style="flex:1;">CLEAR</button>
+    </div>
+  </div>`;
+
   sec.innerHTML=`
     <div class="settings-label">HOW YOU SEE OTHERS</div>
     ${mkToggle('showRoles',        'Role Badges',         'Show all role badges (VETERAN, TESTER, OG…). Off = only OWNER & TEAM MEMBER.')}
@@ -11900,6 +12086,9 @@ function renderDisplayPrefsSection(){
     ${mkRow('Profile Accent Colour','Your personal accent colour — affects your name glow and UI highlights.',accentPicker)}
     ${mkRow('Now Playing Override','Custom activity text shown on your profile. Leave blank for auto-detection.',nowPlayingInput)}
     ${mkRow('Cursor Trail',        'Visual effect that follows your mouse cursor.',trailSel)}
+    <div class="settings-label" style="margin-top:16px;">🎵 NOW PLAYING CARD</div>
+    <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin:2px 0 2px;">A Spotify-style track card shown on your profile. Leave the title blank to hide it.</div>
+    ${npEditor}
   `;
 }
 
@@ -12429,6 +12618,52 @@ function resetActivityIdleTimer(){
 }
 document.addEventListener('mousemove',resetActivityIdleTimer,{passive:true});
 document.addEventListener('keydown',resetActivityIdleTimer,{passive:true});
+
+// ── NOW PLAYING (Spotify-style rich status) ──────
+function detectMusicPlatform(url){
+  url=String(url||'');
+  if(/spotify/i.test(url))            return {name:'Spotify',     color:'#1db954',icon:'♫'};
+  if(/youtube|youtu\.be/i.test(url))  return {name:'YouTube',     color:'#ff4444',icon:'▶'};
+  if(/music\.apple|itunes\.apple/i.test(url)) return {name:'Apple Music',color:'#fc3c44',icon:''};
+  if(/soundcloud/i.test(url))         return {name:'SoundCloud',  color:'#ff7700',icon:'☁'};
+  if(/deezer/i.test(url))             return {name:'Deezer',      color:'#a238ff',icon:'♪'};
+  if(/tidal/i.test(url))              return {name:'TIDAL',       color:'#00ffff',icon:'≋'};
+  return {name:'Listen',color:'var(--accent2)',icon:'♫'};
+}
+function nowPlayingCardHtml(u){
+  const np=u&&u.nowPlaying;
+  if(!np||!np.title) return '';
+  const pl=detectMusicPlatform(np.url);
+  const bars=[0,1,2,3].map(i=>'<span class="np-bar" style="animation-delay:'+(i*0.15)+'s;"></span>').join('');
+  const hasUrl=!!np.url, tag=hasUrl?'a':'div';
+  const attrs=hasUrl?('href="'+esc(np.url)+'" target="_blank" rel="noopener noreferrer"'):'';
+  return '<'+tag+' class="np-card" '+attrs+' style="--np-color:'+pl.color+';">'
+    +'<div class="np-art">'+bars+'</div>'
+    +'<div class="np-meta">'
+      +'<div class="np-now">▶ NOW PLAYING</div>'
+      +'<div class="np-title">'+esc(np.title)+'</div>'
+      +(np.artist?'<div class="np-artist">'+esc(np.artist)+'</div>':'')
+    +'</div>'
+    +(hasUrl?'<div class="np-platform" style="color:'+pl.color+';">'+pl.icon+' '+esc(pl.name)+'</div>':'')
+  +'</'+tag+'>';
+}
+function saveNowPlaying(){
+  const title=(document.getElementById('np-title-input')?.value||'').trim().slice(0,60);
+  const artist=(document.getElementById('np-artist-input')?.value||'').trim().slice(0,60);
+  const url=(document.getElementById('np-url-input')?.value||'').trim().slice(0,300);
+  const np=title?{title,artist,url}:null;
+  if(cud) cud.nowPlaying=np;
+  if(cu&&uCache[cu.uid]) uCache[cu.uid].nowPlaying=np;
+  if(cu) updateDoc(doc(db,'users',cu.uid),{nowPlaying:np}).catch(e=>console.warn('[nowPlaying] save',e));
+  toast(np?'🎵 Now Playing updated':'Now Playing cleared','success');
+}
+function clearNowPlaying(){
+  if(cud) cud.nowPlaying=null;
+  if(cu&&uCache[cu.uid]) uCache[cu.uid].nowPlaying=null;
+  if(cu) updateDoc(doc(db,'users',cu.uid),{nowPlaying:null}).catch(()=>{});
+  ['np-title-input','np-artist-input','np-url-input'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  toast('Now Playing cleared','success');
+}
 
 // ── FOLLOW SYSTEM ─────────────────────────────────
 async function followUser(uid){
@@ -21394,6 +21629,8 @@ window._N = {
   openTtt, tttSendChallenge, tttMove, tttOpenGame, tttNewGame, tttCleanup, tttClose,
   showTnC, hideTnC,
   setReply, clearReply, scrollToMsg,
+  startEditMessage, toggleDestructMenu, setSelfDestruct,
+  saveNowPlaying, clearNowPlaying,
   openLightbox, closeLightbox, dlLightbox, deleteMessage,
   openGcMembers, removeFromGc, inviteToGc, searchGcInvite,
   toggleMoreMenu, closeMoreMenu, filterUsers,
