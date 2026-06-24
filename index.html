@@ -4535,15 +4535,6 @@ function openVipModal(){
     const mi=document.getElementById('vip-music-input');
     if(mi) mi.value=cud?.vipMusic||'';
   }
-  // VIP Now Playing card section
-  const npSec=document.getElementById('vip-nowplaying-section');
-  if(npSec) npSec.style.display=isVip?'block':'none';
-  if(isVip){
-    const _np=cud?.nowPlaying||{};
-    const _t=document.getElementById('np-title-input');   if(_t) _t.value=_np.title||'';
-    const _a=document.getElementById('np-artist-input');  if(_a) _a.value=_np.artist||'';
-    const _u=document.getElementById('np-url-input');     if(_u) _u.value=_np.url||'';
-  }
   // VIP profile effect section
   const profEffSec=document.getElementById('vip-profile-effect-section');
   if(profEffSec) profEffSec.style.display=isVip?'block':'none';
@@ -12085,6 +12076,21 @@ function renderDisplayPrefsSection(){
   const nowPlayingVal=esc(p.nowPlayingText||'');
   const nowPlayingInput=`<input type="text" value="${nowPlayingVal}" maxlength="40" placeholder="Auto" onchange="N.setDisplayPrefVal('nowPlayingText',this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:4px 8px;border-radius:6px;width:130px;">`;
 
+  const _isVipMe=Array.isArray(cud?.roles)&&cud.roles.includes('vip');
+  const _np=cud?.nowPlaying||{};
+  const _npInp=(id,ph,val)=>`<input id="${id}" type="text" value="${esc(val||'')}" placeholder="${ph}" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:11px;padding:6px 9px;border-radius:6px;width:100%;outline:none;">`;
+  const npEditor=_isVipMe?`
+    <div class="settings-label" style="margin-top:16px;">🎵 NOW PLAYING CARD</div>
+    <div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);margin:2px 0 2px;">A Spotify-style track card shown on your profile. Leave the title blank to hide it.</div>
+    <div style="display:flex;flex-direction:column;gap:7px;width:100%;margin-top:6px;">
+      ${_npInp('np-title-input','Song title',_np.title)}
+      ${_npInp('np-artist-input','Artist (optional)',_np.artist)}
+      ${_npInp('np-url-input','Spotify / YouTube / Apple Music link (optional)',_np.url)}
+      <div style="display:flex;gap:6px;">
+        <button onclick="N.saveNowPlaying()" class="btn-small primary" style="flex:1;">SAVE</button>
+        <button onclick="N.clearNowPlaying()" class="btn-small" style="flex:1;">CLEAR</button>
+      </div>
+    </div>`:'';
 
   sec.innerHTML=`
     <div class="settings-label">HOW YOU SEE OTHERS</div>
@@ -12100,6 +12106,7 @@ function renderDisplayPrefsSection(){
     ${mkRow('Profile Accent Colour','Your personal accent colour — affects your name glow and UI highlights.',accentPicker)}
     ${mkRow('Now Playing Override','Custom activity text shown on your profile. Leave blank for auto-detection.',nowPlayingInput)}
     ${mkRow('Cursor Trail',        'Visual effect that follows your mouse cursor.',trailSel)}
+    ${npEditor}
   `;
 }
 
@@ -15033,7 +15040,7 @@ let lbCurrentTab='msgs';
 
 const LB_SECTIONS={
   main:  [{id:'overall',label:'★ OVERALL'},{id:'msgs',label:'MESSAGES'},{id:'time',label:'TIME ON SITE'},{id:'followers',label:'FOLLOWERS'},{id:'referrals',label:'REFERRALS'},{id:'streak',label:'STREAK 🔥'}],
-  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'towerdefense',label:'🏰 Tower Defense'},{id:'eternalrift',label:'🌀 Eternal Rift'},{id:'blockdodge',label:'🟦 Block Dodge'},{id:'stackbuilder',label:'🟪 Stack Builder'},{id:'cosmorunner',label:'🚀 Cosmo Runner'},{id:'wavesurvival',label:'🌊 Wave Survival'},{id:'eggverse_hatched',label:'🥚 Most Hatched'},{id:'eggverse_rarest',label:'💎 Rarest Pet'},{id:'crash_money',label:'📈 Crash Money'},{id:'crash_multi',label:'🚀 Crash Multi'},{id:'dd_score',label:'⚔️ Dungeon Score'},{id:'dd_kills',label:'💀 Dungeon Kills'},{id:'dd_coins',label:'🪙 Dungeon Gold'}],
+  games: [{id:'energy',label:'NEXUS ENERGY'},{id:'flap',label:'NEXUS FLAP'},{id:'wpm',label:'TYPING WPM'},{id:'drift',label:'DRIFT KING'},{id:'blackjack',label:'BLACKJACK'},{id:'shell',label:'SHELL GAME'},{id:'drive',label:'DRIVE'},{id:'longest',label:'LONGEST GAME'},{id:'whack',label:'WHACK-A-MOLE'},{id:'ink',label:'垒守 INK DEFENSE'},{id:'whg',label:'🟥 Hardest Game'},{id:'gauntlet',label:'🔴 Gauntlet'},{id:'towerdefense',label:'🏰 Tower Defense'},{id:'eternalrift',label:'🌀 Eternal Rift'},{id:'blockdodge',label:'🟦 Block Dodge'},{id:'stackbuilder',label:'🟪 Stack Builder'},{id:'cosmorunner',label:'🚀 Cosmo Runner'},{id:'wavesurvival',label:'🌊 Wave Survival'},{id:'eggverse_hatched',label:'🥚 Most Hatched'},{id:'eggverse_rarest',label:'💎 Rarest Pet'},{id:'crash_money',label:'📈 Crash Money'},{id:'crash_multi',label:'🚀 Crash Multi'},{id:'dd_score',label:'⚔️ Dungeon Score'},{id:'dd_kills',label:'💀 Dungeon Kills'},{id:'dd_coins',label:'🪙 Dungeon Gold'},{id:'snake',label:'🐍 Snake'}],
 };
 let lbCurrentSection='main';
 
@@ -15192,6 +15199,7 @@ async function renderLeaderboard(tab){
       dd_score:{t:'Dungeon High Score',        s:' pts',     icon:'⚔️', col:'#f5c842'},
       dd_kills:{t:'Most Dungeon Kills',        s:' kills',   icon:'💀', col:'#ff4d5e'},
       dd_coins:{t:'Most Dungeon Gold',         s:' gold',    icon:'🪙', col:'#f5c842'},
+      snake:   {t:'Snake High Score',          s:' pts',     icon:'🐍', col:'#4dd0c4'},
     };
     const _m=_GM[tab]||{t:'Top Scores',s:'',icon:'🎮',col:'var(--accent)'};
     try{
@@ -17956,6 +17964,18 @@ function openDungeonDash(){
   }catch(e){toast('Could not open: '+e.message,'danger');}
 }
 
+
+var _SNAKE_HTML = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Snake</title>\n<style>\n  * { margin: 0; padding: 0; box-sizing: border-box; }\n  html, body {\n    height: 100%;\n    background: #0a0e14;\n    font-family: 'Space Mono', 'JetBrains Mono', monospace;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    color: #e6f0f0;\n    overflow: hidden;\n  }\n  .wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; }\n  .hud {\n    display: flex;\n    justify-content: space-between;\n    width: 100%;\n    font-size: 14px;\n    letter-spacing: 2px;\n    text-transform: uppercase;\n  }\n  .hud span { color: #4dd0c4; }\n  .hud b { color: #b388ff; }\n  .stage {\n    position: relative;\n    border-radius: 14px;\n    background: #0e141d;\n    box-shadow: 0 0 0 1px rgba(77,208,196,.15), 0 24px 60px rgba(0,0,0,.6);\n    overflow: hidden;\n  }\n  canvas { display: block; }\n  .scanlines {\n    position: absolute; inset: 0; pointer-events: none;\n    background: repeating-linear-gradient(rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 4px);\n    mix-blend-mode: overlay;\n  }\n  .overlay {\n    position: absolute; inset: 0;\n    display: flex; flex-direction: column; align-items: center; justify-content: center;\n    gap: 14px; background: rgba(8,12,18,.82); backdrop-filter: blur(3px);\n    text-align: center; padding: 24px;\n  }\n  .overlay h1 { font-size: 38px; letter-spacing: 6px; color: #4dd0c4; text-shadow: 0 0 24px rgba(77,208,196,.5); }\n  .overlay p { font-size: 13px; opacity: .75; line-height: 1.7; letter-spacing: 1px; }\n  .overlay .big { font-size: 22px; color: #b388ff; letter-spacing: 2px; }\n  .hint { font-size: 12px; opacity: .55; letter-spacing: 2px; }\n  .hidden { display: none; }\n</style>\n</head>\n<body>\n<div class=\"wrap\">\n  <div class=\"hud\">\n    <div>Score <span id=\"score\">0</span></div>\n    <div>Best <b id=\"best\">0</b></div>\n  </div>\n  <div class=\"stage\">\n    <canvas id=\"game\"></canvas>\n    <div class=\"scanlines\"></div>\n    <div class=\"overlay\" id=\"overlay\">\n      <h1>SNAKE</h1>\n      <p>WASD or Arrow Keys to move<br>Eat the orbs. Don't hit yourself.</p>\n      <p class=\"hint\">Press any key to start</p>\n    </div>\n  </div>\n  <div class=\"hint\">Space to pause</div>\n</div>\n<script>\nconst canvas = document.getElementById('game');\nconst ctx = canvas.getContext('2d');\nconst overlay = document.getElementById('overlay');\nconst scoreEl = document.getElementById('score');\nconst bestEl = document.getElementById('best');\n\nconst GRID = 24;\nconst CELL = 22;\nconst SIZE = GRID * CELL;\nconst DPR = window.devicePixelRatio || 1;\ncanvas.width = SIZE * DPR;\ncanvas.height = SIZE * DPR;\ncanvas.style.width = SIZE + 'px';\ncanvas.style.height = SIZE + 'px';\nctx.scale(DPR, DPR);\n\nconst STEP = 110;\nlet snake, dir, nextDir, food, score, best = 0, state = 'menu';\nlet lastStep = 0, lastFrame = 0;\n\nfunction reset() {\n  snake = [{x:8,y:12},{x:7,y:12},{x:6,y:12}];\n  dir = {x:1,y:0};\n  nextDir = {x:1,y:0};\n  score = 0;\n  scoreEl.textContent = 0;\n  placeFood();\n}\n\nfunction placeFood() {\n  while (true) {\n    const f = { x: (Math.random()*GRID)|0, y: (Math.random()*GRID)|0 };\n    if (!snake.some(s => s.x===f.x && s.y===f.y)) { food = f; return; }\n  }\n}\n\nfunction step() {\n  dir = nextDir;\n  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };\n  if (head.x<0||head.x>=GRID||head.y<0||head.y>=GRID||snake.some(s=>s.x===head.x&&s.y===head.y)) {\n    state = 'over';\n    best = Math.max(best, score);\n    bestEl.textContent = best;\n    showOverlay(`<h1>GAME OVER</h1><p class=\"big\">Score ${score}</p><p class=\"hint\">Press any key to retry</p>`);\n    return;\n  }\n  snake.unshift(head);\n  if (head.x===food.x && head.y===food.y) {\n    score++;\n    scoreEl.textContent = score;\n    placeFood();\n  } else {\n    snake.pop();\n  }\n}\n\nfunction lerp(a,b,t){ return a+(b-a)*t; }\n\nfunction draw(t) {\n  ctx.clearRect(0,0,SIZE,SIZE);\n\n  for (let i=0;i<=GRID;i++){\n    ctx.strokeStyle = 'rgba(77,208,196,.04)';\n    ctx.beginPath(); ctx.moveTo(i*CELL,0); ctx.lineTo(i*CELL,SIZE); ctx.stroke();\n    ctx.beginPath(); ctx.moveTo(0,i*CELL); ctx.lineTo(SIZE,i*CELL); ctx.stroke();\n  }\n\n  const pulse = 0.5 + 0.5*Math.sin(t/240);\n  ctx.save();\n  ctx.shadowColor = '#b388ff';\n  ctx.shadowBlur = 18 + pulse*10;\n  ctx.fillStyle = '#b388ff';\n  const fr = CELL*0.32 + pulse*2;\n  ctx.beginPath();\n  ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, fr, 0, Math.PI*2);\n  ctx.fill();\n  ctx.restore();\n\n  const tt = state==='play' ? Math.min(1,(t-lastStep)/STEP) : 0;\n  for (let i=snake.length-1;i>=0;i--){\n    const s = snake[i];\n    const prev = snake[i+1] || s;\n    let px, py;\n    if (i===0 && state==='play') {\n      px = lerp(s.x - dir.x, s.x, tt);\n      py = lerp(s.y - dir.y, s.y, tt);\n    } else if (state==='play') {\n      px = lerp(prev.x, s.x, tt);\n      py = lerp(prev.y, s.y, tt);\n    } else { px = s.x; py = s.y; }\n\n    const f = i/snake.length;\n    const g = Math.round(208 - f*90);\n    const b = Math.round(196 - f*40);\n    ctx.fillStyle = `rgb(77,${g},${b})`;\n    if (i===0){ ctx.shadowColor='#4dd0c4'; ctx.shadowBlur=16; } else ctx.shadowBlur=0;\n    const pad = i===0 ? 1.5 : 2.5;\n    roundRect(px*CELL+pad, py*CELL+pad, CELL-pad*2, CELL-pad*2, 6);\n    ctx.fill();\n  }\n  ctx.shadowBlur = 0;\n}\n\nfunction roundRect(x,y,w,h,r){\n  ctx.beginPath();\n  ctx.moveTo(x+r,y);\n  ctx.arcTo(x+w,y,x+w,y+h,r);\n  ctx.arcTo(x+w,y+h,x,y+h,r);\n  ctx.arcTo(x,y+h,x,y,r);\n  ctx.arcTo(x,y,x+w,y,r);\n  ctx.closePath();\n}\n\nfunction loop(t){\n  if (state==='play'){\n    if (t-lastStep >= STEP){ lastStep = t; step(); }\n  }\n  draw(t);\n  requestAnimationFrame(loop);\n}\n\nfunction showOverlay(html){ overlay.innerHTML = html; overlay.classList.remove('hidden'); }\nfunction hideOverlay(){ overlay.classList.add('hidden'); }\n\nfunction start(){\n  reset();\n  state = 'play';\n  lastStep = performance.now();\n  hideOverlay();\n}\n\nconst KEYS = {\n  ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1}, ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0},\n  w:{x:0,y:-1}, s:{x:0,y:1}, a:{x:-1,y:0}, d:{x:1,y:0},\n  W:{x:0,y:-1}, S:{x:0,y:1}, A:{x:-1,y:0}, D:{x:1,y:0}\n};\n\nwindow.addEventListener('keydown', e => {\n  if (e.key === ' '){\n    e.preventDefault();\n    if (state==='play'){ state='paused'; showOverlay('<h1>PAUSED</h1><p class=\"hint\">Space to resume</p>'); }\n    else if (state==='paused'){ state='play'; lastStep=performance.now(); hideOverlay(); }\n    return;\n  }\n  if (state==='menu' || state==='over'){ start(); return; }\n  const d = KEYS[e.key];\n  if (d && state==='play'){\n    e.preventDefault();\n    if (d.x !== -dir.x || d.y !== -dir.y){\n      if (d.x !== -dir.x && d.y !== -dir.y) nextDir = d;\n    }\n  }\n});\n\nreset();\nrequestAnimationFrame(loop);\n\nfunction reportScoreToNexus(){\n  try{\n    if(window.opener) window.opener.postMessage({type:'cgScore',gameId:'snake',score:best,detail:'Best score: '+best},'*');\n  }catch(e){}\n}\nvar _origShowOverlay=showOverlay;\nshowOverlay=function(html){\n  _origShowOverlay(html);\n  if(html&&html.includes('GAME OVER')) setTimeout(reportScoreToNexus,100);\n};\n<\/script>\n</body>\n</html>\n";
+function openSnake(){
+  setActivity('playing Snake');
+  try{
+    const blob=new Blob([_SNAKE_HTML],{type:'text/html'});
+    const url=URL.createObjectURL(blob);
+    const tab=window.open(url,'_blank');
+    if(!tab){toast('Allow pop-ups to open the game.','danger');URL.revokeObjectURL(url);return;}
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }catch(e){toast('Could not open: '+e.message,'danger');}
+}
 
 function openGamesHub(){
   openModal('games-hub-modal');
@@ -21655,7 +21675,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -22103,6 +22123,11 @@ function makePollCard(poll,isOw){
         <span style="font-size:16px;width:22px;text-align:center;">⚔️</span>
         <span style="flex:1;">Dungeon Dash II</span>
         <span style="font-size:9px;font-family:var(--font-mono);color:#f5c842;letter-spacing:1px;">ROGUELIKE</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openSnake()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(77,208,196,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🐍</span>
+        <span style="flex:1;">Snake</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#4dd0c4;letter-spacing:1px;">CLASSIC</span>
       </button>
 
     </div>
@@ -22727,19 +22752,6 @@ function makePollCard(poll,isOw){
         <button onclick="N.saveVipMusic(document.getElementById('vip-music-input').value)" style="background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:6px 12px;border-radius:7px;cursor:pointer;">SET</button>
       </div>
       <button onclick="N.saveVipMusic('')" style="margin-top:8px;background:none;border:1px solid rgba(255,255,255,0.1);color:var(--text-dim);font-family:var(--font-mono);font-size:9px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;">REMOVE</button>
-    </div>
-    <div id="vip-nowplaying-section" style="display:none;padding:0 20px 16px;">
-      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;">Now Playing Card 🎵</div>
-      <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);margin-bottom:8px;">A Spotify-style track card shown on your profile. Leave the title blank to hide it.</div>
-      <div style="display:flex;flex-direction:column;gap:7px;">
-        <input id="np-title-input" type="text" maxlength="60" placeholder="Song title" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:10px;padding:7px 10px;border-radius:7px;outline:none;">
-        <input id="np-artist-input" type="text" maxlength="60" placeholder="Artist (optional)" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:10px;padding:7px 10px;border-radius:7px;outline:none;">
-        <input id="np-url-input" type="text" maxlength="300" placeholder="Spotify / YouTube / Apple Music link (optional)" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:10px;padding:7px 10px;border-radius:7px;outline:none;">
-        <div style="display:flex;gap:8px;">
-          <button onclick="N.saveNowPlaying()" style="flex:1;background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:7px 12px;border-radius:7px;cursor:pointer;letter-spacing:1px;">SAVE</button>
-          <button onclick="N.clearNowPlaying()" style="flex:1;background:none;border:1px solid rgba(255,255,255,0.1);color:var(--text-dim);font-family:var(--font-mono);font-size:10px;padding:7px 12px;border-radius:7px;cursor:pointer;letter-spacing:1px;">CLEAR</button>
-        </div>
-      </div>
     </div>
     <div id="vip-profile-effect-section" style="display:none;padding:0 20px 16px;">
       <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;">Profile Background Effect ✨</div>
