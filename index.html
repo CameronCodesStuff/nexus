@@ -15181,7 +15181,7 @@ async function renderLeaderboard(tab){
   const el=document.getElementById('lb-content');
   if(!el) return;
   el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-dim);font-family:var(--font-mono);font-size:12px;">Loading…</div>';
-  const _ALL_GAME_IDS=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival','eggverse_hatched','eggverse_rarest','crash_money','crash_multi','dd_score','dd_kills','dd_coins'];
+  const _ALL_GAME_IDS=['whg','gauntlet','towerdefense','eternalrift','blockdodge','stackbuilder','cosmorunner','wavesurvival','eggverse_hatched','eggverse_rarest','crash_money','crash_multi','dd_score','dd_kills','dd_coins','snake'];
   if(_ALL_GAME_IDS.includes(tab)){
     const _GM={
       whg:        {t:'Top Levels Reached',    s:' lvl',    icon:'🟥', col:'#44dd44'},
