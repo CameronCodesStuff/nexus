@@ -853,6 +853,9 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   }
   @keyframes cool-guy-anim{0%{box-shadow:0 0 6px rgba(0,200,255,0.5);border-color:rgba(0,200,255,0.8);}50%{box-shadow:0 0 16px rgba(0,240,255,0.9),0 0 30px rgba(0,160,255,0.4);border-color:rgba(0,240,255,1);}100%{box-shadow:0 0 6px rgba(0,200,255,0.5);border-color:rgba(0,200,255,0.8);}}
   .role-cool-guy{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#001a2e,#002e4a);color:#00d4ff;border:1px solid rgba(0,200,255,0.8);font-weight:900;vertical-align:middle;margin-left:8px;animation:cool-guy-anim 2s ease-in-out infinite;-webkit-text-fill-color:initial;}
+  .role-begger{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#1a0f00,#2e1a00);color:#8a6a30;border:1px solid rgba(120,90,30,0.6);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
+  .role-golden-gray{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);color:#c8b89a;border:1px solid rgba(200,180,150,0.5);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
+  .role-gooner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.06);color:#e8e8e8;border:1px solid rgba(255,255,255,0.35);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   @keyframes github-anim{0%,100%{background-position:0% center;}50%{background-position:100% center;}}
   .role-github{display:inline-block;font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#161b22,#21262d,#30363d,#21262d,#161b22);background-size:300%;color:#f0f6fc;border:1px solid #30363d;font-weight:700;vertical-align:middle;margin-left:8px;box-shadow:0 0 8px rgba(240,246,252,0.1);animation:github-anim 3s linear infinite;-webkit-text-fill-color:initial;}
   @keyframes codetype-flicker{0%,100%{opacity:1;}50%{opacity:0.7;}}
@@ -9473,8 +9476,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','veteran','devoted','streak_king','daily_ops','cool_guy','github','codetype','dedicated','elite','lucky','vip','wow','api','gamer','explorer'];
-const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',veteran:'Veteran 🎖',devoted:'Devoted ❤️‍🔥',streak_king:'Streak King 👑',daily_ops:'Daily Ops ⚡',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite',lucky:'Lucky 🍀',vip:'V.I.P 👑',wow:'Wow ✨',api:'API ⚡',gamer:'Gamer 🎮',explorer:'Explorer 🧭'};
+const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','veteran','devoted','streak_king','daily_ops','cool_guy','github','codetype','dedicated','elite','lucky','vip','wow','api','gamer','explorer','begger','golden_gray','gooner'];
+const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',veteran:'Veteran 🎖',devoted:'Devoted ❤️‍🔥',streak_king:'Streak King 👑',daily_ops:'Daily Ops ⚡',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite',lucky:'Lucky 🍀',vip:'V.I.P 👑',wow:'Wow ✨',api:'API ⚡',gamer:'Gamer 🎮',explorer:'Explorer 🧭',begger:'Begger 🙏',golden_gray:'Golden Gray ✦',gooner:'Gooner'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -12921,6 +12924,9 @@ function getRoleBadge(uid){
     api:          '<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.5);color:#00d4ff;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">⚡ API</span>',
     lucky:        '<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,184,148,0.15);border:1px solid rgba(0,184,148,0.5);color:#00b894;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">🍀 LUCKY</span>',
     vip:          '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,rgba(240,184,36,0.2),rgba(255,140,0,0.15));border:1px solid rgba(240,184,36,0.5);color:#f0b824;font-size:9px;font-family:var(--font-mono);font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:1px;">👑 V.I.P</span>',
+    begger:       '<span class="role-begger">🙏 BEGGER</span>',
+    golden_gray:  '<span class="role-golden-gray">✦ GOLDEN GRAY</span>',
+    gooner:       '<span class="role-gooner">GOONER</span>',
   };
   let _out=roles.map(r=>map[r]||'').join('');
   // "Role Badges" setting OFF → show only OWNER, TEAM MEMBER (and the #1 rank).
