@@ -18917,7 +18917,7 @@ function _populateTPBanner(){
 
 function teamPortalTab(tab){
   teamPortalCurrentTab=tab;
-  ['feed','tickets','testing','suggestions','team','chat','stats','games','roles','feedback','proof','activity','polls','promotion'].forEach(function(t){
+  ['feed','tickets','testing','suggestions','team','chat','stats','games','roles','feedback','proof','activity','polls','promotion','tasks'].forEach(function(t){
     const btn=document.getElementById('tp-tab-'+t);
     const panel=document.getElementById('tp-panel-'+t);
     if(btn) btn.classList.toggle('active',t===tab);
@@ -18937,6 +18937,7 @@ function teamPortalTab(tab){
   if(tab==='activity') loadTeamActivity();
   if(tab==='polls') loadTeamPolls();
   if(tab==='promotion') loadPromotionPanel();
+  if(tab==='tasks') loadTasksPanel();
 }
 
 // ── TEAM FEED ──
@@ -21734,7 +21735,7 @@ window._N = {
   openGithubVerify, verifyGithub,
   linkGoogle, unlinkGoogle, linkGitHub, unlinkGitHub,
   openRolesModal, renderRolesModal, submitCodetypeProof, loadCodetypeProofs,
-  openTeamPortal, teamPortalTab, loadOwnerTesting, agreeToTeamConditions, loadPromotionPanel,
+  openTeamPortal, teamPortalTab, loadOwnerTesting, agreeToTeamConditions, loadPromotionPanel, loadTasksPanel,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
   toggleNotifications, updateNotifSettingsUI,
@@ -21858,6 +21859,244 @@ async function _saveCustomEmoji(){
   if(val.length>8){toast('Too long.','danger');return;}
   await saveEmoji(val);if(inp)inp.value='';renderProfile();renderSettings();toast('Custom emoji set!','success');
 }
+// ── TEAM PORTAL: TASKS ──────────────────────────────────────────────────────
+const TASK_PRIORITIES={low:{label:'Low',color:'#00d4ff'},medium:{label:'Medium',color:'#f0b824'},high:{label:'High',color:'#ff4d4d'}};
+
+async function loadTasksPanel(){
+  const panel=document.getElementById('tp-panel-tasks');
+  if(!panel) return;
+  panel.innerHTML='<div style="color:var(--text-dim);font-size:12px;font-family:var(--font-mono);padding:10px;">Loading…</div>';
+  try{
+    // Tasks stored as array on config/teamTasks doc — uses existing config collection, no new rules needed
+    const snap=await getDoc(doc(db,'config','teamTasks'));
+    const tasks=(snap.exists()?snap.data().tasks:[])||[];
+    panel.innerHTML='';
+
+    // ── Owner: create task form ──
+    if(isOwner){
+      const form=document.createElement('div');
+      form.style.cssText='background:var(--bg2);border:1px solid rgba(0,255,136,0.25);border-radius:10px;padding:14px;margin-bottom:16px;';
+      form.innerHTML='<div style="font-size:11px;font-weight:700;font-family:var(--font-mono);color:#00ff88;letter-spacing:1px;margin-bottom:10px;">👑 CREATE TASK</div>';
+
+      const titleInp=document.createElement('input');
+      titleInp.className='modal-input';titleInp.placeholder='Task title…';titleInp.maxLength=80;
+      titleInp.style.cssText='width:100%;font-size:12px;margin-bottom:8px;';
+
+      const descInp=document.createElement('textarea');
+      descInp.className='modal-input';descInp.placeholder='Description… (what needs doing, how to complete it)';descInp.maxLength=400;descInp.rows=3;
+      descInp.style.cssText='width:100%;font-size:11px;resize:vertical;margin-bottom:8px;font-family:var(--font-mono);';
+
+      const bottomRow=document.createElement('div');
+      bottomRow.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;';
+
+      const prioSel=document.createElement('select');
+      prioSel.className='modal-input';
+      prioSel.style.cssText='font-size:11px;font-family:var(--font-mono);flex:1;min-width:100px;';
+      ['low','medium','high'].forEach(function(p){
+        const o=document.createElement('option');o.value=p;o.textContent=TASK_PRIORITIES[p].label+' Priority';
+        prioSel.appendChild(o);
+      });
+      prioSel.value='medium';
+
+      const xpInp=document.createElement('input');
+      xpInp.className='modal-input';xpInp.type='number';xpInp.min=1;xpInp.max=20;xpInp.value=1;
+      xpInp.placeholder='Task pts (1–20)';
+      xpInp.style.cssText='font-size:11px;width:110px;';
+      xpInp.title='How many task points this is worth (counts toward promotion)';
+
+      const addBtn=document.createElement('button');
+      addBtn.className='btn-small primary';addBtn.style.cssText='font-size:10px;font-family:var(--font-mono);white-space:nowrap;';
+      addBtn.textContent='+ ADD TASK';
+      addBtn.onclick=async function(){
+        const title=(titleInp.value||'').trim();
+        if(!title){toast('Enter a task title.','danger');return;}
+        addBtn.disabled=true;addBtn.textContent='Adding…';
+        try{
+          const newTask={id:'task_'+Date.now(),title,desc:(descInp.value||'').trim(),priority:prioSel.value,points:Math.max(1,Math.min(20,parseInt(xpInp.value)||1)),createdAt:Date.now(),createdBy:cu.uid,createdByName:cud.displayName||cud.username||'Owner',status:'open',claimedBy:null,claimedByName:null,claimedAt:null,completedBy:[],completions:[]};
+          const updated=[...tasks,newTask];
+          await setDoc(doc(db,'config','teamTasks'),{tasks:updated});
+          titleInp.value='';descInp.value='';prioSel.value='medium';xpInp.value=1;
+          toast('Task added!','success');
+          loadTasksPanel();
+        }catch(e){toast('Error: '+e.message,'danger');addBtn.disabled=false;addBtn.textContent='+ ADD TASK';}
+      };
+
+      bottomRow.appendChild(prioSel);bottomRow.appendChild(xpInp);bottomRow.appendChild(addBtn);
+      form.appendChild(titleInp);form.appendChild(descInp);form.appendChild(bottomRow);
+      panel.appendChild(form);
+    }
+
+    // ── Task list ──
+    if(!tasks.length){
+      const empty=document.createElement('div');
+      empty.style.cssText='color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:20px;text-align:center;';
+      empty.textContent='No tasks yet. The owner will post tasks here for the team to complete.';
+      panel.appendChild(empty);
+      return;
+    }
+
+    // Sort: open first (high priority first), then completed
+    const sorted=[...tasks].sort(function(a,b){
+      if(a.status==='open'&&b.status!=='open') return -1;
+      if(a.status!=='open'&&b.status==='open') return 1;
+      const po={high:0,medium:1,low:2};
+      return (po[a.priority]||1)-(po[b.priority]||1);
+    });
+
+    // Filter tabs
+    const filterWrap=document.createElement('div');
+    filterWrap.style.cssText='display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;';
+    let activeFilter='all';
+    const filters=[['all','All'],['open','Open'],['done','Completed']];
+    const listWrap=document.createElement('div');
+    listWrap.id='tasks-list-wrap';
+
+    const renderTasks=function(filter){
+      listWrap.innerHTML='';
+      const show=sorted.filter(function(t){
+        if(filter==='open') return t.status==='open';
+        if(filter==='done') return t.status==='done';
+        return true;
+      });
+      if(!show.length){
+        listWrap.innerHTML='<div style="color:var(--text-dim);font-family:var(--font-mono);font-size:11px;padding:12px;text-align:center;">No tasks in this filter.</div>';
+        return;
+      }
+      show.forEach(function(task){
+        const prio=TASK_PRIORITIES[task.priority]||TASK_PRIORITIES.medium;
+        const isDone=task.status==='done';
+        const alreadyCompleted=Array.isArray(task.completions)&&task.completions.some(function(c){return c.uid===cu.uid;});
+
+        const card=document.createElement('div');
+        card.style.cssText='border:1px solid '+(isDone?'rgba(0,255,136,0.15)':prio.color+'33')+';border-left:3px solid '+(isDone?'rgba(0,255,136,0.4)':prio.color)+';border-radius:10px;padding:14px;margin-bottom:10px;background:var(--bg2);opacity:'+(isDone?0.7:1)+';';
+
+        // Header row
+        const hdr=document.createElement('div');
+        hdr.style.cssText='display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;';
+
+        const prioTag=document.createElement('span');
+        prioTag.style.cssText='font-size:8px;font-family:var(--font-mono);font-weight:700;padding:2px 6px;border-radius:4px;background:'+prio.color+'22;color:'+prio.color+';border:1px solid '+prio.color+'44;flex-shrink:0;margin-top:2px;';
+        prioTag.textContent=prio.label.toUpperCase();
+
+        const info=document.createElement('div');
+        info.style.cssText='flex:1;min-width:0;';
+        info.innerHTML='<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;">'+(isDone?'<s style="opacity:0.6;">':'')+esc(task.title)+(isDone?'</s>':'')+'</div>'
+          +(task.desc?'<div style="font-size:11px;color:var(--text-dim);line-height:1.5;margin-bottom:4px;">'+esc(task.desc)+'</div>':'')
+          +'<div style="font-size:9px;color:var(--text-dim);font-family:var(--font-mono);display:flex;gap:10px;flex-wrap:wrap;">'
+          +'<span>Posted by '+esc(task.createdByName||'Owner')+'</span>'
+          +'<span style="color:'+prio.color+';">⚡ '+task.points+' task pt'+(task.points===1?'':'s')+'</span>'
+          +(Array.isArray(task.completions)&&task.completions.length?'<span style="color:#00ff88;">✓ '+task.completions.length+' completion'+(task.completions.length===1?'':'s')+'</span>':'')
+          +'</div>';
+
+        const rightCol=document.createElement('div');
+        rightCol.style.cssText='display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;';
+
+        // Complete button (team members) — can complete once
+        if(!isDone&&!alreadyCompleted){
+          const doneBtn=document.createElement('button');
+          doneBtn.className='btn-small primary';doneBtn.style.cssText='font-size:10px;font-family:var(--font-mono);';
+          doneBtn.textContent='✓ Mark Done';
+          doneBtn.onclick=async function(){
+            doneBtn.disabled=true;doneBtn.textContent='Saving…';
+            try{
+              const completion={uid:cu.uid,name:cud.displayName||cud.username||'?',at:Date.now()};
+              const newCompletions=Array.isArray(task.completions)?[...task.completions,completion]:[completion];
+              const updatedTasks=tasks.map(function(t){
+                if(t.id!==task.id) return t;
+                return {...t,completions:newCompletions,status:isOwner?t.status:'open'};
+              });
+              await setDoc(doc(db,'config','teamTasks'),{tasks:updatedTasks});
+              // Award task points on user doc
+              const pts=task.points||1;
+              await updateDoc(doc(db,'users',cu.uid),{teamTaskCount:increment(pts)});
+              cud={...cud,teamTaskCount:(cud.teamTaskCount||0)+pts};
+              uCache[cu.uid]={...uCache[cu.uid],teamTaskCount:(uCache[cu.uid]?.teamTaskCount||0)+pts};
+              await logActivity('completed_task','Completed: '+task.title+' (+'+pts+' pts)');
+              toast('Task marked done! +'+pts+' task point'+(pts===1?'':'s')+'.','success');
+              loadTasksPanel();
+            }catch(e){toast('Error: '+e.message,'danger');doneBtn.disabled=false;doneBtn.textContent='✓ Mark Done';}
+          };
+          rightCol.appendChild(doneBtn);
+        } else if(alreadyCompleted){
+          const done=document.createElement('div');
+          done.style.cssText='font-size:10px;font-family:var(--font-mono);color:#00ff88;';
+          done.textContent='✓ Completed';
+          rightCol.appendChild(done);
+        }
+
+        // Owner controls
+        if(isOwner){
+          const closeBtn=document.createElement('button');
+          closeBtn.className='btn-small';closeBtn.style.cssText='font-size:9px;font-family:var(--font-mono);color:'+(isDone?'#f0b824':'var(--text-dim)')+';border-color:'+(isDone?'rgba(240,184,36,0.4)':'var(--border)')+';';
+          closeBtn.textContent=isDone?'↩ Reopen':'✕ Close';
+          closeBtn.onclick=async function(){
+            closeBtn.disabled=true;
+            try{
+              const updatedTasks=tasks.map(function(t){
+                if(t.id!==task.id) return t;
+                return {...t,status:isDone?'open':'done'};
+              });
+              await setDoc(doc(db,'config','teamTasks'),{tasks:updatedTasks});
+              toast(isDone?'Task reopened.':'Task closed.','success');
+              loadTasksPanel();
+            }catch(e){toast('Error: '+e.message,'danger');closeBtn.disabled=false;}
+          };
+          const delBtn=document.createElement('button');
+          delBtn.className='btn-small';delBtn.style.cssText='font-size:9px;font-family:var(--font-mono);color:var(--danger);border-color:rgba(255,60,60,0.3);';
+          delBtn.textContent='🗑';
+          delBtn.onclick=async function(){
+            if(!confirm('Delete this task?')) return;
+            try{
+              const updatedTasks=tasks.filter(function(t){return t.id!==task.id;});
+              await setDoc(doc(db,'config','teamTasks'),{tasks:updatedTasks});
+              toast('Task deleted.','success');loadTasksPanel();
+            }catch(e){toast('Error: '+e.message,'danger');}
+          };
+          rightCol.appendChild(closeBtn);rightCol.appendChild(delBtn);
+        }
+
+        hdr.appendChild(prioTag);hdr.appendChild(info);hdr.appendChild(rightCol);
+        card.appendChild(hdr);
+
+        // Completions list (owner view)
+        if(isOwner&&Array.isArray(task.completions)&&task.completions.length){
+          const compList=document.createElement('div');
+          compList.style.cssText='margin-top:8px;padding-top:8px;border-top:1px solid var(--border);';
+          compList.innerHTML='<div style="font-size:9px;letter-spacing:2px;color:var(--text-dim);font-family:var(--font-mono);margin-bottom:6px;">COMPLETIONS</div>';
+          task.completions.forEach(function(c){
+            const row=document.createElement('div');
+            row.style.cssText='font-size:10px;font-family:var(--font-mono);color:var(--text-dim);display:flex;gap:8px;margin-bottom:3px;';
+            row.innerHTML='<span style="color:#00ff88;">✓</span><span>'+esc(c.name||c.uid)+'</span><span style="opacity:0.4;">'+new Date(c.at).toLocaleDateString()+'</span>';
+            compList.appendChild(row);
+          });
+          card.appendChild(compList);
+        }
+
+        listWrap.appendChild(card);
+      });
+    };
+
+    filters.forEach(function(f){
+      const btn=document.createElement('button');
+      btn.className='btn-small'+(f[0]==='all'?' active':'');
+      btn.style.cssText='font-size:10px;font-family:var(--font-mono);'+(f[0]==='all'?'border-color:var(--accent);color:var(--accent);':'');
+      btn.textContent=f[1];
+      btn.onclick=function(){
+        activeFilter=f[0];
+        filterWrap.querySelectorAll('button').forEach(function(b){b.style.borderColor='';b.style.color='';});
+        btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';
+        renderTasks(f[0]);
+      };
+      filterWrap.appendChild(btn);
+    });
+
+    panel.appendChild(filterWrap);
+    panel.appendChild(listWrap);
+    renderTasks('all');
+
+  }catch(e){panel.innerHTML='<div style="color:var(--danger);font-size:11px;font-family:var(--font-mono);padding:10px;">Error: '+esc(e.message)+'</div>';}
+}
+
 // ── TEAM PORTAL: PROMOTION ──────────────────────────────────────────────────
 const PROMOTION_TIERS=[
   {id:'coordinator',  label:'Coordinator',  icon:'📋', tasksRequired:10,  color:'#00d4ff', desc:'Entry-level leadership. Assists in organising tasks and team comms.'},
@@ -22454,6 +22693,7 @@ function makePollCard(poll,isOw){
           <div class="auth-tab" id="tp-tab-activity" onclick="N.teamPortalTab('activity')" style="font-size:9px;">LOG</div>
           <div class="auth-tab" id="tp-tab-polls" onclick="N.teamPortalTab('polls')" style="font-size:9px;">POLLS</div>
           <div class="auth-tab" id="tp-tab-promotion" onclick="N.teamPortalTab('promotion')" style="font-size:9px;color:#f0b824;">PROMOTION</div>
+          <div class="auth-tab" id="tp-tab-tasks" onclick="N.teamPortalTab('tasks')" style="font-size:9px;color:#00ff88;">TASKS</div>
         </div>
       </div>
       <div style="flex:1;overflow-y:auto;padding:14px 18px;">
@@ -22471,6 +22711,7 @@ function makePollCard(poll,isOw){
         <div id="tp-panel-activity" style="display:none;"></div>
         <div id="tp-panel-polls" style="display:none;"></div>
         <div id="tp-panel-promotion" style="display:none;"></div>
+        <div id="tp-panel-tasks" style="display:none;"></div>
       </div>
     </div>
 
