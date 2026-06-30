@@ -856,6 +856,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .role-begger{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#1a0f00,#2e1a00);color:#8a6a30;border:1px solid rgba(120,90,30,0.6);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   .role-golden-gray{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);color:#c8b89a;border:1px solid rgba(200,180,150,0.5);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   .role-gooner{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.06);color:#e8e8e8;border:1px solid rgba(255,255,255,0.35);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
+  .role-github2x{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#161b22,#21262d);color:#79c0ff;border:1px solid rgba(121,192,255,0.5);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
+  .role-github5x{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#161b22,#21262d);color:#a371f7;border:1px solid rgba(163,113,247,0.6);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
+  .role-github10x{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#161b22,#21262d);color:#f0b824;border:1px solid rgba(240,184,36,0.6);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
+  .role-star{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:radial-gradient(ellipse at center,rgba(255,220,50,0.15),rgba(255,160,0,0.08));color:#ffd700;border:1px solid rgba(255,215,0,0.5);font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 0 8px rgba(255,215,0,0.6);-webkit-text-fill-color:initial;}
   @keyframes github-anim{0%,100%{background-position:0% center;}50%{background-position:100% center;}}
   .role-github{display:inline-block;font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#161b22,#21262d,#30363d,#21262d,#161b22);background-size:300%;color:#f0f6fc;border:1px solid #30363d;font-weight:700;vertical-align:middle;margin-left:8px;box-shadow:0 0 8px rgba(240,246,252,0.1);animation:github-anim 3s linear infinite;-webkit-text-fill-color:initial;}
   @keyframes codetype-flicker{0%,100%{opacity:1;}50%{opacity:0.7;}}
@@ -7080,6 +7084,13 @@ async function answerCall(callId){
   const call = callSnap.data();
   if(call.status === 'ended'||call.status === 'rejected'){ toast('Call has ended.','danger'); return; }
 
+  // ── Switch to the chat this call belongs to so the UI shows correct participants ──
+  if(call.chatId && call.chatId !== acid){
+    await openChat(call.chatId);
+    // Small pause so aChats[acid] is populated before openCallUI reads it
+    await new Promise(r=>setTimeout(r,300));
+  }
+
   activeCallId = callId;
 
   // Get local media
@@ -7217,8 +7228,7 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
       if(st) st.textContent='🟢 Connected';
       toast('Call connected!','success');
       // Re-attach remote stream now that connection is established
-      // (ontrack may have fired before ICE was connected)
-      if(mode==='video'){
+      if(mode==='video'||mode==='screen'){
         const receivers=pc.getReceivers();
         const videoReceiver=receivers.find(r=>r.track&&r.track.kind==='video');
         const audioReceiver=receivers.find(r=>r.track&&r.track.kind==='audio');
@@ -7232,12 +7242,15 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
       }
     }
     if(s==='disconnected'){
-      // Try to restart ICE before giving up
+      const st=document.getElementById('status-'+remoteUid);
+      if(st) st.textContent='🟡 Reconnecting…';
       toast('Connection unstable — reconnecting…','');
+      // Wait 4s then attempt ICE restart if still disconnected
       setTimeout(async()=>{
+        if(!peerConns[remoteUid]||peerConns[remoteUid]!==pc) return;
         if(pc.connectionState==='disconnected'||pc.connectionState==='failed'){
           try{
-            const offer=await pc.createOffer();
+            const offer=await pc.createOffer({iceRestart:true});
             await pc.setLocalDescription(offer);
             if(activeCallId){
               await addDoc(collection(db,'calls',activeCallId,'signals'),{
@@ -7248,10 +7261,12 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
             }
           }catch(e){console.warn('ICE restart failed:',e);}
         }
-      },3000);
+      },4000);
     }
     if(s==='failed'){
-      console.log('[CALL] ICE failed, attempting restart...');
+      console.log('[CALL] ICE failed, attempting full restart...');
+      const st=document.getElementById('status-'+remoteUid);
+      if(st) st.textContent='🔴 Reconnecting…';
       (async()=>{
         try{
           const offer = await pc.createOffer({iceRestart:true});
@@ -7264,10 +7279,27 @@ async function createPeerConnection(remoteUid, isInitiator, callId, mode){
             });
           }
           toast('Reconnecting call…','');
+          // If still failed after 10s, recreate the PC entirely
+          setTimeout(async()=>{
+            if(!peerConns[remoteUid]||peerConns[remoteUid]!==pc) return;
+            if(pc.connectionState==='failed'){
+              console.log('[CALL] Recreating peer connection for '+remoteUid);
+              try{pc.close();}catch{}
+              delete peerConns[remoteUid];
+              if(activeCallId) await createPeerConnection(remoteUid, isInitiator, activeCallId, mode);
+            }
+          },10000);
         }catch(e2){
           console.warn('[CALL] ICE restart failed:',e2);
-          toast('Call connection failed.','danger');
-          endCall();
+          toast('Call connection failed. Retrying…','danger');
+          // Last resort: recreate peer connection
+          setTimeout(async()=>{
+            if(activeCallId&&(!peerConns[remoteUid]||peerConns[remoteUid].connectionState==='failed')){
+              try{if(peerConns[remoteUid])peerConns[remoteUid].close();}catch{}
+              delete peerConns[remoteUid];
+              await createPeerConnection(remoteUid, isInitiator, activeCallId, mode);
+            }
+          },2000);
         }
       })();
     }
@@ -9476,8 +9508,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','veteran','devoted','streak_king','daily_ops','cool_guy','github','codetype','dedicated','elite','lucky','vip','wow','api','gamer','explorer','begger','golden_gray','gooner'];
-const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',veteran:'Veteran 🎖',devoted:'Devoted ❤️‍🔥',streak_king:'Streak King 👑',daily_ops:'Daily Ops ⚡',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite',lucky:'Lucky 🍀',vip:'V.I.P 👑',wow:'Wow ✨',api:'API ⚡',gamer:'Gamer 🎮',explorer:'Explorer 🧭',begger:'Begger 🙏',golden_gray:'Golden Gray ✦',gooner:'Gooner'};
+const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','veteran','devoted','streak_king','daily_ops','cool_guy','github','codetype','dedicated','elite','lucky','vip','wow','api','gamer','explorer','begger','golden_gray','gooner','github2x','github5x','github10x','star'];
+const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',veteran:'Veteran 🎖',devoted:'Devoted ❤️‍🔥',streak_king:'Streak King 👑',daily_ops:'Daily Ops ⚡',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite',lucky:'Lucky 🍀',vip:'V.I.P 👑',wow:'Wow ✨',api:'API ⚡',gamer:'Gamer 🎮',explorer:'Explorer 🧭',begger:'Begger 🙏',golden_gray:'Golden Gray ✦',gooner:'Gooner',github2x:'GitHub 2×',github5x:'GitHub 5×',github10x:'GitHub 10×',star:'⭐ Star'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -12927,6 +12959,10 @@ function getRoleBadge(uid){
     begger:       '<span class="role-begger">🙏 BEGGER</span>',
     golden_gray:  '<span class="role-golden-gray">✦ GOLDEN GRAY</span>',
     gooner:       '<span class="role-gooner">GOONER</span>',
+    github2x:     '<span class="role-github2x">⌥ GITHUB 2×</span>',
+    github5x:     '<span class="role-github5x">⌥ GITHUB 5×</span>',
+    github10x:    '<span class="role-github10x">⌥ GITHUB 10×</span>',
+    star:         '<span class="role-star">★ STAR</span>',
   };
   let _out=roles.map(r=>map[r]||'').join('');
   // "Role Badges" setting OFF → show only OWNER, TEAM MEMBER (and the #1 rank).
@@ -18024,6 +18060,20 @@ function openMinesweeper(){
 
 function openGamesHub(){
   openModal('games-hub-modal');
+  // Reset search on open
+  const inp=document.getElementById('games-search');
+  if(inp){inp.value='';N._filterGames('');}
+}
+
+function _filterGames(q){
+  const list=document.getElementById('games-list');
+  if(!list) return;
+  const term=(q||'').toLowerCase().trim();
+  Array.from(list.querySelectorAll('button')).forEach(function(btn){
+    if(!term){btn.style.display='';return;}
+    const text=btn.textContent.toLowerCase();
+    btn.style.display=text.includes(term)?'':'none';
+  });
 }
 function openDriftGame(){
   setActivity('playing Drift King');
@@ -21722,7 +21772,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openTetris, openAsteroid, openMinesweeper, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, _filterGames, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openTetris, openAsteroid, openMinesweeper, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -22475,6 +22525,8 @@ function makePollCard(poll,isOw){
       🔭 RANDOM PROJECTS
     </button>
     <div style="display:flex;flex-direction:column;gap:2px;margin-top:8px;">
+      <input id="games-search" oninput="N._filterGames(this.value)" placeholder="🔍  Search games…" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:7px 11px;outline:none;margin-bottom:6px;" />
+      <div id="games-list">
 
       <button onclick="N.closeModal('games-hub-modal');N.openModal('typegame-modal')" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(68,102,255,0.1)'" onmouseout="this.style.background='none'">
         <span style="font-size:16px;width:22px;text-align:center;">⌨️</span>
@@ -22622,11 +22674,9 @@ function makePollCard(poll,isOw){
         <span style="font-size:9px;font-family:var(--font-mono);color:#00ccff;letter-spacing:1px;">PUZZLE</span>
       </button>
 
-    </div>
+    </div></div>
   </div>
 </div>
-
-<!-- TEAM PORTAL MODAL -->
 <div class="modal-overlay" id="team-portal-modal">
   <div class="modal" style="width:560px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">
 
