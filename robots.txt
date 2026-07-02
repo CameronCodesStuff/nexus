@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cameroncodesstuff.github.io/nexus/sitemap.xml
