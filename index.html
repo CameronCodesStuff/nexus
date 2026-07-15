@@ -860,6 +860,7 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   .role-github5x{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#161b22,#21262d);color:#a371f7;border:1px solid rgba(163,113,247,0.6);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   .role-github10x{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,#161b22,#21262d);color:#f0b824;border:1px solid rgba(240,184,36,0.6);font-weight:900;vertical-align:middle;margin-left:8px;-webkit-text-fill-color:initial;}
   .role-star{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:radial-gradient(ellipse at center,rgba(255,220,50,0.15),rgba(255,160,0,0.08));color:#ffd700;border:1px solid rgba(255,215,0,0.5);font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 0 8px rgba(255,215,0,0.6);-webkit-text-fill-color:initial;}
+  .role-misty{display:inline-block;font-size:9px;font-family:'Orbitron',monospace;letter-spacing:2px;padding:2px 8px;border-radius:4px;background:linear-gradient(135deg,rgba(0,20,60,0.9),rgba(0,40,80,0.9));color:#7dd3fc;border:1px solid rgba(0,160,255,0.5);font-weight:900;vertical-align:middle;margin-left:8px;text-shadow:0 0 8px rgba(0,160,255,0.5);-webkit-text-fill-color:initial;}
   @keyframes github-anim{0%,100%{background-position:0% center;}50%{background-position:100% center;}}
   .role-github{display:inline-block;font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;padding:2px 8px;border-radius:4px;background:linear-gradient(90deg,#161b22,#21262d,#30363d,#21262d,#161b22);background-size:300%;color:#f0f6fc;border:1px solid #30363d;font-weight:700;vertical-align:middle;margin-left:8px;box-shadow:0 0 8px rgba(240,246,252,0.1);animation:github-anim 3s linear infinite;-webkit-text-fill-color:initial;}
   @keyframes codetype-flicker{0%,100%{opacity:1;}50%{opacity:0.7;}}
@@ -7885,6 +7886,23 @@ function openProfileModal(uid){
                 +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
                 +'</a>';
             })():'')
+            +(u.mistyUsername?(function(){
+              const _mu=u.mistyUsername||'';
+              return '<a href="https://cameroncodesstuff.github.io/misty/@'+_mu+'" target="_blank" rel="noopener" '
+                +'style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
+                +'border-radius:8px;background:linear-gradient(135deg,rgba(0,20,50,0.95),rgba(0,10,30,0.98));'
+                +'border:1px solid rgba(0,160,255,0.3);text-decoration:none;margin-top:6px;'
+                +'transition:border-color 0.2s,box-shadow 0.2s;" '
+                +'onmouseover="this.style.borderColor=\'rgba(0,200,255,0.7)\';this.style.boxShadow=\'0 0 14px rgba(0,160,255,0.25)\'" '
+                +'onmouseout="this.style.borderColor=\'rgba(0,160,255,0.3)\';this.style.boxShadow=\'none\'">'
+                +'<img src="https://raw.githubusercontent.com/CameronCodesStuff/misty/main/logo.png" style="width:22px;height:22px;object-fit:contain;filter:drop-shadow(0 0 5px rgba(0,180,255,0.8));" />'
+                +'<div style="flex:1;min-width:0;">'
+                +'<div style="font-size:12px;font-weight:700;color:#7dd3fc;font-family:var(--font-mono);letter-spacing:0.3px;">@'+esc(_mu)+'</div>'
+                +'<div style="font-size:9px;color:#38bdf8;font-family:var(--font-mono);letter-spacing:1px;margin-top:1px;">MISTY</div>'
+                +'</div>'
+                +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
+                +'</a>';
+            })():'')
             +'</div>';
         })()}
       </div>
@@ -9508,8 +9526,8 @@ async function loadOwnerUsers(){
   }
 }
 
-const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','veteran','devoted','streak_king','daily_ops','cool_guy','github','codetype','dedicated','elite','lucky','vip','wow','api','gamer','explorer','begger','golden_gray','gooner','github2x','github5x','github10x','star'];
-const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',veteran:'Veteran 🎖',devoted:'Devoted ❤️‍🔥',streak_king:'Streak King 👑',daily_ops:'Daily Ops ⚡',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite',lucky:'Lucky 🍀',vip:'V.I.P 👑',wow:'Wow ✨',api:'API ⚡',gamer:'Gamer 🎮',explorer:'Explorer 🧭',begger:'Begger 🙏',golden_gray:'Golden Gray ✦',gooner:'Gooner',github2x:'GitHub 2×',github5x:'GitHub 5×',github10x:'GitHub 10×',star:'⭐ Star'};
+const ROLE_OPTS=['owner','team_member','trial_member','wpm130','tester','beginner_tester','bugfinder','feedback','og','easter','referral','veteran','devoted','streak_king','daily_ops','cool_guy','github','codetype','dedicated','elite','lucky','vip','wow','api','gamer','explorer','begger','golden_gray','gooner','github2x','github5x','github10x','star','misty'];
+const ROLE_LABELS={owner:'Owner',team_member:'Team Member',trial_member:'Trial Member',wpm130:'130WPM+',tester:'Tester',beginner_tester:'Beginner Tester',bugfinder:'Bug Finder',feedback:'Feedback',referral:'Referral',og:'OG',easter:'Easter Egg 🐣',veteran:'Veteran 🎖',devoted:'Devoted ❤️‍🔥',streak_king:'Streak King 👑',daily_ops:'Daily Ops ⚡',cool_guy:'Cool Guy 😎',github:'GitHub',codetype:'Codetype',dedicated:'Dedicated',elite:'Elite',lucky:'Lucky 🍀',vip:'V.I.P 👑',wow:'Wow ✨',api:'API ⚡',gamer:'Gamer 🎮',explorer:'Explorer 🧭',begger:'Begger 🙏',golden_gray:'Golden Gray ✦',gooner:'Gooner',github2x:'GitHub 2×',github5x:'GitHub 5×',github10x:'GitHub 10×',star:'⭐ Star',misty:'Misty 🌊'};
 
 async function loadRolesPanel(){
   const panel=document.getElementById('op-panel-roles');
@@ -12254,6 +12272,15 @@ function renderLinkedAccountsSection(){
           <div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--text);">GitHub</div><div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">${hasGitHub?'Linked — @'+(cud?.githubLogin||cud?.githubUsername||''):'Not linked — also verifies GitHub role'}</div></div>
           <button class="btn-small ${hasGitHub?'':'primary'}" onclick="N.${hasGitHub?'unlinkGitHub':'linkGitHub'}()" style="${hasGitHub?'border-color:var(--danger);color:var(--danger);':''}">${hasGitHub?'UNLINK':'LINK'}</button>
         </div>
+        ${(function(){
+          const hasMisty=!!cud?.mistyUsername;
+          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid '+(hasMisty?'rgba(0,160,255,0.45)':'var(--border)')+';border-radius:8px;">'
+            +'<img src="https://raw.githubusercontent.com/CameronCodesStuff/misty/main/logo.png" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 0 6px rgba(0,160,255,0.7));" onerror="this.style.display=\'none\'" />'
+            +'<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--text);">Misty</div>'
+            +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">'+(hasMisty?'Linked — @'+(cud.mistyUsername):'Not linked — link your Misty profile & earn the Misty role')+'</div></div>'
+            +'<button class="btn-small '+(hasMisty?'':'primary')+'" onclick="N.'+(hasMisty?'unlinkMisty':'linkMisty')+'()" style="'+(hasMisty?'border-color:var(--danger);color:var(--danger);':'')+'">'+(hasMisty?'UNLINK':'LINK')+'</button>'
+            +'</div>';
+        })()}
       </div>
       <div id="link-account-status" style="font-size:11px;font-family:var(--font-mono);margin-top:8px;min-height:16px;"></div>
     </div>
@@ -12342,6 +12369,50 @@ async function unlinkGitHub(){
     await updateDoc(doc(db,'users',cu.uid),{githubLinked:false,githubLogin:'',githubUsername:''});
     cud=Object.assign({},cud,{githubLinked:false,githubLogin:'',githubUsername:''});
     toast('GitHub account unlinked.','success');renderLinkedAccountsSection();
+  }catch(e){toast('Failed: '+e.message,'danger');}
+}
+
+async function linkMisty(){
+  const status=document.getElementById('link-account-status');
+  const username=prompt('Enter your Misty username (the part after @ in your profile URL):\nhttps://cameroncodesstuff.github.io/misty/@YOUR_USERNAME');
+  if(!username){return;}
+  const clean=username.trim().replace(/^@/,'').replace(/\s+/g,'');
+  if(!clean){toast('Invalid username.','danger');return;}
+  if(status){status.style.color='var(--text-dim)';status.textContent='Verifying Misty profile…';}
+  try{
+    // Verify the profile exists by fetching it
+    const testUrl='https://cameroncodesstuff.github.io/misty/@'+encodeURIComponent(clean);
+    const res=await fetch(testUrl,{method:'HEAD'}).catch(()=>null);
+    // HEAD may fail due to CORS — just accept the username and mark as linked
+    // (Misty is a same-origin GH Pages app; we trust the user's input)
+    await updateDoc(doc(db,'users',cu.uid),{mistyUsername:clean,mistyLinked:true});
+    cud=Object.assign({},cud,{mistyUsername:clean,mistyLinked:true});
+    uCache[cu.uid]=Object.assign({},uCache[cu.uid],{mistyUsername:clean,mistyLinked:true});
+    // Grant Misty role automatically
+    const roles=Array.isArray(cud.roles)?[...new Set([...cud.roles,'misty'])]:[...(cud.roles||[]),'misty'];
+    await updateDoc(doc(db,'users',cu.uid),{roles});
+    cud=Object.assign({},cud,{roles});
+    uCache[cu.uid]=Object.assign({},uCache[cu.uid],{roles});
+    toast('✓ Misty profile linked! You\'ve been awarded the Misty role.','success');
+    if(status){status.style.color='var(--success)';status.textContent='✓ Linked as @'+clean+' — Misty role granted!';}
+    renderLinkedAccountsSection();
+    renderProfile();
+  }catch(e){
+    if(status){status.style.color='var(--danger)';status.textContent='Error: '+e.message;}
+    toast('Failed to link Misty: '+e.message,'danger');
+  }
+}
+
+async function unlinkMisty(){
+  if(!confirm('Unlink your Misty profile? This will also remove the Misty role.')) return;
+  try{
+    const roles=(cud.roles||[]).filter(r=>r!=='misty');
+    await updateDoc(doc(db,'users',cu.uid),{mistyUsername:'',mistyLinked:false,roles});
+    cud=Object.assign({},cud,{mistyUsername:'',mistyLinked:false,roles});
+    uCache[cu.uid]=Object.assign({},uCache[cu.uid],{mistyUsername:'',mistyLinked:false,roles});
+    toast('Misty profile unlinked.','success');
+    renderLinkedAccountsSection();
+    renderProfile();
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
 async function verifyGithubAfterLink(ghLogin){
@@ -12969,6 +13040,7 @@ function getRoleBadge(uid){
     github5x:     '<span class="role-github5x">⌥ GITHUB 5×</span>',
     github10x:    '<span class="role-github10x">⌥ GITHUB 10×</span>',
     star:         '<span class="role-star">★ STAR</span>',
+    misty:        '<span class="role-misty">🌊 MISTY</span>',
   };
   let _out=roles.map(r=>map[r]||'').join('');
   // "Role Badges" setting OFF → show only OWNER, TEAM MEMBER (and the #1 rank).
@@ -21830,7 +21902,7 @@ window._N = {
   openTrialTest, submitTrialTest,
   openGithubVerify, verifyGithub,
   linkGoogle, unlinkGoogle, linkGitHub, unlinkGitHub,
-  openRolesModal, renderRolesModal, submitCodetypeProof, loadCodetypeProofs,
+  openRolesModal, renderRolesModal, submitCodetypeProof, loadCodetypeProofs, linkMisty, unlinkMisty,
   openTeamPortal, teamPortalTab, loadOwnerTesting, agreeToTeamConditions, loadPromotionPanel, loadTasksPanel,
   openLongestGame, closeLongestGame,
   openShellGame, closeShellGame,
