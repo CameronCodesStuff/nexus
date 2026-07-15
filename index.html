@@ -7887,7 +7887,21 @@ function openProfileModal(uid){
                 +'</a>';
             })():'')
             +(u.mistyUsername?(function(){
-              const _mu=u.mistyUsername||'';
+              // Sanitise — strip any URL prefix, handle double-prefixing, extract just username
+              let _mu=u.mistyUsername||'';
+              // Keep extracting the last @-segment until no more URL found
+              for(let _i=0;_i<5;_i++){
+                const _m=_mu.match(/@([^/@?\s#]+)\s*$/);
+                if(_m){_mu=_m[1];break;}
+                const _m2=_mu.match(/\/([^/@?\s#]+)\s*$/);
+                if(_m2&&!_mu.startsWith('http')){_mu=_m2[1];break;}
+                // strip leading https?://... up to last @
+                const _last=_mu.lastIndexOf('@');
+                if(_last>0){_mu=_mu.slice(_last+1);}
+                else{_mu=_mu.replace(/^https?:\/\/[^/]+\/misty\//,'').replace(/^@/,'');break;}
+              }
+              _mu=_mu.replace(/^@/,'').replace(/[/?\s#].*/,'').trim();
+              if(!_mu) return '';
               return '<a href="https://cameroncodesstuff.github.io/misty/@'+_mu+'" target="_blank" rel="noopener" '
                 +'style="display:flex;align-items:center;gap:10px;padding:10px 12px;'
                 +'border-radius:8px;background:linear-gradient(135deg,rgba(0,20,50,0.95),rgba(0,10,30,0.98));'
@@ -7902,12 +7916,23 @@ function openProfileModal(uid){
                 +'</div>'
                 +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
                 +'</a>';
-            })():'')
-            +'</div>';
+            })():'')            +'</div>';
         })()}
       </div>
     </div>`;
   if(!isMe&&uid) updateDoc(doc(db,'users',uid),{profileViews:increment(1)}).catch(()=>{});
+  // Auto-fix own bad mistyUsername in Firestore if it contains a URL
+  if(isMe&&cud?.mistyUsername&&cud.mistyUsername.includes('/')){
+    const _bad=cud.mistyUsername;
+    const _lastAt=_bad.lastIndexOf('@');
+    let _fixed=_lastAt>=0?_bad.slice(_lastAt+1):_bad;
+    _fixed=_fixed.replace(/[/?\s#].*/,'').trim();
+    if(_fixed&&_fixed!==_bad){
+      updateDoc(doc(db,'users',cu.uid),{mistyUsername:_fixed}).catch(()=>{});
+      cud=Object.assign({},cud,{mistyUsername:_fixed});
+      uCache[cu.uid]=Object.assign({},uCache[cu.uid],{mistyUsername:_fixed});
+    }
+  }
   openModal('profile-modal');
   // Profile background effect (VIP) — sits behind everything on the profile card
   const _pEffId='prof-eff-'+uid;
@@ -12274,10 +12299,13 @@ function renderLinkedAccountsSection(){
         </div>
         ${(function(){
           const hasMisty=!!cud?.mistyUsername;
+          const _rawMu=cud?.mistyUsername||'';
+          const _muMatch=_rawMu.match(/\/misty\/@?([^/?\s#]+)/);
+          const _cleanMu=(_muMatch?_muMatch[1]:_rawMu).replace(/^@/,'').replace(/\s+/g,'');
           return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid '+(hasMisty?'rgba(0,160,255,0.45)':'var(--border)')+';border-radius:8px;">'
             +'<img src="https://raw.githubusercontent.com/CameronCodesStuff/misty/main/logo.png" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 0 6px rgba(0,160,255,0.7));" onerror="this.style.display=\'none\'" />'
             +'<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--text);">Misty</div>'
-            +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">'+(hasMisty?'Linked — @'+(cud.mistyUsername):'Not linked — link your Misty profile & earn the Misty role')+'</div></div>'
+            +'<div style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono);">'+(hasMisty&&_cleanMu?'Linked — @'+_cleanMu:'Not linked — link your Misty profile & earn the Misty role')+'</div></div>'
             +'<button class="btn-small '+(hasMisty?'':'primary')+'" onclick="N.'+(hasMisty?'unlinkMisty':'linkMisty')+'()" style="'+(hasMisty?'border-color:var(--danger);color:var(--danger);':'')+'">'+(hasMisty?'UNLINK':'LINK')+'</button>'
             +'</div>';
         })()}
@@ -12374,9 +12402,14 @@ async function unlinkGitHub(){
 
 async function linkMisty(){
   const status=document.getElementById('link-account-status');
-  const username=prompt('Enter your Misty username (the part after @ in your profile URL):\nhttps://cameroncodesstuff.github.io/misty/@YOUR_USERNAME');
+  const username=prompt('Enter your Misty username or profile URL:\ne.g. cameron  or  https://cameroncodesstuff.github.io/misty/@cameron');
   if(!username){return;}
-  const clean=username.trim().replace(/^@/,'').replace(/\s+/g,'');
+  // Strip full URL if pasted — extract just the username after @
+  let clean=username.trim();
+  // Handle: https://cameroncodesstuff.github.io/misty/@cameron
+  const atMatch=clean.match(/\/misty\/@?([^/?\s#]+)/);
+  if(atMatch) clean=atMatch[1];
+  clean=clean.replace(/^@/,'').replace(/\s+/g,'').toLowerCase();
   if(!clean){toast('Invalid username.','danger');return;}
   if(status){status.style.color='var(--text-dim)';status.textContent='Verifying Misty profile…';}
   try{
@@ -12388,7 +12421,6 @@ async function linkMisty(){
     await updateDoc(doc(db,'users',cu.uid),{mistyUsername:clean,mistyLinked:true});
     cud=Object.assign({},cud,{mistyUsername:clean,mistyLinked:true});
     uCache[cu.uid]=Object.assign({},uCache[cu.uid],{mistyUsername:clean,mistyLinked:true});
-    // Grant Misty role automatically
     const roles=Array.isArray(cud.roles)?[...new Set([...cud.roles,'misty'])]:[...(cud.roles||[]),'misty'];
     await updateDoc(doc(db,'users',cu.uid),{roles});
     cud=Object.assign({},cud,{roles});
