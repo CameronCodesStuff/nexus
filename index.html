@@ -4650,6 +4650,7 @@ function openVipModal(){
       const picker=document.getElementById('vip-profile-bg-picker');
       if(picker&&currentBg.startsWith('#')&&currentBg.length===7) picker.value=currentBg;
     }
+    _populateVipVideoSelect();
   }
 
   // Pre-fill custom role inputs if already set
@@ -4731,6 +4732,49 @@ async function saveVipProfileBg(val){
   uCache[cu.uid]={...uCache[cu.uid],vipProfileBg:val};
   toast('🎨 Profile background updated!','success');
   openVipModal();
+}
+
+// ── VIP video profile backgrounds (Misty backgrounds library) ─────────────
+const MISTY_BG_BASE='https://raw.githubusercontent.com/CameronCodesStuff/misty/main/assets/backgrounds/';
+const MISTY_VIDEO_BGS=[
+  'akatsuki-rain.mp4','angewomon-digimon_3840x2160.mp4','anime-bikini-girls_3840x2160.mp4',
+  'autumn-tree-in-moonlight_3840x2160.mp4','beneath-headlines.mp4','beneath-the-forgotten-arc_3840x2160.mp4',
+  'bmw-m4-liberty_3840x2160.mp4','bmw-m5-in-dark_3840x2160.mp4','celestial-veil.mp4',
+  'columbina-lunar-ascension_3840x2160.mp4','echoes-of-the-forgotten-ritual_3840x2160.mp4',
+  'fishing-frogs_3840x2160.mp4','forgotten-path_3840x2160.mp4','girl-on-the-beach-at-night_1920x1080.mp4',
+  'golden-sky.mp4','itachi-uchiha_3840x2160.mp4','large-sakura-tree.mp4','levi-ackerman-dark_3840x2160.mp4',
+  'meadow-with-blooming-flowers_3840x2160.mp4','minecraft-sunset.mp4','morning-light.mp4',
+  'mountains-with-flowers_3840x2160.mp4','pixel-rain.mp4','poppy-field.mp4',
+  'rainy-anime-girls_1920x1080.mp4','rainy-pine-forest.mp4','rengoku-dawn-in-flames_3840x2160.mp4',
+  'roses-in-rain.mp4','samurai-spirit-under-the-moon_3840x2160.mp4','serene-anime-girl_3840x2160.mp4',
+  'serious-girl_3840x2160.mp4','shadow-cut-reverie_3840x2160.mp4','shadow-king.mp4',
+  'shadowheart-baldur-gate-3_3840x2160.mp4','suisui-wuthering-waves_3840x2160.mp4',
+  'surviving-the-last-of-us_3840x2160.mp4','the-end-of-summer_3840x2160.mp4','the-witchers-path_3840x2160.mp4',
+  'train-landscape.mp4','vegeta-ultra-ego.mp4','void-king-ascension_1920x1080.mp4',
+  'white-toyota-drifting_3840x2160.mp4','yellow-sundress.mp4'
+];
+function _mistyBgLabel(f){
+  return f.replace(/\.mp4$/,'').replace(/_\d+x\d+$/,'').split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+}
+function _populateVipVideoSelect(){
+  const sel=document.getElementById('vip-profile-video-select');
+  if(!sel) return;
+  sel.innerHTML='<option value="">— None —</option>';
+  MISTY_VIDEO_BGS.forEach(f=>{
+    const o=document.createElement('option');
+    o.value=f;o.textContent=_mistyBgLabel(f);
+    sel.appendChild(o);
+  });
+  sel.value=cud?.vipProfileVideo||'';
+}
+async function saveVipProfileVideo(val){
+  if(!cu||!cud?.roles?.includes('vip')) return toast('VIP only','danger');
+  try{
+    await updateDoc(doc(db,'users',cu.uid),{vipProfileVideo:val||''});
+    cud={...cud,vipProfileVideo:val||''};
+    uCache[cu.uid]={...uCache[cu.uid],vipProfileVideo:val||''};
+    toast(val?'🎬 Video background set!':'Video background cleared.','success');
+  }catch(e){toast('Failed: '+e.message,'danger');}
 }
 
 async function saveVipCustomRole(){
@@ -5382,7 +5426,7 @@ renderSettings();updateNotifSettingsUI();}
     tgStop();tgInit();
   }
 }
-const closeModal=id=>{$(id).classList.remove('open');if(id==='profile-modal'){document.querySelectorAll('[id^="pet-cv-"]').forEach(cv=>{if(cv.__petTimer){clearInterval(cv.__petTimer);cv.__petTimer=null;}});document.querySelectorAll('[id^="prof-eff-"]').forEach(cv=>{if(cv.__stopEff)cv.__stopEff();if(cv.__ro){try{cv.__ro.disconnect();}catch(_){}}cv.remove();});}if(id==='lb-modal'&&window._lbRefreshInterval){clearInterval(window._lbRefreshInterval);window._lbRefreshInterval=null;}if(id==='team-portal-modal'&&_teamChatUnsub){_teamChatUnsub();_teamChatUnsub=null;}};
+const closeModal=id=>{$(id).classList.remove('open');if(id==='profile-modal'){document.querySelectorAll('[id^="pet-cv-"]').forEach(cv=>{if(cv.__petTimer){clearInterval(cv.__petTimer);cv.__petTimer=null;}});document.querySelectorAll('[id^="prof-eff-"]').forEach(cv=>{if(cv.__stopEff)cv.__stopEff();if(cv.__ro){try{cv.__ro.disconnect();}catch(_){}}cv.remove();});document.querySelectorAll('.vip-profile-video-bg').forEach(v=>{try{v.pause();}catch(_){}v.remove();});}if(id==='lb-modal'&&window._lbRefreshInterval){clearInterval(window._lbRefreshInterval);window._lbRefreshInterval=null;}if(id==='team-portal-modal'&&_teamChatUnsub){_teamChatUnsub();_teamChatUnsub=null;}};
 const closeAllModals=()=>{document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open'));};
 
 let usersFilterQuery='';
@@ -7681,7 +7725,26 @@ function openProfileModal(uid){
   const container=$('profile-modal-content');
   // Apply VIP profile bg colour to the modal body
   const _vipBg = u.roles?.includes('vip') && u.vipProfileBg ? u.vipProfileBg : '';
-  if(_vipBg) {
+  const _vipVideo = u.roles?.includes('vip') && u.vipProfileVideo ? u.vipProfileVideo : '';
+  // Remove any previous video bg
+  document.querySelectorAll('.vip-profile-video-bg').forEach(v=>{try{v.pause();}catch{}v.remove();});
+  if(_vipVideo) {
+    const _modalDiv = container?.parentElement;
+    if(_modalDiv){
+      _modalDiv.style.background = 'transparent';
+      _modalDiv.style.position = 'relative';
+      _modalDiv.style.overflow = 'hidden';
+      const vid=document.createElement('video');
+      vid.className='vip-profile-video-bg';
+      vid.src=MISTY_BG_BASE+_vipVideo;
+      vid.autoplay=true;vid.loop=true;vid.muted=true;vid.playsInline=true;
+      vid.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;opacity:0.45;';
+      _modalDiv.insertBefore(vid,_modalDiv.firstChild);
+      // Ensure content sits above the video
+      if(container) container.style.position='relative', container.style.zIndex='1';
+      vid.play().catch(()=>{});
+    }
+  } else if(_vipBg) {
     const _modalDiv = container?.parentElement;
     if(_modalDiv) _modalDiv.style.background = _vipBg;
   } else {
@@ -21922,7 +21985,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, _filterGames, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openTetris, openAsteroid, openMinesweeper, openTunnel, openLawnmower, openColorTunnel, openOrbitalSnap, openWhgChaos, openNeonVault, openGravityDrift, openOfficeChairDrift, openGrandmaParkour, openTaxEvasion, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipProfileVideo, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, _filterGames, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openTetris, openAsteroid, openMinesweeper, openTunnel, openLawnmower, openColorTunnel, openOrbitalSnap, openWhgChaos, openNeonVault, openGravityDrift, openOfficeChairDrift, openGrandmaParkour, openTaxEvasion, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -23540,6 +23603,13 @@ function makePollCard(poll,isOw){
         <input type="color" id="vip-profile-bg-picker" value="#1a1a2e" style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px;padding:2px;flex-shrink:0;">
         <span style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);">Custom colour</span>
         <button onclick="N.saveVipProfileBg(document.getElementById('vip-profile-bg-picker').value)" style="margin-left:auto;background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:6px 12px;border-radius:7px;cursor:pointer;">SET</button>
+      </div>
+      <div style="font-size:9px;font-family:var(--font-mono);letter-spacing:2px;color:var(--text-dim);margin:16px 0 10px;text-transform:uppercase;">Video Background 🎬</div>
+      <div style="font-size:10px;font-family:var(--font-mono);color:var(--text-dim);margin-bottom:8px;">Choose a looping video background for your profile card.</div>
+      <select id="vip-profile-video-select" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:var(--font-mono);font-size:11px;padding:8px 10px;outline:none;margin-bottom:8px;"></select>
+      <div style="display:flex;gap:8px;">
+        <button onclick="N.saveVipProfileVideo(document.getElementById('vip-profile-video-select').value)" style="flex:1;background:rgba(240,184,36,0.15);border:1px solid rgba(240,184,36,0.35);color:#f0b824;font-family:var(--font-mono);font-size:10px;padding:7px 12px;border-radius:7px;cursor:pointer;">SET VIDEO</button>
+        <button onclick="N.saveVipProfileVideo('')" style="background:var(--bg2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--font-mono);font-size:10px;padding:7px 12px;border-radius:7px;cursor:pointer;">CLEAR</button>
       </div>
     </div>
 
