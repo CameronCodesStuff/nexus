@@ -18318,6 +18318,8 @@ var _PAPERTRADING_HTML = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta cha
 function openPaperTrading(){setActivity('paper trading');try{const blob=new Blob([_PAPERTRADING_HTML],{type:'text/html'});const url=URL.createObjectURL(blob);const tab=window.open(url,'_blank');if(!tab){toast('Allow pop-ups.','danger');URL.revokeObjectURL(url);return;}setTimeout(()=>URL.revokeObjectURL(url),10000);}catch(e){toast('Could not open: '+e.message,'danger');}}
 
 function openMint(){window.open('https://cameroncodesstuff.github.io/mint/','_blank');}
+function openDungeonGamble(){window.open('https://cameroncodesstuff.github.io/dungeon/','_blank');}
+function openDegen(){window.open('https://cameroncodesstuff.github.io/degen/','_blank');}
 
 function openGamesHub(){
   openModal('games-hub-modal');
@@ -22033,7 +22035,7 @@ window._N = {
   openAchievementsModal, unlockAch, syncAchCache,
   lbTab, renderLeaderboard, lbSection, startTimeTracking, stopTimeTracking, fmtTime, getTimeClass,
   tgSetMode, tgRestart, tgStop, tgSaveEarned,
-  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipProfileVideo, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, _filterGames, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openTetris, openAsteroid, openMinesweeper, openTunnel, openLawnmower, openColorTunnel, openOrbitalSnap, openWhgChaos, openNeonVault, openGravityDrift, openOfficeChairDrift, openGrandmaParkour, openTaxEvasion, openPaperTrading, openMint, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked,
+  openVipModal, toggleVipFrame, _toggleFunMode, _applyPerfModeDOM, saveVipProfileBg, saveVipProfileVideo, saveVipBio, saveVipMsgColor, saveVipMusic, saveVipProfileEffect, openBgEffectModal, applyBgEffect, _toggleDrunkMode, _togglePerfPanel, _toggleFpsPin, _maxFps, _dbgToast, _toggleRainbow, _toggleGravity, _toggleBigText, _toggleSpin, _toggleDisco, _dbgConfetti, _toggleGoo, _toggleQuake, _toggleMatrix, _toggleFisheye, _toggleLowGrav, _toggleCRT, _toggleMagnet, _toggleSnow, _toggleHeartbeat, _toggleGhost, startVipCheckout, grantVip, checkVipStatus, grantVipDailyMsgs, saveVipCustomRole, _updateVipRolePreview, openGifPicker, closeGifPicker, _gifSearch, sendGif, spinDailyWheel, openGamesHub, _filterGames, openWhgGame, openGauntletGame, openTowerDefense, openEternalRift, openBlockDodge, openStackBuilder, openCosmoRunner, openWaveSurvival, openEggverse, openCrash, openDungeonDash, openSnake, openTetris, openAsteroid, openMinesweeper, openTunnel, openLawnmower, openColorTunnel, openOrbitalSnap, openWhgChaos, openNeonVault, openGravityDrift, openOfficeChairDrift, openGrandmaParkour, openTaxEvasion, openPaperTrading, openMint, openPixelForge, closePixelForge, openAirCanvas, closeProjects, openProjectsHub, openFlapGame, closeFlapGame, doLoginCloaked, openDungeonGamble, openDegen,
   adminSendPopup, adminClearPopup, closePopupAnnounce,
   openNexusGame, closeNexusGame, openDriftGame, closeDriftGame,
   openDriveGame, closeDriveGame,
@@ -22993,6 +22995,16 @@ function makePollCard(poll,isOw){
         <span style="font-size:16px;width:22px;text-align:center;">🪙</span>
         <span style="flex:1;">Mint</span>
         <span style="font-size:9px;font-family:var(--font-mono);color:#c8a0ff;letter-spacing:1px;">EXTERNAL</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openDungeonGamble()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(245,200,66,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🎲</span>
+        <span style="flex:1;">Dungeon Gamble</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#f5c842;letter-spacing:1px;">EXTERNAL</span>
+      </button>
+      <button onclick="N.closeModal('games-hub-modal');N.openDegen()" style="display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:var(--text);font-family:var(--font-mono);font-size:12px;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left;transition:background 0.12s;" onmouseover="this.style.background='rgba(0,255,136,0.08)'" onmouseout="this.style.background='none'">
+        <span style="font-size:16px;width:22px;text-align:center;">🚀</span>
+        <span style="flex:1;">DEGEN</span>
+        <span style="font-size:9px;font-family:var(--font-mono);color:#00ff88;letter-spacing:1px;">EXTERNAL</span>
       </button>
 
     </div></div>
