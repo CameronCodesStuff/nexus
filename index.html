@@ -22560,13 +22560,13 @@ function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
 
 // ---- UI UPDATE ----
 function updateUI() {
-  document.getElementById('score-display').textContent = \`SCORE: ${Math.floor(score)}\`;
+  document.getElementById('score-display').textContent = \`SCORE: \${Math.floor(score)}\`;
   let heartsStr = '';
   for (let i = 0; i < lives; i++) heartsStr += '♥ ';
   document.getElementById('lives-display').textContent = heartsStr;
-  document.getElementById('wave-display').textContent = \`WAVE ${wave}\`;
+  document.getElementById('wave-display').textContent = \`WAVE \${wave}\`;
   if (player.powerup) {
-    document.getElementById('powerup-display').textContent = \`⚡ ${player.powerup.toUpperCase()} ${Math.ceil(player.powerupTimer)}s\`;
+    document.getElementById('powerup-display').textContent = \`⚡ \${player.powerup.toUpperCase()} \${Math.ceil(player.powerupTimer)}s\`;
   } else {
     document.getElementById('powerup-display').textContent = '';
   }
@@ -22619,7 +22619,7 @@ function drawTitle() {
     ctx.fillStyle = COLORS.yellow;
     ctx.shadowColor = COLORS.yellow;
     ctx.shadowBlur = 10;
-    ctx.fillText(\`HIGH SCORE: ${highScore}\`, canvas.width/2, canvas.height/2 + 140);
+    ctx.fillText(\`HIGH SCORE: \${highScore}\`, canvas.width/2, canvas.height/2 + 140);
   }
 
   ctx.restore();
@@ -22643,11 +22643,11 @@ function drawGameOver() {
   ctx.fillStyle = COLORS.cyan;
   ctx.shadowColor = COLORS.cyan;
   ctx.shadowBlur = 15;
-  ctx.fillText(\`SCORE: ${Math.floor(score)}\`, canvas.width/2, canvas.height/2);
+  ctx.fillText(\`SCORE: \${Math.floor(score)}\`, canvas.width/2, canvas.height/2);
 
   ctx.fillStyle = COLORS.yellow;
   ctx.shadowColor = COLORS.yellow;
-  ctx.fillText(\`WAVE: ${wave}\`, canvas.width/2, canvas.height/2 + 35);
+  ctx.fillText(\`WAVE: \${wave}\`, canvas.width/2, canvas.height/2 + 35);
 
   if (score >= highScore && score > 0) {
     ctx.fillStyle = COLORS.magenta;
@@ -22678,7 +22678,7 @@ function drawWaveAnnounce() {
   ctx.fillStyle = isBoss ? COLORS.red : COLORS.yellow;
   ctx.shadowColor = isBoss ? COLORS.red : COLORS.yellow;
   ctx.shadowBlur = 25;
-  ctx.fillText(isBoss ? \`⚠ BOSS WAVE ${wave} ⚠\` : \`WAVE ${wave}\`, canvas.width/2, canvas.height/2);
+  ctx.fillText(isBoss ? \`⚠ BOSS WAVE \${wave} ⚠\` : \`WAVE \${wave}\`, canvas.width/2, canvas.height/2);
   ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -22693,7 +22693,7 @@ function drawCombo() {
   ctx.fillStyle = COLORS.yellow;
   ctx.shadowColor = COLORS.yellow;
   ctx.shadowBlur = 15;
-  ctx.fillText(\`${comboCount}x COMBO!\`, canvas.width/2, 90);
+  ctx.fillText(\`\${comboCount}x COMBO!\`, canvas.width/2, 90);
   ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -23769,11 +23769,11 @@ const asphaltTex = canvasTex(256, 256, (g, w, h) => {
   g.fillStyle = '#34373e'; g.fillRect(0, 0, w, h);
   for (let i = 0; i < 9000; i++) {
     const v = 34 + Math.random() * 46 | 0;
-    g.fillStyle = \`rgba(${v},${v},${v + 3},${0.16 + Math.random() * 0.4})\`;
+    g.fillStyle = \`rgba(\${v},\${v},\${v + 3},\${0.16 + Math.random() * 0.4})\`;
     g.fillRect(Math.random() * w, Math.random() * h, 1.6, 1.6);
   }
   for (let i = 0; i < 26; i++) {                       // faint patch seams
-    g.strokeStyle = \`rgba(255,255,255,${0.012 + Math.random() * 0.02})\`;
+    g.strokeStyle = \`rgba(255,255,255,\${0.012 + Math.random() * 0.02})\`;
     g.lineWidth = 1 + Math.random() * 2;
     g.beginPath(); g.moveTo(Math.random() * w, 0); g.lineTo(Math.random() * w, h); g.stroke();
   }
@@ -25262,7 +25262,7 @@ for (let i = 0; i < 14; i++) { const d = document.createElement('div'); d.classN
 const standRows = cars.map(c => {
   const d = document.createElement('div');
   d.className = 'st' + (c.ai ? '' : ' me');
-  d.innerHTML = \`<span class="n"></span><span class="dot" style="color:#${c.color.toString(16).padStart(6, '0')}"></span><span class="nm">${c.name}</span><span class="gp"></span>\`;
+  d.innerHTML = \`<span class="n"></span><span class="dot" style="color:#\${c.color.toString(16).padStart(6, '0')}"></span><span class="nm">\${c.name}</span><span class="gp"></span>\`;
   el.stand.appendChild(d);
   return d;
 });
@@ -25270,13 +25270,13 @@ const ORD = ['1', '2', '3', '4'], SUF = ['ST', 'ND', 'RD', 'TH'];
 function fmt(ms) {
   if (!isFinite(ms)) return '--:--.---';
   const m = Math.floor(ms / 60000), s = Math.floor(ms % 60000 / 1000), f = Math.floor(ms % 1000);
-  return \`${m}:${String(s).padStart(2, '0')}.${String(f).padStart(3, '0')}\`;
+  return \`\${m}:\${String(s).padStart(2, '0')}.\${String(f).padStart(3, '0')}\`;
 }
 function toast(text, ms = 1600, color = '#ffcc33') {
   el.toast.textContent = text; el.toast.style.color = color;
   el.toast.style.transition = 'none'; el.toast.style.opacity = '1';
   requestAnimationFrame(() => {
-    el.toast.style.transition = \`opacity .5s ease ${(ms - 500) / 1000}s\`;
+    el.toast.style.transition = \`opacity .5s ease \${(ms - 500) / 1000}s\`;
     el.toast.style.opacity = '0';
   });
 }
@@ -25320,7 +25320,7 @@ function updateHUD(dt) {
   el.spdfill.style.strokeDashoffset = 264 * (1 - clamp(p.speed / (TOP_SPEED * 1.16), 0, 1));
   el.gear.textContent = p.vLong < -1 ? 'R' : p.speed < 1.2 ? 'N' : p.gear + 1;
 
-  el.lap.innerHTML = \`${Math.min(LAPS, p.laps + 1)}<small>/${LAPS}</small>\`;
+  el.lap.innerHTML = \`\${Math.min(LAPS, p.laps + 1)}<small>/\${LAPS}</small>\`;
   el.time.textContent = fmt(Game.raceTime);
   el.curlap.textContent = fmt(Game.raceTime - p.lapStart);
   el.bestlap.textContent = fmt(p.best);
@@ -25336,7 +25336,7 @@ function updateHUD(dt) {
 
   const order = cars.slice().sort(cmpRace);
   const rank = order.indexOf(p);
-  el.pos.innerHTML = \`${ORD[rank]}<sup>${SUF[rank]}</sup>\`;
+  el.pos.innerHTML = \`\${ORD[rank]}<sup>\${SUF[rank]}</sup>\`;
   order.forEach((c, i) => {
     const row = standRows[cars.indexOf(c)];
     row.style.order = i;
@@ -25424,7 +25424,7 @@ const Game = {
     if (n < this.lastBeep) { this.lastBeep = n; if (n > 0) Sfx.beep(false); }
     el.count.textContent = n > 0 ? n : 'GO!';
     el.count.style.opacity = String(clamp(this.countdown - Math.floor(this.countdown), 0, 1) * 0.9 + 0.1);
-    el.count.style.transform = \`scale(${1.6 - (this.countdown - Math.floor(this.countdown)) * 0.6})\`;
+    el.count.style.transform = \`scale(\${1.6 - (this.countdown - Math.floor(this.countdown)) * 0.6})\`;
     if (this.countdown <= 0) {
       this.state = 'race';
       el.count.textContent = 'GO!';
@@ -25487,7 +25487,7 @@ const Game = {
                                       seed: SEED, diff: DIFF[diff].name };
     const order = cars.slice().sort(cmpRace);
     $('rtitle').textContent = rank === 0 ? 'VICTORY' : rank === 1 ? 'SO CLOSE' : 'FINISH';
-    $('rsub').textContent = \`${ORD[rank]}${SUF[rank]} PLACE · ${card.diff} · CIRCUIT ${card.seed}\`;
+    $('rsub').textContent = \`\${ORD[rank]}\${SUF[rank]} PLACE · \${card.diff} · CIRCUIT \${card.seed}\`;
     const proj = this.projected || new Map();
     const timeOf = c => c.finished ? { t: c.finishTime, projected: false }
                                    : (proj.get(c) || null);
@@ -25504,10 +25504,10 @@ const Game = {
       const label = !e ? 'DNF'
         : i === 0 ? fmt(e.t)
         : '+' + ((e.t - winner.t) / 1000).toFixed(3);
-      return \`<div class="rrow${c.ai ? '' : ' me'}"><span class="p">${i + 1}</span>
-       <span class="dot" style="color:#${c.color.toString(16).padStart(6, '0')};width:8px;height:8px;border-radius:50%;background:currentColor"></span>
-       <span class="nm">${c.name}</span>
-       <span class="tm${e && e.projected ? ' proj' : ''}">${label}</span></div>\`;
+      return \`<div class="rrow\${c.ai ? '' : ' me'}"><span class="p">\${i + 1}</span>
+       <span class="dot" style="color:#\${c.color.toString(16).padStart(6, '0')};width:8px;height:8px;border-radius:50%;background:currentColor"></span>
+       <span class="nm">\${c.name}</span>
+       <span class="tm\${e && e.projected ? ' proj' : ''}">\${label}</span></div>\`;
     }).join('');
     $('rnote').textContent = anyProjected
       ? '◦ projected — simulated to the flag after you finished' : '';
@@ -25527,7 +25527,7 @@ const Game = {
   lapFlash(lt, personalBest) {
     const isBest = lt <= player.best;
     const tag = personalBest ? '  ★ NEW RECORD' : isBest ? '  ★ BEST' : '';
-    toast(\`LAP ${player.laps} — ${fmt(lt)}${tag}\`, 2200,
+    toast(\`LAP \${player.laps} — \${fmt(lt)}\${tag}\`, 2200,
           personalBest ? '#ff3ea5' : isBest ? '#66ffa8' : '#ffcc33');
   },
 
@@ -25538,7 +25538,7 @@ const Game = {
     this._lastHit = this.now;
     Sfx.bump(v);
     el.dmg.style.transition = 'none';
-    el.dmg.style.boxShadow = \`inset 0 0 130px rgba(255,62,165,${clamp(v * 0.03, 0, 0.5)})\`;
+    el.dmg.style.boxShadow = \`inset 0 0 130px rgba(255,62,165,\${clamp(v * 0.03, 0, 0.5)})\`;
     requestAnimationFrame(() => {
       el.dmg.style.transition = 'box-shadow .6s ease';
       el.dmg.style.boxShadow = 'inset 0 0 130px rgba(255,62,165,0)';
@@ -25801,12 +25801,12 @@ function showTrackInfo() {
   clearArmedAt = 0;
   const shape = t.minCornerRadius < 60 ? 'TECHNICAL' : t.minCornerRadius < 95 ? 'BALANCED' : 'FAST';
   const drive = !t.drive ? ''
-    : t.bestEffort ? \` · <span style="color:var(--am)">BEST OF ${t.tests} DRIVEN</span>\`
-    : \` · <span style="color:var(--gn)">DRIVE-TESTED ${t.drive.offPct}% OFF</span>\`;
+    : t.bestEffort ? \` · <span style="color:var(--am)">BEST OF \${t.tests} DRIVEN</span>\`
+    : \` · <span style="color:var(--gn)">DRIVE-TESTED \${t.drive.offPct}% OFF</span>\`;
   trackInfoEl.innerHTML =
-    \`<b>${(t.length / 1000).toFixed(2)} KM</b> · <b>${t.corners}</b> CORNERS · \` +
-    \`TIGHTEST <b>${Math.round(t.minCornerRadius)}M</b> · <b>${Math.round(t.straightPct)}%</b> FLAT OUT · \` +
-    \`${shape} · <b>${t.time}</b>\` + (t.attempts > 1 ? \` · ${t.attempts} DRAWS\` : '') + drive;
+    \`<b>\${(t.length / 1000).toFixed(2)} KM</b> · <b>\${t.corners}</b> CORNERS · \` +
+    \`TIGHTEST <b>\${Math.round(t.minCornerRadius)}M</b> · <b>\${Math.round(t.straightPct)}%</b> FLAT OUT · \` +
+    \`\${shape} · <b>\${t.time}</b>\` + (t.attempts > 1 ? \` · \${t.attempts} DRAWS\` : '') + drive;
   seedIn.value = t.seed;
   const u = new URL(location.href);
   if (t.seed === 'ALPINE') u.searchParams.delete('seed'); else u.searchParams.set('seed', t.seed);
@@ -26713,7 +26713,7 @@ function drawBg(c,W,H,GY){
     const sr=rand()*1.5+0.2;
     const sa=rand()*0.7+0.3;
     c.beginPath();c.arc(sx,sy,sr,0,Math.PI*2);
-    c.fillStyle=\`rgba(255,255,255,${sa})\`;c.fill();
+    c.fillStyle=\`rgba(255,255,255,\${sa})\`;c.fill();
   }
 
   // moon
@@ -26747,7 +26747,7 @@ function drawBg(c,W,H,GY){
       for(let wx=b.x+4;wx<b.x+b.w-4;wx+=10){
         if(rand2()>.4){
           const lit=rand2()>.55;
-          c.fillStyle=lit?\`rgba(255,${160+rand2()*95},40,${.3+rand2()*.3})\`:'rgba(15,8,30,0.5)';
+          c.fillStyle=lit?\`rgba(255,\${160+rand2()*95},40,\${.3+rand2()*.3})\`:'rgba(15,8,30,0.5)';
           c.fillRect(wx,wy,5,8);
         }
       }
@@ -26773,7 +26773,7 @@ function drawBg(c,W,H,GY){
   }
   for(let j=0;j<=5;j++){
     const t=j/5,gy2=GY+t*(H-GY);
-    c.strokeStyle=\`rgba(136,0,255,${0.12*(1-t)})\`;
+    c.strokeStyle=\`rgba(136,0,255,\${0.12*(1-t)})\`;
     c.beginPath();c.moveTo(0,gy2);c.lineTo(W,gy2);c.stroke();
   }
 
@@ -27355,10 +27355,10 @@ function spawnHitFloat(x,y,dmg,type,color){
   const lbls={punch:'HIT',kick:'HEAVY!!',dash:'DASH!',super:'⚡ SUPER'};
   const sz={punch:14,kick:18,dash:16,super:22};
   el.style.cssText=\`
-    left:${(x/W*100)}%;top:${(y/H*100)}%;
-    color:${cols[type]||color};
-    text-shadow:0 0 20px ${cols[type]||color};
-    font-size:${sz[type]||14}px;
+    left:\${(x/W*100)}%;top:\${(y/H*100)}%;
+    color:\${cols[type]||color};
+    text-shadow:0 0 20px \${cols[type]||color};
+    font-size:\${sz[type]||14}px;
     transform:translateX(-50%);
   \`;
   el.textContent=lbls[type]||'HIT';
@@ -27425,7 +27425,7 @@ function hudUpdate(){
     for(let j=0;j<2;j++){const g=document.createElement('div');g.className='gem'+(j<wins?' lit':'');el.appendChild(g)}
   });
 
-  document.getElementById('round-txt').textContent=\`ROUND ${round}\`;
+  document.getElementById('round-txt').textContent=\`ROUND \${round}\`;
   document.getElementById('mode-txt').textContent=gameMode==='cpu'?'1P VS CPU':'2P LOCAL';
 }
 
@@ -27435,7 +27435,7 @@ function showOvr(txt,col,dur=1400){
   clearTimeout(ovrT1);clearTimeout(ovrT2);
   const el=document.getElementById('ovr-msg');
   el.textContent=txt;el.style.color=col;
-  el.style.textShadow=\`0 0 40px ${col},0 0 80px ${col}44,0 4px 0 rgba(0,0,0,0.5)\`;
+  el.style.textShadow=\`0 0 40px \${col},0 0 80px \${col}44,0 4px 0 rgba(0,0,0,0.5)\`;
   el.className='ovr pop';
   ovrT1=setTimeout(()=>{el.className='ovr bye';ovrT2=setTimeout(()=>el.className='ovr',350)},dur);
 }
@@ -27443,7 +27443,7 @@ function showOvr(txt,col,dur=1400){
 // Round splash
 function showRoundSplash(cb){
   const rs=document.getElementById('round-splash');
-  document.getElementById('rs-round-txt').textContent=\`ROUND ${round}\`;
+  document.getElementById('rs-round-txt').textContent=\`ROUND \${round}\`;
   rs.className='show';
   setTimeout(()=>{rs.className='';cb&&cb()},2400);
 }
@@ -27498,7 +27498,7 @@ function showResult(){
   const rsc=document.getElementById('res-score');
   const rey=document.getElementById('res-eye');
   rey.textContent=gameMode==='cpu'?'MATCH COMPLETE · VS CPU':'MATCH COMPLETE · 2P LOCAL';
-  rsc.textContent=\`${p1w} — ${p2w}\`;
+  rsc.textContent=\`\${p1w} — \${p2w}\`;
   if(p1w>p2w){
     rm.textContent='VICTORY!';rm.style.color='var(--c1)';
     rm.style.textShadow='0 0 60px var(--c1),0 0 120px rgba(0,212,255,0.3)';
