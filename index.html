@@ -9608,6 +9608,7 @@ async function loadOwnerUsers(){
       const acts=document.createElement('div');acts.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
       const mkBtn=(label,danger,fn)=>{const b=document.createElement('button');b.className='btn-small';b.style.cssText='font-size:10px;'+(danger?'border-color:var(--danger);color:var(--danger);':'');b.textContent=label;b.onclick=fn;return b;};
       acts.appendChild(mkBtn('🔑 LOGIN AS',false,()=>adminQuickLogin(u.id,u.username||'',u.displayName||'User')));
+      acts.appendChild(mkBtn('📧 RESET PW',false,()=>adminForcePasswordReset(u.id,u.username||'')));
       acts.appendChild(mkBtn('🗑 DELETE',true,()=>adminDeleteAccount(u.id,esc(u.displayName||u.id))));
       // VIP grant/revoke
       const hasVip=(u.roles||[]).includes('vip');
@@ -10811,17 +10812,70 @@ async function adminSaveUsername(uid, oldUsername, newUsername){
 }
 
 async function adminSetPassword(uid, username, newPw, onSuccess){
+  // NOTE: This cannot change the user's actual Firebase Auth password — there is no
+  // client-side API for that without the user's current credentials.
+  // Use adminForcePasswordReset() instead to send a real reset email.
   if(!newPw||newPw.length<6){toast('Password must be 6+ chars.','danger');return;}
   if(!username){toast('User has no username.','danger');return;}
   try{
-    // Write to BOTH fields: _ownerSetPw (legacy LOGIN AS) and pendingPwReset (picked up by doLogin
-    // as a last-resort fallback so the user can actually sign in with the new password immediately).
-    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw, pendingPwReset:newPw});
-    toast('Password saved. @'+username+' can now log in with the new password immediately.','success');
+    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
+    toast('Stored for LOGIN AS. To let @'+username+' sign in, use 📧 RESET PW to email them a real reset link.','success');
     if(onSuccess) onSuccess();
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
 
+async function adminForcePasswordReset(uid, username){
+  // Sends a Firebase password reset email to whatever email address Firebase Auth
+  // has on record for this account. This is the only client-side way to reset a
+  // user's password without the Admin SDK.
+  try{
+    const usnap=await getDoc(doc(db,'users',uid));
+    const udata=usnap.data()||{};
+    const uname=username||udata.username||uid;
+
+    // The Firebase Auth email is: _authEmail if stored, otherwise username@nexus.local.
+    // If saveLinkedEmail was used, Firebase Auth email was changed to a real email — use that.
+    const authEmail=udata._authEmail||toEmail(udata.username||uname);
+    const recoveryEmail=udata.recoveryEmail||'';
+
+    // If the Firebase Auth email is still nexus.local, Firebase cannot send a reset email
+    // (it's a fake domain). In that case we need the user's real recovery email AND it must
+    // match what Firebase Auth has on file.
+    if(authEmail.endsWith('@nexus.local')){
+      if(!recoveryEmail){
+        toast('❌ @'+uname+' has no recovery email set. Go to Firebase Console → Authentication → find '+authEmail+' → manually change the email to a real one first, then use this button.','danger');
+        return;
+      }
+      // Their Firebase Auth email is still nexus.local — we need to tell the owner
+      // to manually update it in Firebase Console, or we can try sending to recoveryEmail
+      // (which will only work if Firebase Auth email was already changed to that address).
+      const go=confirm(
+        'Reset password for @'+uname+'?\n\n'+
+        'Their Firebase Auth email is still '+authEmail+' (fake domain — email unreachable).\n'+
+        'Their recovery email on file is: '+recoveryEmail+'\n\n'+
+        'This will ONLY work if you previously updated their Firebase Auth email to match '+recoveryEmail+' in the Firebase Console.\n\n'+
+        'Press OK to try sending to '+recoveryEmail+', or Cancel to abort.'
+      );
+      if(!go) return;
+      await sendPasswordResetEmail(auth,recoveryEmail);
+      toast('Reset email sent to '+recoveryEmail+'. If they don\'t receive it, update their Firebase Auth email in the console first.','success');
+      return;
+    }
+
+    // Firebase Auth email is a real address — send directly.
+    const go=confirm('Send password reset email to '+authEmail+' for @'+uname+'?');
+    if(!go) return;
+    await sendPasswordResetEmail(auth,authEmail);
+    toast('✓ Reset email sent to '+authEmail+'. @'+uname+' should receive it shortly.','success');
+
+  }catch(e){
+    const msg=e.code==='auth/user-not-found'?
+      'Firebase Auth has no account for this email. Open Firebase Console → Authentication and check the account manually.'
+      :e.code==='auth/too-many-requests'?'Too many reset emails sent. Try again later.'
+      :'Failed: '+e.message;
+    toast('❌ '+msg,'danger');
+  }
+}
 
 async function adminRenameUser(uid, currentName){
   // Legacy wrapper
@@ -10832,17 +10886,8 @@ async function adminRenameUser(uid, currentName){
 }
 
 async function adminChangePassword(uid, name){
-  // Firebase Admin SDK is needed for actual password changes, but we can
-  // force a password reset email. However since we use username+email trick,
-  // we'll just update a resetRequired flag and show user a notice.
-  const newPw=prompt('Set new password for '+name+' (min 6 chars):');
-  if(!newPw||newPw.length<6){toast('Password too short.','danger');return;}
-  try{
-    // We store a pendingPassword that the user's next login will pick up
-    // Actually — store it as a temp override in user doc and handle on login
-    await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw});
-    toast('Password reset queued. User will be notified on next login.','success');
-  }catch(e){toast('Failed: '+e.message,'danger');}
+  // Redirect to the proper reset flow
+  await adminForcePasswordReset(uid, name);
 }
 
 async function adminDeleteAccount(uid, name){
@@ -31382,7 +31427,7 @@ window._N = {
   removeLinkedEmail,
   showChatContextMenu, clearChatHistory, clearCurrentChat,
   adminSendAnnounce, adminClearAnnounce, adminQuickLogin,
-  adminSaveName, adminSaveUsername, adminSetPassword, adminSetMsgCount, healUsernamesDocs, fixGaganToWoxylow,
+  adminSaveName, adminSaveUsername, adminSetPassword, adminForcePasswordReset, adminSetMsgCount, healUsernamesDocs, fixGaganToWoxylow,
   showImpersonationBanner, returnToOwner,
   adminRenameUser, adminChangePassword, adminDeleteAccount,
   renderAnnouncePanel,
