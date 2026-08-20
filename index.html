@@ -3390,19 +3390,56 @@ async function doLogin(){
       try{
         cred=await _tryEmails(candidates,pw);
       }catch(allFailed){
-        // Nothing worked. Show a helpful message and log what was tried.
-        console.error('[NEXUS login] All email variants failed for',un,
-          '— check Firebase Auth console for the actual email. Tried:',candidates);
-        err.textContent='Login failed. If your username was recently changed, contact the owner.';
-        return;
+        // All normal password attempts failed.
+        // Last resort: check if the owner set a recovery password in Firestore
+        // (_ownerSetPw or pendingPwReset). If so, try logging in with that,
+        // then immediately update Firebase Auth to match and clean up.
+        let recoveryWorked=false;
+        if(mappedUid){
+          const uSnap2=uSnap||await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
+          const uData2=uSnap2?.data()||{};
+          const ownerPw=uData2.pendingPwReset||uData2._ownerSetPw||null;
+          if(ownerPw&&ownerPw!==pw){
+            const allEmails=[...new Set([
+              uData2._authEmail,uData2._oldAuthEmail,uData2._pendingAuthEmail,
+              toEmail(uData2.username||''),directEmail,
+            ].filter(Boolean))];
+            try{
+              cred=await _tryEmails(allEmails,ownerPw);
+              // It worked — apply the owner-set password to Firebase Auth for real
+              err.textContent='Applying new password…';
+              try{
+                await updatePassword(cred.user,pw||ownerPw);
+                // If user typed a new password use that, else keep owner's
+                await updateDoc(doc(db,'users',cred.user.uid),{
+                  _ownerSetPw: pw||ownerPw,
+                  pendingPwReset: deleteField(),
+                });
+              }catch(applyErr){
+                // Non-fatal — they're logged in; clean up Firestore anyway
+                console.warn('[NEXUS login] Could not apply new password to Auth:',applyErr.message);
+                try{await updateDoc(doc(db,'users',cred.user.uid),{pendingPwReset:deleteField()});}catch{}
+              }
+              recoveryWorked=true;
+            }catch{
+              // Owner password didn't work either — fall through to final error
+            }
+          }
+        }
+        if(!recoveryWorked){
+          console.error('[NEXUS login] All email variants failed for',un,
+            '— check Firebase Auth console for the actual email. Tried:',candidates);
+          err.textContent='Login failed. If you recently reset your password, contact the owner.';
+          return;
+        }
       }
     }
     err.textContent='';
-    // Store password in Firestore (used by owner LOGIN AS feature).
+    // Store current working password in Firestore (used by owner LOGIN AS feature).
     // We deliberately do NOT attempt to change the Firebase Auth email here.
     // The nexus.local email is a stable internal key — usernames live in Firestore only.
     try{
-      await updateDoc(doc(db,'users',cred.user.uid),{_ownerSetPw:pw});
+      await updateDoc(doc(db,'users',cred.user.uid),{_ownerSetPw:pw,pendingPwReset:deleteField()});
     }catch{}
     // Show loading screen while app initialises
     const ls=document.getElementById('loading-screen');
@@ -10777,9 +10814,10 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
   if(!newPw||newPw.length<6){toast('Password must be 6+ chars.','danger');return;}
   if(!username){toast('User has no username.','danger');return;}
   try{
-    // Store new password in Firestore - user's next login will update Firebase Auth automatically
-    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw});
-    toast('Password saved. @'+username+' can now be accessed via LOGIN AS after their next login.','success');
+    // Write to BOTH fields: _ownerSetPw (legacy LOGIN AS) and pendingPwReset (picked up by doLogin
+    // as a last-resort fallback so the user can actually sign in with the new password immediately).
+    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw, pendingPwReset:newPw});
+    toast('Password saved. @'+username+' can now log in with the new password immediately.','success');
     if(onSuccess) onSuccess();
   }catch(e){toast('Failed: '+e.message,'danger');}
 }
@@ -12639,20 +12677,35 @@ async function unlinkGoogle(){
 }
 
 async function sendPasswordReset(){
-  const inp=document.getElementById('reset-email-input');
   const status=document.getElementById('reset-status');
-  // Use recovery email from Firestore if the input is empty or nexus.local
-  const rawInput=(inp?.value||'').trim();
-  const email=rawInput&&!rawInput.endsWith('@nexus.local')?rawInput:(cud?.recoveryEmail||'');
-  if(inp&&email) inp.value=email;
-  if(!email){if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent='Please enter an email address.';}return;}
+  const showStatus=(msg,ok)=>{if(status){status.style.display='block';status.style.color=ok?'var(--success)':'var(--danger)';status.textContent=msg;}};
+
+  if(!auth.currentUser){showStatus('You must be logged in to reset your password.',false);return;}
+
+  // Always use the actual Firebase Auth email for THIS account.
+  // Sending to a recovery/input email targets a DIFFERENT Firebase account and breaks login.
+  const authEmail=auth.currentUser.email;
+  if(!authEmail){showStatus('No email on this account — contact the owner to reset your password.',false);return;}
+
+  // If the account has no password provider (Google/GitHub only), explain that instead.
+  const hasPassword=auth.currentUser.providerData.some(p=>p.providerId==='password');
+  if(!hasPassword){
+    showStatus('Your account uses Google or GitHub login — there\'s no password to reset. Use those to sign in.',false);
+    return;
+  }
+
   try{
-    await sendPasswordResetEmail(auth,email);
-    if(status){status.style.display='block';status.style.color='var(--success)';status.textContent='Reset email sent! Check your inbox (and spam).';}
+    await sendPasswordResetEmail(auth,authEmail);
+    // Show where it was sent, but mask the nexus.local internal email — show recovery email if we have it
+    const displayEmail=authEmail.endsWith('@nexus.local')?(cud?.recoveryEmail||'your linked email'):authEmail;
+    showStatus('✓ Reset link sent to '+displayEmail+'. Check your inbox (and spam).',true);
     toast('Password reset email sent.','success');
   }catch(e){
-    const msg=e.code==='auth/user-not-found'?'No account found with that email.':e.code==='auth/invalid-email'?'Invalid email address.':'Failed: '+e.message;
-    if(status){status.style.display='block';status.style.color='var(--danger)';status.textContent=msg;}
+    const msg=e.code==='auth/user-not-found'?'No account found — contact the owner.'
+      :e.code==='auth/invalid-email'?'Invalid email on this account — contact the owner.'
+      :e.code==='auth/too-many-requests'?'Too many attempts. Try again later.'
+      :'Failed: '+e.message;
+    showStatus(msg,false);
     toast(msg,'danger');
   }
 }
