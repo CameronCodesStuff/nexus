@@ -3308,14 +3308,37 @@ function showForgotPassword(){
 async function doForgotPassword(){
   const inp=document.getElementById('forgot-user-inp');
   const status=document.getElementById('forgot-status');
-  const setS=(msg,ok)=>{if(status){status.style.display='block';status.style.color=ok?'rgba(0,255,136,0.8)':'rgba(255,80,80,0.9)';status.textContent=msg;}};
+  const setS=(msg,ok,html)=>{
+    if(!status) return;
+    status.style.display='block';
+    status.style.color=ok?'rgba(0,255,136,0.8)':'rgba(255,80,80,0.9)';
+    if(html) status.innerHTML=msg; else status.textContent=msg;
+  };
   const val=(inp?.value||'').trim().toLowerCase().replace(/^@/,'');
   if(!val){setS('enter your username');return;}
-  setS('sending…',true);
+  setS('checking…',true);
   try{
     const unSnap=await getDoc(doc(db,'usernames',val)).catch(()=>null);
     const uid=unSnap?.exists?.()?unSnap.data().uid:null;
     if(!uid){setS('no account found for @'+val);return;}
+
+    // Check what login methods the account has
+    const uSnap=await getDoc(doc(db,'users',uid)).catch(()=>null);
+    const udata=uSnap?.data()||{};
+    const hasGoogle=udata.googleLinked===true;
+    const hasGithub=udata.githubLinked===true;
+
+    // If they have Google or GitHub linked, just tell them to use that —
+    // password reset will never work for nexus.local accounts anyway.
+    if(hasGoogle||hasGithub){
+      const methods=[];
+      if(hasGoogle) methods.push('Google');
+      if(hasGithub) methods.push('GitHub');
+      setS('✓ Your account is linked to '+methods.join(' and ')+'. Use the '+methods[0]+' button above to sign in — no password needed.',true);
+      return;
+    }
+
+    // No social login — file a reset ticket as before
     await addDoc(collection(db,'passwordResetRequests'),{
       username:val,uid:uid,ts:serverTimestamp(),status:'pending',
       note:'User submitted forgot-password request from login screen.'
