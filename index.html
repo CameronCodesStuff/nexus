@@ -12482,20 +12482,7 @@ function renderLinkedAccountsSection(){
       </div>
       <div id="link-account-status" style="font-size:11px;font-family:var(--font-mono);margin-top:8px;min-height:16px;"></div>
     </div>
-    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
-      <div style="font-size:11px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">CHANGE PASSWORD</div>
-      ${providers.includes('password')?`
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <input type="password" id="cp-current" placeholder="Current password" autocomplete="current-password" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;border-radius:7px;width:100%;">
-        <input type="password" id="cp-new" placeholder="New password (6+ chars)" autocomplete="new-password" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;border-radius:7px;width:100%;">
-        <input type="password" id="cp-confirm" placeholder="Confirm new password" autocomplete="new-password" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:12px;padding:8px 12px;border-radius:7px;width:100%;">
-        <button class="btn-small primary" onclick="N.changeOwnPassword()" style="align-self:flex-start;">UPDATE PASSWORD</button>
-      </div>
-      <div id="cp-status" style="font-size:11px;font-family:var(--font-mono);margin-top:8px;display:none;"></div>
-      `:`
-      <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">You signed up with Google or GitHub only, so there's no Nexus password to change. Link a password by using "Forgot password" below to set one.</div>
-      `}
-    </div>
+
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
       <div style="font-size:11px;font-family:var(--font-display);letter-spacing:2px;color:var(--text-dim);margin-bottom:10px;">FORGOT PASSWORD</div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;line-height:1.5;">Send a password reset link to your linked email.</div>
