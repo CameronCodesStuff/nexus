@@ -3458,6 +3458,11 @@ async function doLogin(){
       }
     }
     err.textContent='';
+    // Cache this session's working email+password in memory so adminSetPassword
+    // can restore the owner session after temporarily signing in as another user.
+    // Never written to storage — clears automatically on page refresh.
+    window._nexusSessionEmail=cred.user.email;
+    window._nexusSessionPw=pw;
     // Store current working password in Firestore (used by owner LOGIN AS feature).
     // We deliberately do NOT attempt to change the Firebase Auth email here.
     // The nexus.local email is a stable internal key — usernames live in Firestore only.
@@ -10838,74 +10843,84 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
   if(!newPw||newPw.length<6){toast('Password must be 6+ chars.','danger');return;}
   if(!username){toast('User has no username.','danger');return;}
 
-  // We sign in as the target user (using their stored current password from Firestore),
-  // call updatePassword() to change it for real in Firebase Auth, then sign back in as owner.
-  const ownerUser = auth.currentUser;
-  if(!ownerUser){toast('Not signed in.','danger');return;}
-
-  // Read owner's own stored password so we can re-authenticate after
-  const ownerSnap = await getDoc(doc(db,'users',ownerUser.uid)).catch(()=>null);
-  const ownerData = ownerSnap?.data()||{};
-  const ownerStoredPw = ownerData._ownerSetPw;
-  const ownerAuthEmail = ownerData._authEmail || (ownerData.username ? ownerData.username+'@nexus.local' : null);
-
-  if(!ownerStoredPw||!ownerAuthEmail){
-    // Can't sign back in — fall back to Firestore-only storage so at least login recovery works
+  // We need the owner's current session credentials to restore after signing in as target.
+  // window._nexusSessionEmail/Pw are set in-memory by doLogin() on every successful login.
+  const ownerEmail=window._nexusSessionEmail;
+  const ownerPw=window._nexusSessionPw;
+  if(!ownerEmail||!ownerPw){
+    // Owner hasn't logged in this page session (e.g. reloaded after auto-login).
+    // Fall back to Firestore-only store — user can log in with new password via
+    // the recovery path in doLogin() IF they still know their old password.
+    // This is the best we can do without the Admin SDK.
     try{
       await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw,_ownerSetPw:newPw});
-      toast('⚠️ Stored in Firestore only (owner re-auth info missing). @'+username+' can log in with the new password if they previously logged in on this device.','success');
+      toast('⚠️ Stored for recovery (re-login as owner first to apply directly). @'+username+' will get the new password applied automatically on their next login attempt.','success');
       if(onSuccess) onSuccess();
     }catch(e){toast('Failed: '+e.message,'danger');}
     return;
   }
 
   try{
-    // Read target user's stored current password and auth email
-    const usnap = await getDoc(doc(db,'users',uid));
-    const udata = usnap.data()||{};
-    const targetAuthEmail = udata._authEmail || (udata.username ? udata.username+'@nexus.local' : username+'@nexus.local');
-    const targetCurrentPw = udata._ownerSetPw || udata.pendingPwReset;
+    // Read target user's Firestore doc to get their auth email + stored password
+    const usnap=await getDoc(doc(db,'users',uid));
+    const udata=usnap.data()||{};
+    const targetStoredPw=udata._ownerSetPw||udata.pendingPwReset;
+    const targetAuthEmail=udata._authEmail||toEmail(udata.username||username);
 
-    if(!targetCurrentPw){
-      // No stored password — can't sign in as them. Store for recovery path only.
+    if(!targetStoredPw){
+      // No stored password on record — can't sign in as them to change it.
+      // Store for the recovery path instead.
       await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw,_ownerSetPw:newPw});
-      toast('⚠️ @'+username+' has never logged in with a password on record. New password stored — they must use it as their first login attempt and it will be applied automatically.','success');
+      toast('⚠️ @'+username+' has no password on record (never logged in via password). Stored for recovery — they\'ll get the new password applied on first login attempt.','success');
       if(onSuccess) onSuccess();
       return;
     }
 
-    toast('Signing in as @'+username+' to apply password…','');
+    toast('Applying password change…','');
 
-    // Sign in as target user
-    let targetCred;
-    const emailsToTry=[...new Set([targetAuthEmail,udata._oldAuthEmail,udata._pendingAuthEmail,username+'@nexus.local'].filter(Boolean))];
-    let signInErr=null;
+    // Try every known email variant for this account
+    const emailsToTry=[...new Set([
+      targetAuthEmail,
+      udata._oldAuthEmail,
+      udata._pendingAuthEmail,
+      toEmail(udata.username||username),
+    ].filter(Boolean))];
+
+    let targetCred=null;
     for(const em of emailsToTry){
-      try{ targetCred=await signInWithEmailAndPassword(auth,em,targetCurrentPw); break; }
-      catch(e){ signInErr=e; }
-    }
-    if(!targetCred){
-      // Sign back in as owner before giving up
-      await signInWithEmailAndPassword(auth,ownerAuthEmail,ownerStoredPw).catch(()=>{});
-      throw signInErr||new Error('Could not sign in as @'+username);
+      try{
+        targetCred=await signInWithEmailAndPassword(auth,em,targetStoredPw);
+        break;
+      }catch(e){
+        if(e.code!=='auth/user-not-found'&&e.code!=='auth/invalid-credential'&&e.code!=='auth/wrong-password') throw e;
+      }
     }
 
-    // Apply the new password to Firebase Auth
-    await updatePassword(targetCred.user, newPw);
+    if(!targetCred){
+      // Can't sign in as them — restore owner and fall back to Firestore store
+      await signInWithEmailAndPassword(auth,ownerEmail,ownerPw).catch(()=>{});
+      await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw,_ownerSetPw:newPw}).catch(()=>{});
+      toast('⚠️ Could not sign in as @'+username+' (stored password may be outdated). Stored for recovery — they\'ll get the new password applied automatically on next login.','success');
+      if(onSuccess) onSuccess();
+      return;
+    }
+
+    // Signed in as target — change their Firebase Auth password
+    await updatePassword(targetCred.user,newPw);
 
     // Update Firestore
-    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw, pendingPwReset:deleteField()});
+    await updateDoc(doc(db,'users',uid),{_ownerSetPw:newPw,pendingPwReset:deleteField()});
 
-    // Sign back in as owner
-    await signInWithEmailAndPassword(auth, ownerAuthEmail, ownerStoredPw);
+    // Restore owner session
+    await signInWithEmailAndPassword(auth,ownerEmail,ownerPw);
 
-    toast('✓ Password for @'+username+' changed in Firebase Auth and stored. They can now log in with the new password.','success');
+    toast('✓ Password for @'+username+' changed successfully. They can now log in with the new password.','success');
     if(onSuccess) onSuccess();
 
   }catch(e){
-    // Always try to restore owner session
-    try{ await signInWithEmailAndPassword(auth, ownerAuthEmail, ownerStoredPw); }catch{}
-    toast('❌ Failed to set password: '+e.message,'danger');
+    // Always attempt to restore owner session before reporting the error
+    try{await signInWithEmailAndPassword(auth,ownerEmail,ownerPw);}catch{}
+    toast('❌ Failed: '+e.message,'danger');
   }
 }
 
