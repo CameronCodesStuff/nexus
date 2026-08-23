@@ -3414,38 +3414,60 @@ async function doLogin(){
         cred=await _tryEmails(candidates,pw);
       }catch(allFailed){
         // All normal password attempts failed.
-        // Last resort: check if the owner set a recovery password in Firestore
-        // (_ownerSetPw or pendingPwReset). If so, try logging in with that,
-        // then immediately update Firebase Auth to match and clean up.
+        // Check if the owner stored a pending password reset (_pendingPwReset) or a
+        // known-working password (_ownerSetPw). Strategy:
+        //   1. If the user typed the pending new password → try signing in with the OLD
+        //      _ownerSetPw (Firebase Auth hasn't been updated yet), then updatePassword.
+        //   2. If the user typed something else → try signing in with _ownerSetPw directly
+        //      (covers the case where owner set it via adminSetPassword successfully).
+        //   3. Also try _pendingPwReset as the sign-in password (legacy path).
         let recoveryWorked=false;
         if(mappedUid){
           const uSnap2=uSnap||await getDoc(doc(db,'users',mappedUid)).catch(()=>null);
           const uData2=uSnap2?.data()||{};
-          const ownerPw=uData2.pendingPwReset||uData2._ownerSetPw||null;
-          if(ownerPw&&ownerPw!==pw){
-            const allEmails=[...new Set([
-              uData2._authEmail,uData2._oldAuthEmail,uData2._pendingAuthEmail,
-              toEmail(uData2.username||''),directEmail,
-            ].filter(Boolean))];
+          const storedPw=uData2._ownerSetPw||null;       // last known good Firebase Auth pw
+          const pendingPw=uData2._pendingPwReset||null;  // new pw waiting to be applied
+          const allEmails=[...new Set([
+            uData2._authEmail,uData2._oldAuthEmail,uData2._pendingAuthEmail,
+            toEmail(uData2.username||''),directEmail,
+          ].filter(Boolean))];
+
+          // Build a prioritised list of (signInPw, applyPw) pairs to attempt.
+          // signInPw = what we use for signInWithEmailAndPassword
+          // applyPw  = what we then set as the real Auth password (null = keep signInPw)
+          const attempts=[];
+          if(pendingPw){
+            // User typed the pending new pw → sign in with old pw, then apply pending
+            if(storedPw && pw===pendingPw)  attempts.push([storedPw, pendingPw]);
+            // Try signing in with the pending pw directly (in case Auth was already updated)
+            attempts.push([pendingPw, pw!==pendingPw ? pw : null]);
+          }
+          if(storedPw){
+            // Try the last known good pw, then lock in whatever the user typed
+            attempts.push([storedPw, pw||storedPw]);
+          }
+
+          for(const [signInPw, applyPw] of attempts){
+            if(!signInPw) continue;
             try{
-              cred=await _tryEmails(allEmails,ownerPw);
-              // It worked — apply the owner-set password to Firebase Auth for real
+              cred=await _tryEmails(allEmails,signInPw);
+              // Signed in — apply the target password to Firebase Auth
               err.textContent='Applying new password…';
+              const finalPw=applyPw||signInPw;
               try{
-                await updatePassword(cred.user,pw||ownerPw);
-                // If user typed a new password use that, else keep owner's
+                await updatePassword(cred.user,finalPw);
                 await updateDoc(doc(db,'users',cred.user.uid),{
-                  _ownerSetPw: pw||ownerPw,
-                  pendingPwReset: deleteField(),
+                  _ownerSetPw:finalPw,
+                  _pendingPwReset:deleteField(),
                 });
               }catch(applyErr){
-                // Non-fatal — they're logged in; clean up Firestore anyway
                 console.warn('[NEXUS login] Could not apply new password to Auth:',applyErr.message);
-                try{await updateDoc(doc(db,'users',cred.user.uid),{pendingPwReset:deleteField()});}catch{}
+                try{await updateDoc(doc(db,'users',cred.user.uid),{_pendingPwReset:deleteField()});}catch{}
               }
               recoveryWorked=true;
+              break;
             }catch{
-              // Owner password didn't work either — fall through to final error
+              // This attempt failed — try the next pair
             }
           }
         }
@@ -3467,7 +3489,7 @@ async function doLogin(){
     // We deliberately do NOT attempt to change the Firebase Auth email here.
     // The nexus.local email is a stable internal key — usernames live in Firestore only.
     try{
-      await updateDoc(doc(db,'users',cred.user.uid),{_ownerSetPw:pw,pendingPwReset:deleteField()});
+      await updateDoc(doc(db,'users',cred.user.uid),{_ownerSetPw:pw,pendingPwReset:deleteField(),_pendingPwReset:deleteField()});
     }catch{}
     // Show loading screen while app initialises
     const ls=document.getElementById('loading-screen');
@@ -10849,11 +10871,10 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
   const ownerPw=window._nexusSessionPw;
   if(!ownerEmail||!ownerPw){
     // Owner hasn't logged in this page session (e.g. reloaded after auto-login).
-    // Fall back to Firestore-only store — user can log in with new password via
-    // the recovery path in doLogin() IF they still know their old password.
-    // This is the best we can do without the Admin SDK.
+    // Write ONLY to _pendingPwReset — do NOT touch _ownerSetPw (the old working
+    // Firebase Auth password) so the recovery path can still sign in with it.
     try{
-      await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw,_ownerSetPw:newPw});
+      await updateDoc(doc(db,'users',uid),{_pendingPwReset:newPw});
       toast('⚠️ Stored for recovery (re-login as owner first to apply directly). @'+username+' will get the new password applied automatically on their next login attempt.','success');
       if(onSuccess) onSuccess();
     }catch(e){toast('Failed: '+e.message,'danger');}
@@ -10864,13 +10885,14 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
     // Read target user's Firestore doc to get their auth email + stored password
     const usnap=await getDoc(doc(db,'users',uid));
     const udata=usnap.data()||{};
-    const targetStoredPw=udata._ownerSetPw||udata.pendingPwReset;
+    const targetStoredPw=udata._ownerSetPw||null; // last known Firebase Auth password for this user
     const targetAuthEmail=udata._authEmail||toEmail(udata.username||username);
 
     if(!targetStoredPw){
-      // No stored password on record — can't sign in as them to change it.
-      // Store for the recovery path instead.
-      await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw,_ownerSetPw:newPw});
+      // No stored password on record — nothing to sign in with.
+      // Write to _pendingPwReset only. The user must already know their old password
+      // to log in; doLogin() will then apply _pendingPwReset via updatePassword.
+      await updateDoc(doc(db,'users',uid),{_pendingPwReset:newPw});
       toast('⚠️ @'+username+' has no password on record (never logged in via password). Stored for recovery — they\'ll get the new password applied on first login attempt.','success');
       if(onSuccess) onSuccess();
       return;
@@ -10897,9 +10919,10 @@ async function adminSetPassword(uid, username, newPw, onSuccess){
     }
 
     if(!targetCred){
-      // Can't sign in as them — restore owner and fall back to Firestore store
+      // Can't sign in as them — restore owner and store pending change only.
+      // _ownerSetPw is left untouched so the user can still log in with their old password.
       await signInWithEmailAndPassword(auth,ownerEmail,ownerPw).catch(()=>{});
-      await updateDoc(doc(db,'users',uid),{pendingPwReset:newPw,_ownerSetPw:newPw}).catch(()=>{});
+      await updateDoc(doc(db,'users',uid),{_pendingPwReset:newPw}).catch(()=>{});
       toast('⚠️ Could not sign in as @'+username+' (stored password may be outdated). Stored for recovery — they\'ll get the new password applied automatically on next login.','success');
       if(onSuccess) onSuccess();
       return;
