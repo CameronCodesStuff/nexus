@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+<title>NEXUS — Offline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #050a12;
+    --panel: #0b1220;
+    --border: #1a2d4a;
+    --blue: #2d9cdb;
+    --cyan: #00d4ff;
+    --red: #ff3b3b;
+    --pulse: #7c3aed;
+    --pulse-glow: #a855f7;
+    --text: #c8ddf0;
+    --muted: #4a6280;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── LANDING ── */
+  #landing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(45,156,219,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(45,156,219,.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridDrift 20s linear infinite;
+  }
+  @keyframes gridDrift { from { background-position: 0 0; } to { background-position: 40px 40px; } }
+
+  .scanline {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 3px,
+      rgba(0,212,255,.015) 3px, rgba(0,212,255,.015) 4px
+    );
+    pointer-events: none;
+  }
+
+  .landing-content {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 0 1.5rem;
+    max-width: 700px;
+    width: 100%;
+  }
+
+  .nexus-logo {
+    font-size: clamp(3.2rem, 12vw, 5.5rem);
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    text-shadow: 0 0 30px rgba(0,212,255,.6), 0 0 80px rgba(0,212,255,.2);
+    animation: logoPulse 3s ease-in-out infinite;
+  }
+  @keyframes logoPulse {
+    0%,100% { text-shadow: 0 0 30px rgba(0,212,255,.6), 0 0 80px rgba(0,212,255,.2); }
+    50% { text-shadow: 0 0 50px rgba(0,212,255,.9), 0 0 120px rgba(0,212,255,.4); }
+  }
+
+  .tagline {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.7rem, 2.5vw, 0.95rem);
+    letter-spacing: .25em;
+    color: var(--muted);
+    margin-top: .5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    background: rgba(255,59,59,.1);
+    border: 1px solid rgba(255,59,59,.4);
+    border-radius: 4px;
+    padding: .35rem .9rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.65rem, 2vw, 0.8rem);
+    color: var(--red);
+    letter-spacing: .1em;
+    margin-bottom: 2.5rem;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── apology banner (animated joke) ── */
+  .apology-banner {
+    background: rgba(255,59,59,0.08);
+    border: 1px solid rgba(255,59,59,0.25);
+    border-radius: 6px;
+    padding: 0.8rem 1.2rem;
+    margin-bottom: 2rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.7rem, 2.5vw, 0.95rem);
+    color: #ff8a8a;
+    letter-spacing: 0.05em;
+    animation: apologyGlow 2s ease-in-out infinite alternate;
+    backdrop-filter: blur(4px);
+    transform-origin: center;
+    transition: all 0.2s;
+    max-width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.5;
+  }
+  .apology-banner strong {
+    color: #ffb3b3;
+    font-weight: 700;
+  }
+  .apology-banner .emoji-big {
+    font-size: 1.2em;
+    display: inline-block;
+    animation: wave 1.8s ease-in-out infinite;
+  }
+  @keyframes apologyGlow {
+    0% { box-shadow: 0 0 8px rgba(255,59,59,0.1); border-color: rgba(255,59,59,0.2); }
+    100% { box-shadow: 0 0 25px rgba(255,59,59,0.25); border-color: rgba(255,59,59,0.5); }
+  }
+  @keyframes wave {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(10deg); }
+  }
+
+  .start-btn {
+    position: relative;
+    background: transparent;
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(0.95rem, 3vw, 1.2rem);
+    font-weight: 600;
+    letter-spacing: .25em;
+    padding: 0.9rem 2.2rem;
+    cursor: pointer;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    transition: all .2s;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .start-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--cyan);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform .25s ease;
+    z-index: -1;
+  }
+  .start-btn:hover { color: var(--bg); box-shadow: 0 0 30px rgba(0,212,255,.4); }
+  .start-btn:hover::before { transform: scaleX(1); }
+
+  /* ── SLIDESHOW ── */
+  #slideshow {
+    display: none;
+    height: 100vh;
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    opacity: 0;
+    transform: translateX(60px);
+    transition: opacity .5s ease, transform .5s ease;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+  }
+  .slide.exit {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  .slide-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.6rem, 1.8vw, 0.8rem);
+    letter-spacing: .2em;
+    color: var(--muted);
+    margin-bottom: 1.2rem;
+  }
+
+  .slide-img {
+    max-width: min(460px, 92vw);
+    width: auto;
+    height: auto;
+    max-height: 45vh;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 0 40px rgba(0,0,0,.6);
+    margin-bottom: 1.2rem;
+    object-fit: contain;
+  }
+
+  .slide-img.pc {
+    max-width: min(360px, 80vw);
+    border-color: var(--pulse);
+    box-shadow: 0 0 40px rgba(124,58,237,.3);
+  }
+
+  .slide-headline {
+    font-size: clamp(1.2rem, 4.5vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-align: center;
+    margin-bottom: 0.6rem;
+    line-height: 1.3;
+    padding: 0 0.5rem;
+  }
+
+  .slide-headline .hl-red { color: var(--red); }
+  .slide-headline .hl-cyan { color: var(--cyan); }
+  .slide-headline .hl-pulse { color: var(--pulse-glow); }
+
+  .slide-body {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.7rem, 2.2vw, 0.9rem);
+    color: var(--muted);
+    text-align: center;
+    max-width: 520px;
+    line-height: 1.7;
+    padding: 0 0.5rem;
+  }
+
+  .slide-body .accent { color: var(--text); }
+
+  /* slide 3 — PC highlight */
+  .pc-specs {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .spec-item {
+    background: rgba(124,58,237,.12);
+    border: 1px solid rgba(124,58,237,.3);
+    border-radius: 4px;
+    padding: .35rem .8rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(0.6rem, 1.6vw, 0.75rem);
+    color: var(--pulse-glow);
+    letter-spacing: .05em;
+  }
+
+  /* nav */
+  .slide-nav {
+    position: absolute;
+    bottom: 1.5rem; left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    z-index: 10;
+    flex-wrap: wrap;
+    padding: 0 1rem;
+  }
+
+  .nav-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(0.8rem, 2.2vw, 1rem);
+    font-weight: 600;
+    letter-spacing: .1em;
+    padding: 0.4rem 1.2rem;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .nav-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .nav-btn.primary { border-color: var(--cyan); color: var(--cyan); }
+  .nav-btn.primary:hover { background: var(--cyan); color: var(--bg); }
+  .nav-btn.pulse-btn { border-color: var(--pulse); color: var(--pulse-glow); }
+  .nav-btn.pulse-btn:hover { background: var(--pulse); color: #fff; box-shadow: 0 0 20px rgba(124,58,237,.5); }
+
+  .dots {
+    display: flex; gap: 0.5rem;
+  }
+  .dot-ind {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background .3s;
+  }
+  .dot-ind.on { background: var(--cyan); }
+
+  /* progress bar */
+  .progress-bar {
+    position: absolute;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    transition: width .4s ease;
+    z-index: 20;
+  }
+</style>
+</head>
+<body>
+
+<!-- LANDING -->
+<div id="landing">
+  <div class="grid-bg"></div>
+  <div class="scanline"></div>
+  <div class="landing-content">
+    <div class="nexus-logo">NEXUS</div>
+    <div class="tagline">ENCRYPTED · REALTIME · CONNECTED</div>
+
+    <!-- Apology banner with animated joke -->
+    <div class="apology-banner">
+      <span class="emoji-big">🙏</span> <strong>We goofed.</strong> Google pulled the plug (again).<br>
+      We're <strong>really</strong> sorry. But hey — we built something better. <span class="emoji-big">😎</span>
+    </div>
+
+    <div class="status-badge"><span class="dot"></span> SERVICE SUSPENDED</div>
+    <button class="start-btn" onclick="startSlideshow()">WHAT HAPPENED ›</button>
+  </div>
+</div>
+
+<!-- SLIDESHOW -->
+<div id="slideshow">
+  <div class="progress-bar" id="progressBar"></div>
+
+  <!-- Slide 1 — billing suspension email (bye1.jpg) -->
+  <div class="slide active" id="slide-0">
+    <div class="slide-num">01 / 03</div>
+    <img class="slide-img" src="bye1.jpg" alt="Google billing suspension email" loading="lazy">
+    <div class="slide-headline"><span class="hl-red">Suspended. Again.</span></div>
+    <div class="slide-body">
+      Google suspended our Firebase billing account —
+      <span class="accent">not for the first time.</span><br>
+      Nexus runs on Firebase infrastructure, which means when Google pulls the plug, everything goes dark instantly.
+    </div>
+  </div>
+
+  <!-- Slide 2 — login error (bye2.jpg) -->
+  <div class="slide" id="slide-1">
+    <div class="slide-num">02 / 03</div>
+    <img class="slide-img" src="bye2.jpg" alt="Nexus login error" loading="lazy">
+    <div class="slide-headline">The <span class="hl-cyan">real cost</span> of renting infrastructure</div>
+    <div class="slide-body">
+      Overpriced fees. Usage limits. Zero control.<br>
+      Every login, every connection, every bit of data —
+      <span class="accent">we were paying Google for the privilege of existing.</span><br><br>
+      No more.
+    </div>
+  </div>
+
+  <!-- Slide 3 — the PC (bye3.jpg) -->
+  <div class="slide" id="slide-2">
+    <div class="slide-num">03 / 03</div>
+    <img class="slide-img pc" src="bye3.jpg" alt="Pulse server PC" loading="lazy">
+    <div class="slide-headline">Meet <span class="hl-pulse">Pulse</span></div>
+    <div class="slide-body">
+      Our own hardware. Our own rules.<br>
+      <span class="accent">No monthly fees. No usage caps. No one to suspend us.</span><br><br>
+      Nexus is going offline for good — Pulse is launching on dedicated iron, and it's going to be faster.
+    </div>
+    <div class="pc-specs">
+      <span class="spec-item">⚡ FASTER SPEEDS</span>
+      <span class="spec-item">∞ NO USAGE LIMITS</span>
+      <span class="spec-item">🔒 SELF-HOSTED</span>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="slide-nav" id="navArea">
+    <div class="dots">
+      <div class="dot-ind on" id="d0"></div>
+      <div class="dot-ind" id="d1"></div>
+      <div class="dot-ind" id="d2"></div>
+    </div>
+    <button class="nav-btn primary" id="nextBtn" onclick="nextSlide()">NEXT ›</button>
+  </div>
+</div>
+
+<script>
+  let current = 0;
+  const total = 3;
+
+  function startSlideshow() {
+    document.getElementById('landing').style.display = 'none';
+    document.getElementById('slideshow').style.display = 'block';
+    updateProgress();
+  }
+
+  function nextSlide() {
+    if (current >= total - 1) {
+      // Last slide — go to countdown
+      window.location.href = 'https://cameroncodesstuff.github.io/countdown/';
+      return;
+    }
+    const cur = document.getElementById('slide-' + current);
+    cur.classList.remove('active');
+    cur.classList.add('exit');
+    setTimeout(() => cur.classList.remove('exit'), 500);
+
+    current++;
+    document.getElementById('slide-' + current).classList.add('active');
+    updateNav();
+    updateProgress();
+  }
+
+  function updateNav() {
+    for (let i = 0; i < total; i++) {
+      document.getElementById('d' + i).classList.toggle('on', i === current);
+    }
+    const btn = document.getElementById('nextBtn');
+    if (current === total - 1) {
+      btn.textContent = 'SEE THE COUNTDOWN ›';
+      btn.classList.add('pulse-btn');
+      btn.classList.remove('primary');
+    } else {
+      btn.textContent = 'NEXT ›';
+    }
+  }
+
+  function updateProgress() {
+    const pct = ((current + 1) / total) * 100;
+    document.getElementById('progressBar').style.width = pct + '%';
+  }
+
+  // Keyboard nav
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'Enter') {
+      if (document.getElementById('slideshow').style.display === 'block') nextSlide();
+      else if (e.key === 'Enter') startSlideshow();
+    }
+  });
+</script>
+</body>
+</html>
