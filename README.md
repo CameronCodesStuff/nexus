@@ -4,7 +4,7 @@
 
 ## 🌐 Site!
 
-[Nexus](https://cameroncodesstuff.github.io/nexus/) - The messaging site made for students!
+[Nexus](https://cameroncodesstuff.github.io/nexus/) - The messaging site made for students! (Soon being replaced by Pulse!)
 
 ---
 
